@@ -1,6 +1,5 @@
 import { tv, type VariantProps } from 'tailwind-variants';
 import { twMerge } from 'tailwind-merge';
-import { MapPin, BedDouble, Bath, CookingPot } from 'lucide-react';
 import type { ComponentProps } from 'react';
 import { Carousel } from '../ui/carousel';
 
@@ -9,7 +8,7 @@ const propertyCardVariants = tv({
   variants: {
     size: {
       sm: 'max-w-[300px]',
-      md: 'max-w-[360px]',
+      md: 'max-w-[380px]',
       lg: 'max-w-[430px]',
     },
   },
@@ -19,26 +18,28 @@ const propertyCardVariants = tv({
 export interface PropertyCardProps
   extends ComponentProps<'article'>, VariantProps<typeof propertyCardVariants> {
   images: [string, string, string, string];
-  title: string;
+  propertyType: string;
   price: number;
+  monthlyFees?: string;
+  area: number;
+  bedrooms: number;
+  parkingSpots: number;
   address: string;
-  sqft: number;
-  beds: number;
-  baths: number;
-  kitchens: number;
+  city: string;
 }
 
 export function PropertyCard({
   className,
   size,
   images,
-  title,
+  propertyType,
   price,
+  monthlyFees,
+  area,
+  bedrooms,
+  parkingSpots,
   address,
-  sqft,
-  beds,
-  baths,
-  kitchens,
+  city,
   ...props
 }: PropertyCardProps) {
   return (
@@ -47,11 +48,11 @@ export function PropertyCard({
       className={twMerge(propertyCardVariants({ size }), className)}
       {...props}
     >
-      <PropertyCardImage images={images} alt={title} />
+      <PropertyCardImage images={images} alt={propertyType} />
       <PropertyCardBody>
-        <PropertyCardHeader title={title} price={price} />
-        <PropertyCardLocation address={address} sqft={sqft} />
-        <PropertyCardFeatures beds={beds} baths={baths} kitchens={kitchens} />
+        <PropertyCardPricing propertyType={propertyType} price={price} monthlyFees={monthlyFees} />
+        <PropertyCardFeatures area={area} bedrooms={bedrooms} parkingSpots={parkingSpots} />
+        <PropertyCardLocation address={address} city={city} />
       </PropertyCardBody>
     </article>
   );
@@ -88,56 +89,59 @@ function PropertyCardBody({ className, ...props }: ComponentProps<'div'>) {
   return (
     <div
       data-slot="property-card-body"
-      className={twMerge('flex flex-col gap-3 p-4', className)}
+      className={twMerge('flex flex-col gap-2 p-4', className)}
       {...props}
     />
   );
 }
 
-function PropertyCardHeader({ title, price }: { title: string; price: number }) {
+function PropertyCardPricing({
+  propertyType,
+  price,
+  monthlyFees,
+}: {
+  propertyType: string;
+  price: number;
+  monthlyFees?: string;
+}) {
   return (
-    <div data-slot="property-card-header" className="flex items-center justify-between gap-2">
-      <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-      <span className="text-lg font-bold text-primary">${price.toLocaleString()}</span>
-    </div>
-  );
-}
-
-function PropertyCardLocation({ address, sqft }: { address: string; sqft: number }) {
-  return (
-    <div data-slot="property-card-location" className="flex items-center justify-between gap-2">
-      <div className="flex items-center gap-1.5 text-sm text-foreground-subtle">
-        <MapPin className="size-3.5 text-accent" />
-        <span>{address}</span>
-      </div>
-      <span className="text-sm text-foreground-subtle">({sqft.toLocaleString()}sqft)</span>
+    <div data-slot="property-card-pricing" className="flex flex-col gap-0.5">
+      <span className="text-sm text-foreground-subtle">{propertyType}</span>
+      <span className="text-xl font-bold text-foreground">R$ {price.toLocaleString('pt-BR')}</span>
+      {monthlyFees && <span className="text-sm text-foreground-subtle">{monthlyFees}</span>}
     </div>
   );
 }
 
 function PropertyCardFeatures({
-  beds,
-  baths,
-  kitchens,
+  area,
+  bedrooms,
+  parkingSpots,
 }: {
-  beds: number;
-  baths: number;
-  kitchens: number;
+  area: number;
+  bedrooms: number;
+  parkingSpots: number;
 }) {
   return (
-    <div data-slot="property-card-features" className="flex items-center gap-4 pt-1">
-      <div className="flex items-center gap-1.5 text-sm text-foreground-subtle">
-        <BedDouble className="size-3.5 text-accent" />
-        <span>{beds} Bed</span>
-      </div>
-      <div className="flex items-center gap-1.5 text-sm text-foreground-subtle">
-        <Bath className="size-3.5 text-accent" />
-        <span>{baths} Bath</span>
-      </div>
-      <div className="flex items-center gap-1.5 text-sm text-foreground-subtle">
-        <CookingPot className="size-3.5 text-accent" />
-        <span>{kitchens} Kitchen</span>
-      </div>
+    <div data-slot="property-card-features" className="flex items-center gap-1.5 text-sm">
+      <span className="font-semibold text-foreground">{area}m²</span>
+      <span className="text-foreground-subtle">·</span>
+      <span className="font-semibold text-foreground">{bedrooms} quartos</span>
+      <span className="text-foreground-subtle">·</span>
+      <span className="font-semibold text-foreground">{parkingSpots} vaga</span>
+    </div>
+  );
+}
+
+function PropertyCardLocation({ address, city }: { address: string; city: string }) {
+  return (
+    <div
+      data-slot="property-card-location"
+      className="flex items-center gap-1.5 text-sm text-foreground-subtle"
+    >
+      <span>{address}</span>
+      <span>·</span>
+      <span>{city}</span>
     </div>
   );
 }
