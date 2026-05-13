@@ -1,23 +1,41 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-surface: #f8f9fb;
+  /* Primary palette — navy */
+  --color-primary: #00072d;
+  --color-primary-light: #0a1a5c;
+  --color-primary-foreground: #ffffff;
+
+  /* Action — blue buttons, links, active chips */
+  --color-action: #1a7fd4;
+  --color-action-hover: #1567b0;
+  --color-secondary: #1a7fd4; /* alias kept for existing components */
+  --color-secondary-foreground: #ffffff;
+
+  /* Danger — destructive actions */
+  --color-danger: #d00000;
+  --color-danger-hover: #a80000;
+
+  /* Accent — positive confirmations, badges */
+  --color-accent: #3d6b62;
+  --color-accent-foreground: #ffffff;
+
+  /* Surfaces */
+  --color-surface: #f9f9f9;
   --color-surface-raised: #ffffff;
   --color-background: #f0f1f5;
 
-  --color-foreground: #1a1d2e;
-  --color-foreground-subtle: #6b7085;
-  --color-muted-foreground: #9a9eb0;
+  /* Text */
+  --color-foreground: #00072d;
+  --color-foreground-subtle: #4a5568;
+  --color-muted-foreground: #718096;
 
-  --color-primary: #6c63ff;
-  --color-primary-foreground: #ffffff;
+  /* Brand */
+  --color-whatsapp: #25d366;
 
-  --color-accent: #ef4444;
-  --color-accent-foreground: #ffffff;
-
-  --color-border: #e2e4ea;
-
-  --color-ring: #6c63ff;
+  /* Border / ring */
+  --color-border: #e2e8f0;
+  --color-ring: #1a7fd4;
 
   --font-sans: system-ui, -apple-system, sans-serif;
 }
