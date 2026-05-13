@@ -1,39 +1,16 @@
-import { tv, type VariantProps } from 'tailwind-variants';
 import { twMerge } from 'tailwind-merge';
 import type { ComponentProps, ReactNode } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
-const bottomNavVariants = tv({
-  base: 'fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around border-t border-border bg-surface-raised px-2 pb-4',
-  variants: {
-    size: {
-      sm: 'h-24',
-      md: 'h-26',
-      lg: 'h-28',
-    },
-  },
-  defaultVariants: { size: 'md' },
-});
-
-const bottomNavItemVariants = tv({
-  base: 'flex flex-col items-center justify-center rounded-full transition-colors active:scale-90 transition-transform',
-  variants: {
-    state: {
-      active: 'size-12 bg-primary/15 text-primary',
-      inactive: 'size-12 text-foreground-subtle',
-    },
-  },
-  defaultVariants: { state: 'inactive' },
-});
-
-export interface BottomNavProps
-  extends ComponentProps<'nav'>, VariantProps<typeof bottomNavVariants> {}
-
-export function BottomNav({ className, size, ...props }: BottomNavProps) {
+export function BottomNav({ className, ...props }: ComponentProps<'nav'>) {
   return (
     <nav
       data-slot="bottom-nav"
-      className={twMerge(bottomNavVariants({ size }), className)}
+      className={twMerge(
+        'fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-primary px-2 pb-[env(safe-area-inset-bottom,0px)]',
+        'h-16',
+        className,
+      )}
       {...props}
     />
   );
@@ -41,13 +18,14 @@ export function BottomNav({ className, size, ...props }: BottomNavProps) {
 
 export interface BottomNavItemProps extends Omit<ComponentProps<'button'>, 'children'> {
   icon: ReactNode;
+  label: string;
   to: string;
 }
 
-export function BottomNavItem({ className, icon, to, ...props }: BottomNavItemProps) {
+export function BottomNavItem({ className, icon, label, to, ...props }: BottomNavItemProps) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
-  const active = pathname === to;
+  const active = pathname === to || (to !== '/' && pathname.startsWith(to));
 
   return (
     <button
@@ -57,12 +35,14 @@ export function BottomNavItem({ className, icon, to, ...props }: BottomNavItemPr
       aria-current={active ? 'page' : undefined}
       onClick={() => navigate(to)}
       className={twMerge(
-        bottomNavItemVariants({ state: active ? 'active' : 'inactive' }),
+        'flex flex-col items-center justify-center gap-1 px-4 py-2 text-white/60 transition-colors active:scale-90',
+        active && 'text-white',
         className,
       )}
       {...props}
     >
       {icon}
+      <span className="text-[10px] font-medium leading-none">{label}</span>
     </button>
   );
 }
