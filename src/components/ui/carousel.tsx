@@ -9,6 +9,8 @@ export interface CarouselProps extends ComponentProps<'div'> {
   children: ReactNode[];
   gap?: number;
   showDots?: boolean;
+  initialIndex?: number;
+  onSlideChange?: (index: number) => void;
 }
 
 export function Carousel({
@@ -16,9 +18,11 @@ export function Carousel({
   className,
   gap = DEFAULT_GAP,
   showDots = true,
+  initialIndex = 0,
+  onSlideChange,
   ...props
 }: CarouselProps) {
-  const [current, setCurrent] = useState(0);
+  const [current, setCurrent] = useState(initialIndex);
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [slideWidth, setSlideWidth] = useState(0);
@@ -46,6 +50,7 @@ export function Carousel({
     setCurrent(clamped);
     setDragOffset(0);
     setIsDragging(false);
+    onSlideChange?.(clamped);
   }
 
   function handleTouchStart(e: React.TouchEvent) {
