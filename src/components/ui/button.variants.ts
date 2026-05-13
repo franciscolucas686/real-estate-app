@@ -8,10 +8,10 @@ export const buttonVariants = tv({
   ],
   variants: {
     variant: {
-      primary: 'bg-primary text-primary-foreground active:bg-primary/80',
-      secondary: 'bg-surface-raised text-foreground active:bg-surface-raised/80',
+      primary: 'bg-action text-white active:bg-action-hover',
+      secondary: 'bg-surface-raised text-foreground border border-border active:bg-border',
       ghost: 'bg-transparent text-muted-foreground active:text-foreground',
-      destructive: 'bg-accent text-accent-foreground active:bg-accent/80',
+      destructive: 'bg-danger text-white active:bg-danger-hover',
     },
     size: {
       sm: 'h-10 px-4 text-sm [&_svg]:size-3.5',
