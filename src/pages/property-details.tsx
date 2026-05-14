@@ -105,23 +105,25 @@ export function PropertyDetails() {
     : null;
 
   return (
-    <div data-slot="page-property-details" className="flex flex-col pb-24">
-      {/* Header */}
-      <PageContainer className="flex items-center gap-3 py-3">
+    <div
+      data-slot="page-property-details"
+      className="-mt-[env(safe-area-inset-top,0px)] flex flex-col pb-24"
+    >
+      {/* Full-width carousel with back button overlaid */}
+      <div className="relative mx-0 w-full">
+        <PropertyMediaCarousel
+          images={allImages}
+          onOpenGallery={() => setGalleryOpen(true)}
+          showDots={false}
+        />
         <button
           type="button"
           onClick={() => navigate(-1)}
           aria-label="Voltar"
-          className="flex size-10 items-center justify-center rounded-full text-foreground active:scale-90 transition-transform"
+          className="absolute left-3 top-[calc(env(safe-area-inset-top,16px)+12px)] z-10 flex size-10 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-transform active:scale-90"
         >
           <ChevronLeft size={24} />
         </button>
-        <span className="text-base font-semibold text-foreground">Detalhes do imóvel</span>
-      </PageContainer>
-
-      {/* Full-width carousel — breakout */}
-      <div className="mx-0 w-full">
-        <PropertyMediaCarousel images={allImages} onOpenGallery={() => setGalleryOpen(true)} />
       </div>
 
       {/* Main content */}
@@ -233,7 +235,7 @@ export function PropertyDetails() {
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
             className="fixed inset-0 z-50 flex flex-col bg-background overflow-y-auto"
           >
-            <div className="sticky top-0 z-10 flex items-center gap-3 bg-background px-4 py-3 border-b border-border">
+            <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)]">
               <button
                 type="button"
                 onClick={() => setGalleryOpen(false)}
@@ -275,7 +277,7 @@ export function PropertyDetails() {
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 400 }}
-            className="fixed inset-x-0 bottom-0 z-40 px-4 pb-[calc(env(safe-area-inset-bottom,0px)+12px)] pt-3 bg-surface-raised border-t border-border shadow-lg"
+            className="fixed inset-x-0 bottom-0 z-40 px-4 pb-[calc(env(safe-area-inset-bottom,16px)+12px)] pt-3 bg-surface-raised border-t border-border shadow-lg"
           >
             <a
               href={whatsUrl}
