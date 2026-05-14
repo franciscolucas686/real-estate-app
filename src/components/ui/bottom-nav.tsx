@@ -7,8 +7,7 @@ export function BottomNav({ className, ...props }: ComponentProps<'nav'>) {
     <nav
       data-slot="bottom-nav"
       className={twMerge(
-        'fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-primary px-2 pb-[env(safe-area-inset-bottom,0px)]',
-        'h-16',
+        'fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-primary px-2 pt-2 pb-[env(safe-area-inset-bottom,16px)]',
         className,
       )}
       {...props}
