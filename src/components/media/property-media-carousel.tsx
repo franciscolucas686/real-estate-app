@@ -6,18 +6,20 @@ interface PropertyMediaCarouselProps {
   images: PropertyImageDto[];
   className?: string;
   onOpenGallery?: () => void;
+  showDots?: boolean;
 }
 
 export function PropertyMediaCarousel({
   images,
   className,
   onOpenGallery,
+  showDots = true,
 }: PropertyMediaCarouselProps) {
   if (images.length === 0) {
     return (
       <div
         className={twMerge(
-          'flex aspect-16/10 w-full items-center justify-center bg-border',
+          'flex aspect-4/3 w-full items-center justify-center bg-border',
           className,
         )}
       >
@@ -28,7 +30,7 @@ export function PropertyMediaCarousel({
 
   return (
     <div data-slot="property-media-carousel" className={twMerge('relative w-full', className)}>
-      <Carousel>
+      <Carousel showDots={showDots}>
         {images.map((img, i) => (
           <img
             key={img.id}
@@ -38,7 +40,7 @@ export function PropertyMediaCarousel({
             draggable={false}
             onClick={onOpenGallery}
             className={twMerge(
-              'aspect-16/10 w-full object-cover',
+              'aspect-4/3.5 w-full object-cover',
               onOpenGallery && 'cursor-pointer',
             )}
           />
