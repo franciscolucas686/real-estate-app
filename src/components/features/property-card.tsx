@@ -58,7 +58,7 @@ export function PropertyCard({ property, className }: PropertyCardProps) {
       </div>
 
       {/* Body */}
-      <div className="flex flex-col gap-1.5 p-4">
+      <div className="flex flex-col gap-2 p-4">
         {/* Type */}
         <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
           {PropertyTypeLabel[property.type]}

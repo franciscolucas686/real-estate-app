@@ -13,7 +13,7 @@ import { twMerge } from 'tailwind-merge';
  *   `className="-mx-4"` or be placed outside the PageContainer.
  */
 
-export const LAYOUT_PADDING_X = 'px-4';
+export const LAYOUT_PADDING_X = 'px-6';
 
 export type PageContainerProps = ComponentProps<'div'>;
 

@@ -385,7 +385,7 @@ function PropertyFormInner({
       </PageContainer>
 
       {/* Footer */}
-      <PageContainer className="fixed inset-x-0 bottom-0 z-40 bg-background/90 pb-[calc(env(safe-area-inset-bottom,0px)+16px)] pt-3 backdrop-blur-sm">
+      <PageContainer className="fixed inset-x-0 bottom-0 z-40 bg-background/90 pb-[calc(env(safe-area-inset-bottom,16px)+16px)] pt-3 backdrop-blur-sm">
         <button
           type="button"
           onClick={handleNext}

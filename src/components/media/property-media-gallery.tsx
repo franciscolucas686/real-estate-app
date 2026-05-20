@@ -85,13 +85,10 @@ export function PropertyMediaGallery({
 
     if (leftImages.length > 0 || rightImages.length > 0) {
       blocks.push(
-        <div key={`grid-${blockNum}`} className="grid grid-cols-2 gap-0.5">
+        <div key={`grid-${blockNum}`} className="grid grid-cols-2 gap-2">
           {/* Left column */}
           <div
-            className={twMerge(
-              'flex flex-col gap-0.5',
-              leftImages.length === 1 && 'justify-center',
-            )}
+            className={twMerge('flex flex-col gap-2', leftImages.length === 1 && 'justify-center')}
           >
             {leftImages.map((img, li) => (
               <img
@@ -110,10 +107,7 @@ export function PropertyMediaGallery({
           </div>
           {/* Right column */}
           <div
-            className={twMerge(
-              'flex flex-col gap-0.5',
-              rightImages.length === 1 && 'justify-center',
-            )}
+            className={twMerge('flex flex-col gap-2', rightImages.length === 1 && 'justify-center')}
           >
             {rightImages.map((img, ri) => (
               <img
@@ -138,7 +132,7 @@ export function PropertyMediaGallery({
   }
 
   return (
-    <div data-slot="property-media-gallery" className={twMerge('flex flex-col gap-0.5', className)}>
+    <div data-slot="property-media-gallery" className={twMerge('flex flex-col gap-2', className)}>
       {blocks}
     </div>
   );
