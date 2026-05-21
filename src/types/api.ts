@@ -80,6 +80,7 @@ export interface PropertyImageDto {
   url: string;
   label: string | null;
   order: number;
+  roomName?: string;
 }
 
 export interface PropertyRoomDto {
