@@ -53,15 +53,15 @@ export function PropertyMediaViewer({
   return (
     <motion.div
       data-slot="property-media-viewer"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
+      initial={{ x: '100%' }}
+      animate={{ x: 0 }}
+      exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 40, stiffness: 400 }}
       className={twMerge('fixed inset-0 z-100 flex flex-col bg-black', className)}
       {...props}
     >
       {/* Header */}
-      <div className="relative z-10 flex items-center px-4 pt-[env(safe-area-inset-top,12px)] pb-2">
+      <div className="relative z-10 flex items-center px-4 pt-[calc(env(safe-area-inset-top,0px)+12px)] pb-2">
         <button
           type="button"
           onClick={onClose}
@@ -122,8 +122,8 @@ export function PropertyMediaViewer({
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between px-4 pb-[env(safe-area-inset-bottom,16px)] pt-2">
-        <span className="text-sm text-white/70 line-clamp-1">{img.label ?? ''}</span>
+      <div className="flex items-center justify-between px-4 pt-2 pb-[calc(env(safe-area-inset-bottom,0px)+16px)]">
+        <span className="text-sm text-white/70 line-clamp-1 ">{img.roomName ?? ''}</span>
         <span className="shrink-0 text-sm text-white/70">
           {current + 1}/{images.length}
         </span>
