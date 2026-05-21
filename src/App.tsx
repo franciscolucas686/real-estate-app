@@ -1,5 +1,6 @@
+import { useEffect, useRef, useState } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
-import { AnimatePresence, LayoutGroup } from 'motion/react';
+import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
 import { Home as HomeIcon, Search as SearchIcon, Phone, User } from 'lucide-react';
 import { BottomNav, BottomNavItem } from './components/ui/bottom-nav';
 import { PageWrapper } from './components/ui/page-wrapper';
@@ -22,6 +23,15 @@ import { GalleryManagement } from './pages/gallery-management';
 function AppRoutes() {
   const location = useLocation();
   const showBottomNav = useShowBottomNav();
+  const scrollPositions = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    const path = location.pathname;
+    window.scrollTo(0, scrollPositions.current[path] ?? 0);
+    return () => {
+      scrollPositions.current[path] = window.scrollY;
+    };
+  }, [location.pathname]);
 
   return (
     <LayoutGroup>
@@ -71,7 +81,12 @@ function AppRoutes() {
           <Route
             path="/properties/:id"
             element={
-              <PageWrapper>
+              <PageWrapper
+                initial={{ x: '100%' }}
+                animate={{ x: 0 }}
+                exit={{ x: '100%' }}
+                transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              >
                 <PropertyDetails />
               </PageWrapper>
             }
@@ -141,13 +156,46 @@ function AppRoutes() {
   );
 }
 
+const SESSION_KEY = '__splash_shown__';
+
 function App() {
+  const [splashVisible, setSplashVisible] = useState(() => {
+    if (sessionStorage.getItem(SESSION_KEY)) return false;
+    sessionStorage.setItem(SESSION_KEY, '1');
+    return true;
+  });
+
+  useEffect(() => {
+    if (!splashVisible) return;
+    const timer = setTimeout(() => setSplashVisible(false), 2000);
+    return () => clearTimeout(timer);
+  }, [splashVisible]);
+
   return (
-    <SplashScreen>
-      <FilterProvider>
-        <AppRoutes />
-      </FilterProvider>
-    </SplashScreen>
+    <AnimatePresence mode="wait">
+      {splashVisible ? (
+        <motion.div
+          key="splash-container"
+          initial={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.4, ease: 'easeOut' }}
+          className="fixed inset-0 z-9999 flex items-center justify-center bg-background"
+        >
+          <SplashScreen />
+        </motion.div>
+      ) : (
+        <motion.div
+          key="app-content"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.2 }}
+        >
+          <FilterProvider>
+            <AppRoutes />
+          </FilterProvider>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
