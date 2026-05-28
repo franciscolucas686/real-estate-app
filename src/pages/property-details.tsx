@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
 import { motion } from 'motion/react';
@@ -15,12 +15,13 @@ import {
   Wind,
   Sun,
   Waves,
-  Map,
+  Map as MapIcon,
   Triangle,
   Droplets,
   Trees,
   Fish,
   Workflow,
+  Ruler,
 } from 'lucide-react';
 import { FaWhatsapp } from 'react-icons/fa';
 import { useProperty } from '../hooks/use-property';
@@ -29,6 +30,7 @@ import { PropertyMediaGallery } from '../components/media/property-media-gallery
 import { PropertyMediaViewer } from '../components/media/property-media-viewer';
 import { PropertyDetailSkeleton } from '../components/ui/skeletons';
 import { PageContainer } from '../components/ui/page-container';
+import { PropertyMap } from '../components/property-map';
 import {
   formatPrice,
   formatArea,
@@ -38,7 +40,7 @@ import {
   BusinessTypeLabel,
   SaleTypeLabel,
   SunPositionLabel,
-  ZoningLabel,
+  formatZoning,
   TopographyLabel,
   WaterSourceLabel,
 } from '../utils/format';
@@ -47,6 +49,7 @@ import {
   BusinessType,
   type PropertyDetailDto,
   type PropertyImageDto,
+  type PropertyLocationDto,
   type HouseDetailsDto,
   type ApartmentDetailsDto,
   type LandDetailsDto,
@@ -63,9 +66,10 @@ function flattenGallery(property: PropertyDetailDto): PropertyImageDto[] {
   return [...roomImages, ...unassigned].sort((a, b) => a.order - b.order);
 }
 
-function getDisplayArea(property: PropertyDetailDto): number | null {
-  if (property.type === PropertyType.APARTMENT) return property.builtArea;
-  return property.totalArea;
+function hasCoords(
+  location: PropertyLocationDto | null,
+): location is PropertyLocationDto & { latitude: number; longitude: number } {
+  return location !== null && location.latitude !== null && location.longitude !== null;
 }
 
 export function PropertyDetails() {
@@ -74,10 +78,20 @@ export function PropertyDetails() {
   const { data: property, isLoading } = useProperty(id!);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const [mapFullscreen, setMapFullscreen] = useState(false);
   const [stickyCtaVisible, setStickyCtaVisible] = useState(false);
+  const [stickyHeaderVisible, setStickyHeaderVisible] = useState(false);
   const ctaRef = useRef<HTMLDivElement>(null);
 
   const allImages = property ? flattenGallery(property) : [];
+
+  // Memoize map coordinates to prevent re-renders during gestures
+  const mapCenter = useMemo<[number, number] | undefined>(() => {
+    if (property && hasCoords(property.location)) {
+      return [property.location.latitude, property.location.longitude];
+    }
+    return undefined;
+  }, [property]);
 
   useEffect(() => {
     if (!property?.whatsappContact) return;
@@ -90,6 +104,12 @@ export function PropertyDetails() {
     return () => obs.disconnect();
   }, [property?.whatsappContact]);
 
+  useEffect(() => {
+    const handleScroll = () => setStickyHeaderVisible(window.scrollY > 10);
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   if (isLoading) return <PropertyDetailSkeleton />;
 
   if (!property) {
@@ -100,7 +120,6 @@ export function PropertyDetails() {
     );
   }
 
-  const displayArea = getDisplayArea(property);
   const whatsUrl = property.whatsappContact
     ? buildWhatsAppUrl(property.whatsappContact, property.code)
     : null;
@@ -108,7 +127,7 @@ export function PropertyDetails() {
   return (
     <div
       data-slot="page-property-details"
-      className="-mt-[env(safe-area-inset-top,0px)] flex flex-col pb-24"
+      className="-mt-[env(safe-area-inset-top,0px)] flex flex-col"
     >
       {/* Full-width carousel with back button overlaid */}
       <div className="relative mx-0 w-full">
@@ -160,8 +179,8 @@ export function PropertyDetails() {
             {(() => {
               const items = [];
 
-              if (displayArea) {
-                items.push(<span key="area">{formatArea(displayArea)}</span>);
+              if (property.totalArea) {
+                items.push(<span key="area">{formatArea(property.totalArea)}</span>);
               }
               if (property.bedrooms != null) {
                 items.push(
@@ -214,7 +233,7 @@ export function PropertyDetails() {
 
         {/* Values and Deals wrapper */}
         <div className="flex flex-col gap-5">
-          <h2 className="text-base font-medium text-foreground">Valores e Negócios</h2>
+          <h2 className="text-base font-semibold text-foreground">Valores e Negócios</h2>
           <div className="flex flex-wrap gap-2">
             <Badge color={property.businessType === BusinessType.SALE ? 'action' : 'accent'}>
               {BusinessTypeLabel[property.businessType]}
@@ -256,8 +275,38 @@ export function PropertyDetails() {
 
         {/* Property code */}
         <div>
-          <span className="text-xs text-muted-foreground">Cód. Prop: {property.code}</span>
+          <Badge color="border">Cód. Prop: {property.code}</Badge>
         </div>
+
+        {/* Map section */}
+        {hasCoords(property.location) && (
+          <>
+            <hr className="border-bs-gray-300 my-6" />
+
+            <div className="flex flex-col gap-3">
+              <h2 className="text-base font-semibold text-foreground">Localização</h2>
+
+              {/* Inline map - read-only */}
+              {mapCenter && (
+                <div
+                  className={twMerge(
+                    'relative isolate h-96 w-full rounded-lg overflow-hidden cursor-pointer',
+                    mapFullscreen && 'invisible',
+                  )}
+                  onClick={() => setMapFullscreen(true)}
+                >
+                  <PropertyMap center={mapCenter} interactive={false} className="h-full w-full" />
+                </div>
+              )}
+
+              {/* Address text */}
+              <p className="text-sm text-foreground-subtle">
+                {property.location.neighborhood}, {property.location.city} —{' '}
+                {property.location.state}
+              </p>
+            </div>
+          </>
+        )}
       </PageContainer>
 
       {/* Gallery overlay */}
@@ -304,9 +353,56 @@ export function PropertyDetails() {
         )}
       </AnimatePresence>
 
+      {/* Fullscreen map overlay */}
+      <AnimatePresence>
+        {mapFullscreen && hasCoords(property.location) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 flex flex-col bg-background"
+            style={{
+              zIndex: 1000,
+              touchAction: 'none',
+              WebkitOverflowScrolling: 'touch',
+              isolation: 'isolate',
+            }}
+          >
+            {/* Header - fixed height */}
+            <div className="flex-none flex items-center gap-3 border-b border-border bg-background px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)] relative z-20">
+              <button
+                type="button"
+                onClick={() => setMapFullscreen(false)}
+                aria-label="Voltar"
+                className="flex size-10 items-center justify-center rounded-full text-foreground active:scale-90 transition-transform"
+              >
+                <ChevronLeft size={24} />
+              </button>
+              <span className="text-base font-semibold text-foreground">Localização</span>
+            </div>
+
+            {/* Map container - fills remaining space */}
+            <div className="flex-1 relative overflow-hidden">
+              {mapCenter && (
+                <PropertyMap center={mapCenter} interactive={true} className="h-full w-full" />
+              )}
+            </div>
+
+            {/* Footer - fixed height */}
+            <div className="flex-none px-4 py-3 border-t border-border bg-background relative z-20">
+              <p className="text-sm text-foreground-subtle">
+                {property.location.neighborhood}, {property.location.city} —{' '}
+                {property.location.state}
+              </p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* WhatsApp CTA 2 — sticky, appears when CTA1 leaves viewport */}
       <AnimatePresence>
-        {whatsUrl && stickyCtaVisible && (
+        {whatsUrl && stickyCtaVisible && !mapFullscreen && (
           <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
@@ -323,6 +419,28 @@ export function PropertyDetails() {
               <FaWhatsapp size={22} />
               Conversar conosco agora
             </a>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Sticky back button header — appears when carousel scrolls out of view */}
+      <AnimatePresence>
+        {stickyHeaderVisible && !mapFullscreen && (
+          <motion.div
+            initial={{ y: '-100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '-100%' }}
+            transition={{ type: 'spring', damping: 40, stiffness: 400 }}
+            className="fixed inset-x-0 top-0 z-40 flex items-center gap-3 border-b border-border bg-surface-raised px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)] shadow-sm"
+          >
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              aria-label="Voltar"
+              className="flex size-10 items-center justify-center rounded-full text-foreground transition-transform active:scale-90"
+            >
+              <ChevronLeft size={24} />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
@@ -373,13 +491,20 @@ function SpecItem({
 
 function PropertySpecGrid({ property }: { property: PropertyDetailDto }) {
   const items: { icon: React.ReactNode; label: string; sublabel?: string }[] = [];
-  const displayArea = getDisplayArea(property);
 
-  // Basic specs — intentionally duplicated from quick specs row for emphasis
-  if (displayArea) {
+  // Area items — shown separately so both are visible when available
+  if (property.builtArea != null) {
+    items.push({
+      icon: <Ruler size={20} />,
+      label: formatArea(property.builtArea),
+      sublabel: 'Área construída',
+    });
+  }
+  if (property.totalArea != null) {
     items.push({
       icon: <Maximize size={20} />,
-      label: formatArea(displayArea),
+      label: formatArea(property.totalArea),
+      sublabel: 'Área total',
     });
   }
 
@@ -439,7 +564,7 @@ function PropertySpecGrid({ property }: { property: PropertyDetailDto }) {
 
   if (property.type === PropertyType.LAND && d) {
     const l = d as LandDetailsDto;
-    items.push({ icon: <Map size={20} />, label: ZoningLabel[l.zoning] });
+    items.push({ icon: <MapIcon size={20} />, label: formatZoning(l.zoning) });
     items.push({ icon: <Triangle size={20} />, label: TopographyLabel[l.topography] });
   }
 
