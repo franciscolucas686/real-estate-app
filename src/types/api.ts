@@ -95,6 +95,14 @@ export interface PropertySaleTypeDto {
   type: SaleType;
 }
 
+export interface PropertyLocationDto {
+  latitude: number | null;
+  longitude: number | null;
+  neighborhood: string;
+  city: string;
+  state: string;
+}
+
 export interface GalleryDto {
   unassigned?: PropertyImageDto[];
   rooms: PropertyRoomDto[];
@@ -164,6 +172,7 @@ export interface PropertyDetailDto {
   gallery: GalleryDto;
   details: PropertyDetailsDto;
   whatsappContact: string | null;
+  location: PropertyLocationDto | null;
   userId: string;
   createdAt: string;
   updatedAt: string;
