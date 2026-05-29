@@ -126,7 +126,7 @@ export function RangeFilter({
             aria-valuenow={minVal}
             className={twMerge(
               'absolute top-1/2 flex size-11 -translate-x-1/2 -translate-y-1/2 cursor-grab items-center justify-center rounded-full bg-[#e5e7eb] shadow-md active:cursor-grabbing',
-              dragging === 'min' ? 'z-30' : 'z-10',
+              dragging === 'min' ? 'z-30' : 'z-9',
             )}
             style={{ left: `${minPercent}%` }}
             onPointerDown={handlePointerDown('min')}
@@ -153,7 +153,7 @@ export function RangeFilter({
             aria-valuenow={maxVal}
             className={twMerge(
               'absolute top-1/2 flex size-11 -translate-x-1/2 -translate-y-1/2 cursor-grab items-center justify-center rounded-full bg-[#e5e7eb] shadow-md active:cursor-grabbing',
-              dragging === 'max' ? 'z-30' : 'z-20',
+              dragging === 'max' ? 'z-30' : 'z-9',
             )}
             style={{ left: `${maxPercent}%` }}
             onPointerDown={handlePointerDown('max')}
