@@ -95,7 +95,7 @@ export function Dashboard() {
   return (
     <div data-slot="page-dashboard" className="flex min-h-dvh flex-col pb-24">
       {/* Header */}
-      <PageContainer className="flex items-center justify-between py-4">
+      <PageContainer withSafeAreaTop className="flex items-center justify-between py-4">
         <div>
           <p className="text-sm text-foreground-subtle">Painel</p>
           <h1 className="text-xl font-bold text-foreground">

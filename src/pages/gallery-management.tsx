@@ -115,7 +115,7 @@ export function GalleryManagement() {
   return (
     <div data-slot="page-gallery-management" className="flex min-h-dvh flex-col pb-24">
       {/* Header */}
-      <PageContainer className="flex items-center gap-3 py-4">
+      <PageContainer withSafeAreaTop className="flex items-center gap-3 py-4">
         <button
           type="button"
           onClick={() => navigate(-1)}
