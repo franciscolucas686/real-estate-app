@@ -125,10 +125,7 @@ export function PropertyDetails() {
     : null;
 
   return (
-    <div
-      data-slot="page-property-details"
-      className="-mt-[env(safe-area-inset-top,0px)] flex flex-col"
-    >
+    <div data-slot="page-property-details" className=" flex flex-col">
       {/* Full-width carousel with back button overlaid */}
       <div className="relative mx-0 w-full">
         <PropertyMediaCarousel
