@@ -61,7 +61,7 @@ export function Filters() {
   return (
     <div data-slot="page-filters" className="flex h-dvh flex-col bg-background">
       {/* Header - FORA do scroll context */}
-      <PageContainer className="flex shrink-0 items-center justify-between gap-3 bg-background pb-2 pt-4">
+      <PageContainer withSafeAreaTop className="flex shrink-0 items-center justify-between gap-3 bg-background pb-2 pt-4">
         <button
           type="button"
           onClick={() => navigate(-1)}

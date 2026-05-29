@@ -8,8 +8,8 @@ export function Contact() {
   const whatsUrl = `https://wa.me/55${AGENCY_WHATSAPP.replace(/\D/g, '')}?text=${encodeURIComponent('Olá! Tenho interesse em um imóvel.')}`;
 
   return (
-    <div data-slot="page-contact" className="flex flex-col pb-24">
-      <PageContainer className="pt-6 pb-4">
+    <div data-slot="page-contact" className="flex max-h-dvh flex-col overflow-hidden pb-24">
+      <PageContainer withSafeAreaTop className="pt-6 pb-4">
         <h1 className="text-2xl font-bold text-foreground">Contato</h1>
         <p className="mt-1 text-sm text-foreground-subtle">
           Entre em contato conosco. Estamos prontos para ajudar.

@@ -15,7 +15,10 @@ export function Search() {
   return (
     <div data-slot="page-search" className="flex h-dvh flex-col bg-background">
       {/* Header - FORA do scroll context */}
-      <PageContainer className="flex shrink-0 items-center gap-3 py-3 bg-background">
+      <PageContainer
+        withSafeAreaTop
+        className="flex shrink-0 items-center gap-3 py-3 bg-background"
+      >
         <button
           type="button"
           onClick={() => navigate('/search/filters')}
