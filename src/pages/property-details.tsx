@@ -304,6 +304,9 @@ export function PropertyDetails() {
                 {property.location.neighborhood}, {property.location.city} —{' '}
                 {property.location.state}
               </p>
+
+              {/* Fixed padding to prevent content from being covered by sticky CTA */}
+              <div className="h-24" aria-hidden="true" />
             </div>
           </>
         )}
@@ -400,9 +403,9 @@ export function PropertyDetails() {
         )}
       </AnimatePresence>
 
-      {/* WhatsApp CTA 2 — sticky, appears when CTA1 leaves viewport */}
+      {/* WhatsApp CTA 2 — sticky, appears when CTA1 is covered by sticky header */}
       <AnimatePresence>
-        {whatsUrl && stickyCtaVisible && !mapFullscreen && (
+        {whatsUrl && stickyCtaVisible && stickyHeaderVisible && !mapFullscreen && (
           <motion.div
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
