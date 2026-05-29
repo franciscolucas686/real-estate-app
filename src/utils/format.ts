@@ -51,6 +51,10 @@ export const WaterSourceLabel: Record<WaterSource, string> = {
   MAINS: 'Rede pública',
 };
 
+export function formatZoning(zoning: Zoning): string {
+  return `Área ${ZoningLabel[zoning]}`;
+}
+
 export function formatPrice(value: string | null): string {
   if (!value) return '—';
   return new Intl.NumberFormat('pt-BR', {

@@ -7,7 +7,7 @@ export function BottomNav({ className, ...props }: ComponentProps<'nav'>) {
     <nav
       data-slot="bottom-nav"
       className={twMerge(
-        'fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-primary px-2 pt-2 pb-[env(safe-area-inset-bottom,16px)]',
+        'fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around bg-primary px-2 pt-2 pb-[calc(env(safe-area-inset-bottom,0px)+16px)]',
         className,
       )}
       {...props}
@@ -34,7 +34,7 @@ export function BottomNavItem({ className, icon, label, to, ...props }: BottomNa
       aria-current={active ? 'page' : undefined}
       onClick={() => navigate(to)}
       className={twMerge(
-        'flex flex-col items-center justify-center gap-1 px-4 py-2 text-white/60 transition-colors active:scale-90',
+        'flex flex-col items-center justify-center gap-1 px-4 py-2 text-white/60 transition-all duration-300 ease-out active:scale-90',
         active && 'text-white',
         className,
       )}

@@ -44,7 +44,7 @@ export function Carousel({
         </div>
       </div>
       {showDots && totalSlides > 1 && (
-        <div data-slot="carousel-dots" className="flex justify-center gap-3 py-2">
+        <div data-slot="carousel-dots" className="flex justify-center gap-3 pt-4">
           {children.map((_, i) => (
             <button
               key={i}

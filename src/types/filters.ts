@@ -2,7 +2,7 @@ import { BusinessType, type FilterPropertyDto, PropertyType, type SaleType } fro
 
 export interface PropertyFilters {
   businessType?: BusinessType;
-  type?: PropertyType;
+  types: PropertyType[];
   saleTypes: SaleType[];
   city: string;
   state: string;
@@ -24,7 +24,7 @@ export interface PropertyFilters {
 
 export const DEFAULT_FILTERS: PropertyFilters = {
   businessType: undefined,
-  type: undefined,
+  types: [],
   saleTypes: [],
   city: '',
   state: '',
@@ -47,7 +47,7 @@ export const DEFAULT_FILTERS: PropertyFilters = {
 export function filtersToApiParams(filters: PropertyFilters, take = 20): FilterPropertyDto {
   return {
     ...(filters.businessType && { businessType: filters.businessType }),
-    ...(filters.type && { type: filters.type }),
+    ...(filters.types.length > 0 && { types: filters.types }),
     ...(filters.saleTypes.length > 0 && { saleTypes: filters.saleTypes }),
     ...(filters.city && { city: filters.city }),
     ...(filters.state && { state: filters.state }),
@@ -72,7 +72,7 @@ export function filtersToApiParams(filters: PropertyFilters, take = 20): FilterP
 export function countActiveFilters(filters: PropertyFilters): number {
   let count = 0;
   if (filters.businessType) count++;
-  if (filters.type) count++;
+  if (filters.types.length > 0) count++;
   if (filters.saleTypes.length > 0) count++;
   if (filters.city) count++;
   if (filters.state) count++;

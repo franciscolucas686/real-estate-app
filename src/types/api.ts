@@ -80,6 +80,7 @@ export interface PropertyImageDto {
   url: string;
   label: string | null;
   order: number;
+  roomName?: string;
 }
 
 export interface PropertyRoomDto {
@@ -92,6 +93,14 @@ export interface PropertyRoomDto {
 export interface PropertySaleTypeDto {
   id: string;
   type: SaleType;
+}
+
+export interface PropertyLocationDto {
+  latitude: number | null;
+  longitude: number | null;
+  neighborhood: string;
+  city: string;
+  state: string;
 }
 
 export interface GalleryDto {
@@ -163,6 +172,7 @@ export interface PropertyDetailDto {
   gallery: GalleryDto;
   details: PropertyDetailsDto;
   whatsappContact: string | null;
+  location: PropertyLocationDto | null;
   userId: string;
   createdAt: string;
   updatedAt: string;
@@ -188,7 +198,7 @@ export interface UserProfile {
 }
 
 export interface FilterPropertyDto {
-  type?: PropertyType;
+  types?: PropertyType[];
   businessType?: BusinessType;
   saleTypes?: SaleType[];
   city?: string;
