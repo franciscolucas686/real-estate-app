@@ -21,7 +21,7 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-center bg-background px-4 relative">
+    <div className="relative flex min-h-dvh max-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-4">
       <button
         type="button"
         onClick={() => navigate(-1)}

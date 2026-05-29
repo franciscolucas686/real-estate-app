@@ -66,7 +66,7 @@ function AppRoutes() {
           <Route
             path="/contact"
             element={
-              <PageWrapper>
+              <PageWrapper noScroll>
                 <Contact />
               </PageWrapper>
             }
@@ -95,7 +95,7 @@ function AppRoutes() {
           <Route
             path="/login"
             element={
-              <PageWrapper>
+              <PageWrapper noScroll>
                 <Login />
               </PageWrapper>
             }
