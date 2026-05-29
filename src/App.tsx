@@ -11,7 +11,7 @@ import { useShowBottomNav } from './config/navigation';
 
 import { Home } from './pages/home';
 import { Search } from './pages/search';
-import { Contact } from './pages/favorites';
+import { Contact } from './pages/contact';
 import { Profile } from './pages/profile';
 import { Filters } from './pages/filters';
 import { PropertyDetails } from './pages/property-details';
@@ -27,9 +27,10 @@ function AppRoutes() {
 
   useEffect(() => {
     const path = location.pathname;
-    window.scrollTo(0, scrollPositions.current[path] ?? 0);
+    const savedPositions = scrollPositions.current;
+    window.scrollTo(0, savedPositions[path] ?? 0);
     return () => {
-      scrollPositions.current[path] = window.scrollY;
+      savedPositions[path] = window.scrollY;
     };
   }, [location.pathname]);
 
