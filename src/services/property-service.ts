@@ -15,7 +15,8 @@ function buildQuery(params: FilterPropertyDto = {}) {
     if (value === undefined || value === null || value === '') return;
     if (Array.isArray(value)) {
       if (value.length === 0) return;
-      query.set(key, value.join(','));
+      // Use append() to create repeated params: types=HOUSE&types=APARTMENT
+      value.forEach((item) => query.append(key, String(item)));
       return;
     }
     query.set(key, String(value));

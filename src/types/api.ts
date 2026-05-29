@@ -198,7 +198,7 @@ export interface UserProfile {
 }
 
 export interface FilterPropertyDto {
-  type?: PropertyType;
+  types?: PropertyType[];
   businessType?: BusinessType;
   saleTypes?: SaleType[];
   city?: string;
