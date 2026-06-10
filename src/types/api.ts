@@ -52,6 +52,14 @@ export interface PreviewImageDto {
   url: string;
 }
 
+export const PropertyStatus = {
+  DRAFT: 'DRAFT',
+  PENDING: 'PENDING',
+  ACTIVE: 'ACTIVE',
+  INACTIVE: 'INACTIVE',
+} as const;
+export type PropertyStatus = (typeof PropertyStatus)[keyof typeof PropertyStatus];
+
 export interface PropertyCardDto {
   id: string;
   code: string;
@@ -66,6 +74,7 @@ export interface PropertyCardDto {
   bathrooms: number | null;
   parkingSpaces: number | null;
   previewImages: PreviewImageDto[];
+  status: PropertyStatus;
 }
 
 export interface PropertyListResponseDto {
@@ -219,6 +228,8 @@ export interface FilterPropertyDto {
   sort?: 'newest' | 'oldest';
   skip?: number;
   take?: number;
+  code?: string;
+  status?: PropertyStatus;
 }
 
 export interface CreatePropertyDto {
@@ -228,9 +239,9 @@ export interface CreatePropertyDto {
   price: string;
   rentPrice?: string;
   condoFee?: string;
+  neighborhood: string;
   city: string;
   state: string;
-  neighborhood: string;
   description: string;
   totalArea?: number;
   builtArea?: number;
@@ -239,11 +250,17 @@ export interface CreatePropertyDto {
   suites?: number;
   parkingSpaces?: number;
   whatsappContact?: string;
+  latitude?: number;
+  longitude?: number;
   house?: HouseDetailsDto;
   apartment?: ApartmentDetailsDto;
   land?: LandDetailsDto;
   smallFarm?: SmallFarmDetailsDto;
   countryHouse?: CountryHouseDetailsDto;
+}
+
+export interface UpdatePropertyStatusDto {
+  status: PropertyStatus;
 }
 
 export interface CreateRoomDto {
@@ -262,4 +279,21 @@ export interface ApiErrorResponse {
   statusCode: number;
   message: string | string[];
   error: string;
+}
+
+export interface WhatsappNumber {
+  id: string;
+  number: string;
+  label: string | null;
+  isActive: boolean;
+  order: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateWhatsappNumberDto {
+  number: string;
+  label?: string;
+  isActive?: boolean;
+  order?: number;
 }
