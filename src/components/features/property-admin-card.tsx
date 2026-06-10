@@ -1,112 +1,174 @@
+import { useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Trash2, Images } from 'lucide-react';
+import { Pencil, Images, MoreVertical, PowerOff, Trash2 } from 'lucide-react';
 import type { PropertyCardDto } from '../../types/api';
 import { BusinessType } from '../../types/api';
-import {
-  formatMainPrice,
-  PropertyTypeLabel,
-  BusinessTypeLabel,
-  isPending,
-} from '../../utils/format';
+import { formatMainPrice, PropertyTypeLabel, BusinessTypeLabel } from '../../utils/format';
+import { StatusBadge } from '../ui/status-badge';
+import { BottomSheet } from '../ui/bottom-sheet';
 
 interface PropertyAdminCardProps {
   property: PropertyCardDto;
   onDelete: (id: string) => void;
+  onDeactivate: (id: string) => void;
   className?: string;
 }
 
-export function PropertyAdminCard({ property, onDelete, className }: PropertyAdminCardProps) {
+export function PropertyAdminCard({
+  property,
+  onDelete,
+  onDeactivate,
+  className,
+}: PropertyAdminCardProps) {
   const navigate = useNavigate();
-  const pending = isPending(property);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const firstImage = property.previewImages[0];
 
+  function openMore() {
+    setConfirmDelete(false);
+    setMoreOpen(true);
+  }
+
+  function closeMore() {
+    setMoreOpen(false);
+    setConfirmDelete(false);
+  }
+
   return (
-    <article
-      data-slot="property-admin-card"
-      className={twMerge(
-        'overflow-hidden rounded-2xl border border-border bg-surface-raised shadow-sm',
-        className,
-      )}
-    >
-      {/* Thumbnail */}
-      <div
-        className="relative h-36 cursor-pointer"
-        onClick={() => navigate(`/properties/${property.id}`)}
+    <>
+      <article
+        data-slot="property-admin-card"
+        className={twMerge(
+          'overflow-hidden rounded-2xl border border-border bg-surface-raised shadow-sm',
+          className,
+        )}
       >
-        {firstImage ? (
-          <img
-            src={firstImage.url}
-            alt={PropertyTypeLabel[property.type]}
-            loading="lazy"
-            className="h-full w-full object-cover"
-          />
+        {/* Thumbnail */}
+        <div
+          className="relative h-36 cursor-pointer"
+          onClick={() => navigate(`/properties/${property.id}`)}
+        >
+          {firstImage ? (
+            <img
+              src={firstImage.url}
+              alt={PropertyTypeLabel[property.type]}
+              loading="lazy"
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-border">
+              <span className="text-xs text-muted-foreground">Sem fotos</span>
+            </div>
+          )}
+
+          <StatusBadge status={property.status} className="absolute left-2 top-2" />
+        </div>
+
+        {/* Info */}
+        <div className="flex flex-col gap-1 p-3">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs font-mono font-medium text-muted-foreground">
+              Cód: {property.code}
+            </span>
+            <span
+              className={twMerge(
+                'rounded-full px-2 py-0.5 text-[10px] font-semibold text-white',
+                property.businessType === BusinessType.SALE ? 'bg-action' : 'bg-accent',
+              )}
+            >
+              {BusinessTypeLabel[property.businessType]}
+            </span>
+          </div>
+
+          <span className="text-sm font-medium text-foreground line-clamp-1">
+            {PropertyTypeLabel[property.type]} · {property.neighborhood}
+          </span>
+
+          <span className="text-base font-bold text-foreground">
+            {formatMainPrice(property.businessType, property.price, property.rentPrice)}
+          </span>
+
+          {/* Actions */}
+          <div className="mt-1 flex justify-around border-t border-border pt-2">
+            <button
+              type="button"
+              onClick={() => navigate(`/properties/${property.id}/edit`)}
+              aria-label="Editar imóvel"
+              className="flex size-9 items-center justify-center rounded-full bg-surface text-foreground-subtle transition-colors active:bg-border"
+            >
+              <Pencil size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate(`/properties/${property.id}/gallery`)}
+              aria-label="Gerenciar galeria"
+              className="flex size-9 items-center justify-center rounded-full bg-surface text-foreground-subtle transition-colors active:bg-border"
+            >
+              <Images size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={openMore}
+              aria-label="Mais opções"
+              className="flex size-9 items-center justify-center rounded-full bg-surface text-foreground-subtle transition-colors active:bg-border"
+            >
+              <MoreVertical size={16} />
+            </button>
+          </div>
+        </div>
+      </article>
+
+      {/* More actions bottom sheet */}
+      <BottomSheet open={moreOpen} onClose={closeMore}>
+        {!confirmDelete ? (
+          <div className="flex flex-col px-6 pb-4">
+            <button
+              type="button"
+              onClick={() => {
+                onDeactivate(property.id);
+                closeMore();
+              }}
+              className="flex h-14 items-center gap-3 text-sm text-foreground"
+            >
+              <PowerOff size={20} className="text-muted-foreground" />
+              Desativar imóvel
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(true)}
+              className="flex h-14 items-center gap-3 text-sm text-danger"
+            >
+              <Trash2 size={20} />
+              Excluir imóvel
+            </button>
+          </div>
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-border">
-            <span className="text-xs text-muted-foreground">Sem fotos</span>
+          <div className="flex flex-col gap-3 px-6 pb-4">
+            <p className="text-sm text-foreground-subtle">
+              Tem certeza que deseja excluir este imóvel?
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                onDelete(property.id);
+                closeMore();
+              }}
+              className="h-12 rounded-full bg-danger text-sm font-semibold text-white"
+            >
+              Sim, excluir
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirmDelete(false)}
+              className="h-12 rounded-full border border-border text-sm text-foreground"
+            >
+              Cancelar
+            </button>
           </div>
         )}
-
-        {/* Pending badge */}
-        {pending && (
-          <span className="absolute right-2 top-2 rounded-full bg-foreground/70 px-2 py-0.5 text-[10px] font-semibold text-white">
-            Pendente
-          </span>
-        )}
-      </div>
-
-      {/* Info */}
-      <div className="flex flex-col gap-1 p-3">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-mono font-medium text-muted-foreground">
-            Cód: {property.code}
-          </span>
-          <span
-            className={twMerge(
-              'rounded-full px-2 py-0.5 text-[10px] font-semibold text-white',
-              property.businessType === BusinessType.SALE ? 'bg-action' : 'bg-accent',
-            )}
-          >
-            {BusinessTypeLabel[property.businessType]}
-          </span>
-        </div>
-
-        <span className="text-sm font-medium text-foreground line-clamp-1">
-          {PropertyTypeLabel[property.type]} · {property.neighborhood}
-        </span>
-
-        <span className="text-base font-bold text-foreground">
-          {formatMainPrice(property.businessType, property.price, property.rentPrice)}
-        </span>
-
-        {/* Actions */}
-        <div className="mt-1 flex gap-2 border-t border-border pt-2">
-          <button
-            type="button"
-            onClick={() => navigate(`/properties/${property.id}/edit`)}
-            aria-label="Editar imóvel"
-            className="flex size-9 items-center justify-center rounded-full bg-surface text-foreground-subtle transition-colors active:bg-border"
-          >
-            <Pencil size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate(`/properties/${property.id}/gallery`)}
-            aria-label="Gerenciar galeria"
-            className="flex size-9 items-center justify-center rounded-full bg-surface text-foreground-subtle transition-colors active:bg-border"
-          >
-            <Images size={16} />
-          </button>
-          <button
-            type="button"
-            onClick={() => onDelete(property.id)}
-            aria-label="Excluir imóvel"
-            className="flex size-9 items-center justify-center rounded-full bg-surface text-danger transition-colors active:bg-danger/10"
-          >
-            <Trash2 size={16} />
-          </button>
-        </div>
-      </div>
-    </article>
+      </BottomSheet>
+    </>
   );
 }

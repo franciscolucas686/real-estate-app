@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeft } from 'lucide-react';
+import { ChevronLeft, MapPin } from 'lucide-react';
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
+import type { LatLngExpression } from 'leaflet';
+import { apiFetch } from '../services/api-client';
 import { twMerge } from 'tailwind-merge';
+import { formatPrice } from '../utils/format';
 import { PageContainer } from '../components/ui/page-container';
 import {
   PropertyTypeLabel,
@@ -34,7 +38,6 @@ interface FormState {
   price: string;
   rentPrice: string;
   condoFee: string;
-  whatsappContact: string;
   description: string;
   // Step 2
   city: string;
@@ -71,6 +74,9 @@ interface FormState {
   // Country house
   hasRiver: boolean;
   hasSpring: boolean;
+  // Location coords
+  latitude: number | null;
+  longitude: number | null;
 }
 
 const INITIAL: FormState = {
@@ -80,7 +86,6 @@ const INITIAL: FormState = {
   price: '',
   rentPrice: '',
   condoFee: '',
-  whatsappContact: '',
   description: '',
   city: '',
   state: '',
@@ -110,6 +115,8 @@ const INITIAL: FormState = {
   waterSource: '',
   hasRiver: false,
   hasSpring: false,
+  latitude: null,
+  longitude: null,
 };
 
 // ─── Helper ──────────────────────────────────────────────────────────────────
@@ -122,21 +129,25 @@ function buildPayload(f: FormState): CreatePropertyDto {
     type: f.type as PropertyType,
     businessType: f.businessType as BusinessType,
     price: f.price,
-    city: f.city,
-    state: f.state,
-    neighborhood: f.neighborhood,
+    neighborhood: f.neighborhood.trim(),
+    city: f.city.trim(),
+    state: f.state.trim().toUpperCase(),
     description: f.description,
     ...(f.businessType === BusinessType.SALE &&
       f.saleTypes.length > 0 && { saleTypes: f.saleTypes }),
     ...(f.businessType === BusinessType.RENT && f.rentPrice && { rentPrice: f.rentPrice }),
     ...(f.condoFee && { condoFee: f.condoFee }),
-    ...(f.whatsappContact && { whatsappContact: f.whatsappContact }),
     ...(f.bedrooms && { bedrooms: n(f.bedrooms) }),
     ...(f.bathrooms && { bathrooms: n(f.bathrooms) }),
     ...(f.suites && { suites: n(f.suites) }),
     ...(f.parkingSpaces && { parkingSpaces: n(f.parkingSpaces) }),
     ...(f.totalArea && { totalArea: n(f.totalArea) }),
     ...(f.builtArea && { builtArea: n(f.builtArea) }),
+    ...(f.latitude !== null &&
+      f.longitude !== null && {
+        latitude: f.latitude,
+        longitude: f.longitude,
+      }),
   };
 
   if (f.type === PropertyType.HOUSE) {
@@ -148,7 +159,7 @@ function buildPayload(f: FormState): CreatePropertyDto {
     };
   } else if (f.type === PropertyType.APARTMENT) {
     base.apartment = {
-      floor: Number(f.floor) || 1,
+      floor: f.isGroundFloor ? 0 : Number(f.floor) || 1,
       isGroundFloor: f.isGroundFloor,
       hasElevator: f.hasElevator,
       hasBalcony: f.hasBalcony,
@@ -185,7 +196,6 @@ function propertyToFormState(p: PropertyDetailDto): FormState {
     price: p.price ?? '',
     rentPrice: p.rentPrice ?? '',
     condoFee: p.condoFee ?? '',
-    whatsappContact: p.whatsappContact ?? '',
     description: p.description,
     city: p.city,
     state: p.state,
@@ -196,6 +206,8 @@ function propertyToFormState(p: PropertyDetailDto): FormState {
     parkingSpaces: p.parkingSpaces != null ? String(p.parkingSpaces) : '',
     totalArea: p.totalArea != null ? String(p.totalArea) : '',
     builtArea: p.builtArea != null ? String(p.builtArea) : '',
+    latitude: p.location?.latitude ?? null,
+    longitude: p.location?.longitude ?? null,
   };
 
   const d = p.details;
@@ -274,9 +286,28 @@ function PropertyFormInner({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [mapOpen, setMapOpen] = useState(false);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleMapConfirm(
+    lat: number,
+    lng: number,
+    city: string,
+    state: string,
+    neighborhood: string,
+  ) {
+    setForm((prev) => ({
+      ...prev,
+      latitude: lat,
+      longitude: lng,
+      ...(city && { city }),
+      ...(state && { state: state.toUpperCase() }),
+      ...(neighborhood && { neighborhood }),
+    }));
+    setMapOpen(false);
   }
 
   function validateStep(): string {
@@ -286,17 +317,36 @@ function PropertyFormInner({
       if (form.businessType === BusinessType.SALE && form.saleTypes.length === 0)
         return 'Selecione ao menos uma modalidade de venda.';
       if (!form.price) return 'Informe o preço.';
-      if (!form.description) return 'Informe a descrição.';
+
+      // Validate condoFee cannot be greater than price or rentPrice
+      if (form.condoFee) {
+        const condoFeeNum = Number(form.condoFee);
+        const priceNum = Number(form.price);
+        const rentPriceNum = form.rentPrice ? Number(form.rentPrice) : 0;
+
+        if (priceNum > 0 && condoFeeNum > priceNum) {
+          return 'O valor do condomínio não pode ser maior que o preço.';
+        }
+        if (
+          form.businessType === BusinessType.RENT &&
+          rentPriceNum > 0 &&
+          condoFeeNum > rentPriceNum
+        ) {
+          return 'O valor do condomínio não pode ser maior que o valor do aluguel.';
+        }
+      }
     }
     if (step === 2) {
       if (!form.city) return 'Informe a cidade.';
       if (!form.state) return 'Informe o estado.';
+      if (form.state.length !== 2) return 'Estado deve ter 2 letras (ex: SP).';
       if (!form.neighborhood) return 'Informe o bairro.';
     }
     if (step === 3) {
+      if (!form.description) return 'Informe a descrição.';
       if (form.type === PropertyType.APARTMENT) {
         if (!form.sunPosition) return 'Selecione a posição do sol.';
-        if (!form.floor) return 'Informe o andar.';
+        if (!form.isGroundFloor && !form.floor) return 'Informe o andar.';
       }
       if (form.type === PropertyType.LAND) {
         if (!form.zoning) return 'Selecione o zoneamento.';
@@ -373,7 +423,7 @@ function PropertyFormInner({
       <PageContainer className="flex-1 overflow-y-auto pb-28">
         <div className="flex flex-col gap-5 py-2">
           {step === 1 && <Step1 form={form} set={set} />}
-          {step === 2 && <Step2 form={form} set={set} />}
+          {step === 2 && <Step2 form={form} set={set} onOpenMap={() => setMapOpen(true)} />}
           {step === 3 && <Step3 form={form} set={set} />}
 
           {error && (
@@ -383,6 +433,17 @@ function PropertyFormInner({
           )}
         </div>
       </PageContainer>
+
+      <LocationPickerOverlay
+        open={mapOpen}
+        onClose={() => setMapOpen(false)}
+        onConfirm={handleMapConfirm}
+        initialCenter={
+          form.latitude !== null && form.longitude !== null
+            ? [form.latitude, form.longitude]
+            : undefined
+        }
+      />
 
       {/* Footer */}
       <PageContainer className="fixed inset-x-0 bottom-0 z-40 bg-background/90 pb-[calc(env(safe-area-inset-bottom,16px)+16px)] pt-3 backdrop-blur-sm">
@@ -563,63 +624,161 @@ function Step1({ form, set }: { form: FormState; set: Setter }) {
         </Field>
       )}
 
-      <Field label="Preço (R$)">
+      <Field label="Preço">
         <Input
-          type="number"
+          type="text"
           inputMode="numeric"
-          placeholder="Ex: 450000"
-          value={form.price}
-          onChange={(v) => set('price', v)}
+          placeholder="Ex: R$ 450.000"
+          value={formatPrice(form.price)}
+          onChange={(v) => set('price', v.replace(/\D/g, ''))}
         />
       </Field>
 
       {form.businessType === BusinessType.RENT && (
-        <Field label="Valor do aluguel (R$)">
+        <Field label="Valor do aluguel">
           <Input
-            type="number"
+            type="text"
             inputMode="numeric"
-            placeholder="Ex: 2500"
-            value={form.rentPrice}
-            onChange={(v) => set('rentPrice', v)}
+            placeholder="Ex: R$ 2.500"
+            value={formatPrice(form.rentPrice)}
+            onChange={(v) => set('rentPrice', v.replace(/\D/g, ''))}
           />
         </Field>
       )}
 
-      <Field label="Condomínio (R$) — opcional">
+      <Field label="Condomínio — opcional">
         <Input
-          type="number"
+          type="text"
           inputMode="numeric"
-          placeholder="Ex: 800"
-          value={form.condoFee}
-          onChange={(v) => set('condoFee', v)}
-        />
-      </Field>
-
-      <Field label="WhatsApp de contato — opcional">
-        <Input
-          type="tel"
-          inputMode="numeric"
-          placeholder="Ex: 15988193239"
-          value={form.whatsappContact}
-          onChange={(v) => set('whatsappContact', v)}
-        />
-      </Field>
-
-      <Field label="Descrição *">
-        <textarea
-          value={form.description}
-          onChange={(e) => set('description', e.target.value)}
-          rows={4}
-          placeholder="Descreva o imóvel..."
-          className="rounded-xl border border-border bg-surface-raised px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-action resize-none"
+          placeholder="Ex: R$ 800"
+          value={formatPrice(form.condoFee)}
+          onChange={(v) => set('condoFee', v.replace(/\D/g, ''))}
         />
       </Field>
     </>
   );
 }
 
+// ─── Location picker map ─────────────────────────────────────────────────────
+interface GeoResult {
+  neighborhood?: string;
+  city?: string;
+  state?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+function MapClickHandler({ onClick }: { onClick: (lat: number, lng: number) => void }) {
+  useMapEvents({
+    click(e) {
+      onClick(e.latlng.lat, e.latlng.lng);
+    },
+  });
+  return null;
+}
+
+interface LocationPickerOverlayProps {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: (lat: number, lng: number, city: string, state: string, neighborhood: string) => void;
+  initialCenter?: [number, number];
+}
+
+function LocationPickerOverlay({
+  open,
+  onClose,
+  onConfirm,
+  initialCenter,
+}: LocationPickerOverlayProps) {
+  const DEFAULT_CENTER: [number, number] = initialCenter ?? [-23.5505, -46.6333];
+  const [markerPos, setMarkerPos] = useState<[number, number] | null>(initialCenter ?? null);
+  const [resolved, setResolved] = useState<GeoResult | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleClick = useCallback(async (lat: number, lng: number) => {
+    setMarkerPos([lat, lng]);
+    setLoading(true);
+    try {
+      const result = await apiFetch<GeoResult>('/geocode/reverse', {
+        method: 'POST',
+        body: JSON.stringify({ latitude: lat, longitude: lng }),
+      });
+      setResolved(result);
+    } catch {
+      setResolved(null);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  if (!open) return null;
+
+  const center: LatLngExpression = markerPos ?? DEFAULT_CENTER;
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+      {/* Header */}
+      <div className="flex shrink-0 items-center gap-3 bg-background px-4 pt-[env(safe-area-inset-top,16px)] pb-3">
+        <button
+          type="button"
+          onClick={onClose}
+          className="flex size-11 items-center justify-center rounded-full"
+          aria-label="Fechar mapa"
+        >
+          <ChevronLeft size={24} />
+        </button>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-foreground">Selecionar localização</p>
+          {loading && <p className="text-xs text-muted-foreground">Buscando endereço…</p>}
+          {!loading && resolved?.city && (
+            <p className="text-xs text-foreground-subtle">
+              {resolved.neighborhood ? `${resolved.neighborhood}, ` : ''}
+              {resolved.city} – {resolved.state}
+            </p>
+          )}
+        </div>
+        <button
+          type="button"
+          disabled={!markerPos}
+          onClick={() => {
+            if (!markerPos) return;
+            onConfirm(
+              markerPos[0],
+              markerPos[1],
+              resolved?.city ?? '',
+              resolved?.state ?? '',
+              resolved?.neighborhood ?? '',
+            );
+          }}
+          className="rounded-full bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
+        >
+          Confirmar
+        </button>
+      </div>
+
+      {/* Map */}
+      <div className="flex-1">
+        <MapContainer
+          center={center}
+          zoom={13}
+          style={{ height: '100%', width: '100%' }}
+          zoomControl={true}
+          attributionControl={false}
+        >
+          <TileLayer
+            url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+            maxZoom={18}
+          />
+          <MapClickHandler onClick={handleClick} />
+          {markerPos && <Marker position={markerPos} />}
+        </MapContainer>
+      </div>
+    </div>
+  );
+}
+
 // ─── Step 2: Location ─────────────────────────────────────────────────────────
-function Step2({ form, set }: { form: FormState; set: Setter }) {
+function Step2({ form, set, onOpenMap }: { form: FormState; set: Setter; onOpenMap: () => void }) {
   return (
     <>
       <Field label="Cidade *">
@@ -629,7 +788,7 @@ function Step2({ form, set }: { form: FormState; set: Setter }) {
         <Input
           placeholder="Ex: SP"
           value={form.state}
-          onChange={(v) => set('state', v)}
+          onChange={(v) => set('state', v.toUpperCase())}
           maxLength={2}
         />
       </Field>
@@ -640,6 +799,20 @@ function Step2({ form, set }: { form: FormState; set: Setter }) {
           onChange={(v) => set('neighborhood', v)}
         />
       </Field>
+
+      <button
+        type="button"
+        onClick={onOpenMap}
+        className="flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-surface-raised text-sm font-medium text-foreground active:bg-border"
+      >
+        <MapPin size={18} className="text-action" />
+        {form.latitude !== null ? 'Alterar localização no mapa' : 'Selecionar localização no mapa'}
+      </button>
+      {form.latitude !== null && form.longitude !== null && (
+        <p className="text-xs text-muted-foreground">
+          Coordenadas: {form.latitude.toFixed(5)}, {form.longitude.toFixed(5)}
+        </p>
+      )}
     </>
   );
 }
@@ -717,6 +890,16 @@ function Step3({ form, set }: { form: FormState; set: Setter }) {
       {form.type === PropertyType.LAND && <LandFields form={form} set={set} />}
       {form.type === PropertyType.SMALL_FARM && <SmallFarmFields form={form} set={set} />}
       {form.type === PropertyType.COUNTRY_HOUSE && <CountryHouseFields form={form} set={set} />}
+
+      <Field label="Descrição *">
+        <textarea
+          value={form.description}
+          onChange={(e) => set('description', e.target.value)}
+          rows={4}
+          placeholder="Descreva o imóvel..."
+          className="rounded-xl border border-border bg-surface-raised px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-action resize-none"
+        />
+      </Field>
     </>
   );
 }
@@ -771,7 +954,10 @@ function ApartmentFields({ form, set }: { form: FormState; set: Setter }) {
       <Toggle
         label="É térreo"
         value={form.isGroundFloor}
-        onChange={(v) => set('isGroundFloor', v)}
+        onChange={(v) => {
+          set('isGroundFloor', v);
+          if (v) set('floor', ''); // Clear floor when ground floor is selected
+        }}
       />
       {!form.isGroundFloor && (
         <Field label="Andar *">

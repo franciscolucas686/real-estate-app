@@ -24,7 +24,12 @@ export interface PageContainerProps extends ComponentProps<'div'> {
   withSafeAreaTop?: boolean;
 }
 
-export function PageContainer({ className, children, withSafeAreaTop = false, ...props }: PageContainerProps) {
+export function PageContainer({
+  className,
+  children,
+  withSafeAreaTop = false,
+  ...props
+}: PageContainerProps) {
   return (
     <div
       data-slot="page-container"

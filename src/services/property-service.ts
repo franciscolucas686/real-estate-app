@@ -111,3 +111,13 @@ export async function reorderPropertyImages(propertyId: string, payload: Reorder
     body: JSON.stringify(payload),
   });
 }
+
+export async function updatePropertyStatus(
+  id: string,
+  status: import('../types/api').PropertyStatus,
+) {
+  return apiFetch<import('../types/api').PropertyDetailDto>(`/properties/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}

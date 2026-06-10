@@ -1,162 +1,187 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, LogOut, Home as HomeIcon, AlertCircle, Calendar } from 'lucide-react';
-import { useMe, useLogout } from '../hooks/use-auth';
+import { Plus, HelpCircle, Settings } from 'lucide-react';
 import { useProperties } from '../hooks/use-properties';
+import { usePropertyStatusCounts } from '../hooks/use-property-status-counts';
 import { PropertyAdminCard } from '../components/features/property-admin-card';
-import { PropertyAdminCardSkeleton, DashboardStatsSkeleton } from '../components/ui/skeletons';
+import { PropertyAdminCardSkeleton } from '../components/ui/skeletons';
 import { PageContainer } from '../components/ui/page-container';
-import { softDeleteProperty, restoreProperty } from '../services/property-service';
-import { isPending } from '../utils/format';
-import { BusinessType } from '../types/api';
-import { BusinessTypeLabel } from '../utils/format';
+import { BottomSheet } from '../components/ui/bottom-sheet';
+import { softDeleteProperty, updatePropertyStatus } from '../services/property-service';
+import { PropertyStatus } from '../types/api';
 import { twMerge } from 'tailwind-merge';
 import { useQueryClient } from '@tanstack/react-query';
-
-type FilterTab = 'all' | 'SALE' | 'RENT';
-
-interface UndoState {
-  propertyId: string;
-  timer: ReturnType<typeof setTimeout>;
-}
 
 export function Dashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: user } = useMe();
-  const logout = useLogout();
-  const [tab, setTab] = useState<FilterTab>('all');
-  const [undoState, setUndoState] = useState<UndoState | null>(null);
+  const [statusFilter, setStatusFilter] = useState<PropertyStatus | null>(null);
+  const [codeSearch, setCodeSearch] = useState('');
+  const [helpOpen, setHelpOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
+  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { data, isLoading } = useProperties({ take: 100 });
+  const counts = usePropertyStatusCounts(true);
+
+  const { data, isLoading } = useProperties({
+    take: 100,
+    ...(statusFilter ? { status: statusFilter } : {}),
+  });
   const allProperties = data?.data ?? [];
 
   // Exclude recently soft-deleted from display
   const visibleProperties = allProperties.filter((p) => !deletedIds.has(p.id));
 
-  const filtered =
-    tab === 'all' ? visibleProperties : visibleProperties.filter((p) => p.businessType === tab);
-
-  const totalActive = visibleProperties.filter((p) => !isPending(p)).length;
-  const totalPending = visibleProperties.filter(isPending).length;
+  const displayProperties = codeSearch.trim()
+    ? visibleProperties.filter((p) => p.code.includes(codeSearch.trim()))
+    : visibleProperties;
 
   const handleDelete = useCallback(
     (id: string) => {
-      // Optimistically remove from display
+      if (deleteTimerRef.current) {
+        clearTimeout(deleteTimerRef.current);
+        deleteTimerRef.current = null;
+      }
+
       setDeletedIds((prev) => new Set([...prev, id]));
+      setPendingDeleteId(id);
 
-      // Immediately soft-delete on server
-      softDeleteProperty(id).catch(() => {
-        // Restore display if server call failed
-        setDeletedIds((prev) => {
-          const s = new Set(prev);
-          s.delete(id);
-          return s;
-        });
-      });
-
-      // Set undo timer
-      if (undoState) clearTimeout(undoState.timer);
-      const timer = setTimeout(() => {
-        setUndoState(null);
-        queryClient.invalidateQueries({ queryKey: ['properties'] });
+      deleteTimerRef.current = setTimeout(async () => {
+        try {
+          await softDeleteProperty(id);
+          await queryClient.refetchQueries({ queryKey: ['properties'] });
+        } catch {
+          setDeletedIds((prev) => {
+            const s = new Set(prev);
+            s.delete(id);
+            return s;
+          });
+        } finally {
+          setPendingDeleteId(null);
+          deleteTimerRef.current = null;
+        }
       }, 6000);
-
-      setUndoState({ propertyId: id, timer });
     },
-    [undoState, queryClient],
+    [queryClient],
   );
 
-  const handleUndo = useCallback(async () => {
-    if (!undoState) return;
-    clearTimeout(undoState.timer);
-    const id = undoState.propertyId;
-    setUndoState(null);
+  const handleDeactivate = useCallback(
+    async (id: string) => {
+      try {
+        await updatePropertyStatus(id, PropertyStatus.INACTIVE);
+        await queryClient.refetchQueries({ queryKey: ['properties'] });
+      } catch {
+        /* silent */
+      }
+    },
+    [queryClient],
+  );
+
+  const handleUndo = useCallback(() => {
+    if (!pendingDeleteId || !deleteTimerRef.current) return;
+    clearTimeout(deleteTimerRef.current);
+    deleteTimerRef.current = null;
     setDeletedIds((prev) => {
       const s = new Set(prev);
-      s.delete(id);
+      s.delete(pendingDeleteId);
       return s;
     });
-    try {
-      await restoreProperty(id);
-      queryClient.invalidateQueries({ queryKey: ['properties'] });
-    } catch {
-      // If restore fails, remove from display permanently
-      setDeletedIds((prev) => new Set([...prev, id]));
-    }
-  }, [undoState, queryClient]);
-
-  async function handleLogout() {
-    await logout.mutateAsync();
-    navigate('/login', { replace: true });
-  }
+    setPendingDeleteId(null);
+  }, [pendingDeleteId]);
 
   return (
     <div data-slot="page-dashboard" className="flex min-h-dvh flex-col pb-24">
       {/* Header */}
       <PageContainer withSafeAreaTop className="flex items-center justify-between py-4">
-        <div>
-          <p className="text-sm text-foreground-subtle">Painel</p>
-          <h1 className="text-xl font-bold text-foreground">
-            Olá, {user?.name?.split(' ')[0] ?? '—'}
-          </h1>
+        <h1 className="text-xl font-bold text-foreground">Dashboard</h1>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            className="flex size-10 items-center justify-center rounded-full border border-border text-foreground-subtle active:bg-border"
+          >
+            <HelpCircle size={20} />
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/settings')}
+            className="flex size-10 items-center justify-center rounded-full border border-border text-foreground-subtle active:bg-border"
+          >
+            <Settings size={20} />
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={handleLogout}
-          disabled={logout.isPending}
-          className="flex items-center gap-2 rounded-full border border-border px-4 py-2 text-sm text-foreground-subtle active:bg-border"
-        >
-          <LogOut size={16} />
-          Sair
-        </button>
       </PageContainer>
 
-      {/* Stats */}
+      {/* Help bottom sheet */}
+      <BottomSheet open={helpOpen} onClose={() => setHelpOpen(false)} title="Status dos imóveis">
+        <div className="flex flex-col gap-4 px-6 pb-4">
+          {[
+            { emoji: '🟢', label: 'Ativo', desc: 'Publicado e visível para todos' },
+            { emoji: '🩶', label: 'Rascunho', desc: 'Não publicado, sem imagens' },
+            { emoji: '🟨', label: 'Pendente', desc: 'Aguardando revisão' },
+            { emoji: '⬛', label: 'Inativo', desc: 'Desativado manualmente' },
+          ].map(({ emoji, label, desc }) => (
+            <div key={label} className="flex items-center gap-3">
+              <span className="text-xl">{emoji}</span>
+              <div>
+                <p className="text-sm font-semibold text-foreground">{label}</p>
+                <p className="text-xs text-foreground-subtle">{desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </BottomSheet>
+
+      {/* Status cards */}
       <PageContainer className="pb-4">
-        {isLoading ? (
-          <DashboardStatsSkeleton />
-        ) : (
-          <div className="grid grid-cols-3 gap-3">
-            <StatCard
-              icon={<HomeIcon size={20} className="text-action" />}
-              value={String(totalActive)}
-              label="Ativos"
-            />
-            <StatCard
-              icon={<AlertCircle size={20} className="text-muted-foreground" />}
-              value={String(totalPending)}
-              label="Pendentes"
-            />
-            <StatCard
-              icon={<Calendar size={20} className="text-accent" />}
-              value={String(allProperties.length)}
-              label="Total"
-            />
-          </div>
-        )}
-      </PageContainer>
-
-      {/* Filter tabs */}
-      <PageContainer className="pb-3">
-        <div className="inline-flex rounded-full bg-surface p-1">
-          {(['all', 'SALE', 'RENT'] as FilterTab[]).map((t) => (
+        <div className="grid grid-cols-4 gap-2">
+          {(
+            [
+              { key: 'ACTIVE', label: 'Ativos', color: 'text-emerald-500' },
+              { key: 'DRAFT', label: 'Rascunhos', color: 'text-muted-foreground' },
+              { key: 'PENDING', label: 'Pendentes', color: 'text-amber-500' },
+              { key: 'INACTIVE', label: 'Inativos', color: 'text-foreground-subtle' },
+            ] as const
+          ).map(({ key, label, color }) => (
             <button
-              key={t}
+              key={key}
               type="button"
-              onClick={() => setTab(t)}
+              onClick={() => setStatusFilter(statusFilter === key ? null : key)}
               className={twMerge(
-                'rounded-full px-5 py-2 text-sm font-medium transition-all',
-                tab === t
-                  ? 'bg-surface-raised text-foreground shadow-sm'
-                  : 'text-foreground-subtle',
+                'flex flex-col items-center gap-1 rounded-2xl border p-3 text-center transition-colors',
+                statusFilter === key
+                  ? 'border-action bg-action/10'
+                  : 'border-border bg-surface-raised',
               )}
             >
-              {t === 'all' ? 'Todos' : BusinessTypeLabel[t as BusinessType]}
+              <span className={twMerge('text-xl font-bold', color)}>{counts[key]}</span>
+              <span className="text-[10px] text-muted-foreground leading-tight">{label}</span>
             </button>
           ))}
         </div>
+      </PageContainer>
+
+      {/* Total stats */}
+      <PageContainer className="pb-3">
+        <div className="rounded-2xl border border-border bg-surface-raised px-4 py-3">
+          <p className="text-xs text-muted-foreground">Total de imóveis</p>
+          <p className="text-2xl font-bold text-foreground">
+            {Object.values(counts).reduce((a, b) => a + b, 0)}
+          </p>
+        </div>
+      </PageContainer>
+
+      {/* Code search */}
+      <PageContainer className="pb-3">
+        <input
+          type="text"
+          inputMode="numeric"
+          placeholder="Buscar por código (ex: 575301)"
+          value={codeSearch}
+          onChange={(e) => setCodeSearch(e.target.value)}
+          className="h-11 w-full rounded-xl border border-border bg-surface-raised px-4 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-action"
+        />
       </PageContainer>
 
       {/* Property grid */}
@@ -167,23 +192,32 @@ export function Dashboard() {
               <PropertyAdminCardSkeleton key={i} />
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        ) : displayProperties.length === 0 ? (
           <div className="flex flex-col items-center gap-4 py-16">
             <p className="text-center text-base font-medium text-foreground">
-              Nenhum imóvel cadastrado
+              {codeSearch.trim()
+                ? 'Nenhum imóvel encontrado com esse código'
+                : 'Nenhum imóvel cadastrado'}
             </p>
-            <button
-              type="button"
-              onClick={() => navigate('/properties/new')}
-              className="rounded-full bg-action px-6 py-3 text-sm font-semibold text-white"
-            >
-              Cadastrar meu primeiro imóvel
-            </button>
+            {!codeSearch.trim() && (
+              <button
+                type="button"
+                onClick={() => navigate('/properties/new')}
+                className="rounded-full bg-action px-6 py-3 text-sm font-semibold text-white"
+              >
+                Cadastrar meu primeiro imóvel
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
-            {filtered.map((property) => (
-              <PropertyAdminCard key={property.id} property={property} onDelete={handleDelete} />
+            {displayProperties.map((property) => (
+              <PropertyAdminCard
+                key={property.id}
+                property={property}
+                onDelete={handleDelete}
+                onDeactivate={handleDeactivate}
+              />
             ))}
           </div>
         )}
@@ -194,42 +228,24 @@ export function Dashboard() {
         type="button"
         onClick={() => navigate('/properties/new')}
         aria-label="Criar imóvel"
-        className="fixed bottom-20 right-4 z-30 flex size-14 items-center justify-center rounded-full bg-action text-white shadow-lg active:scale-95 transition-transform"
+        className="fixed bottom-[calc(env(safe-area-inset-bottom,0px)+100px)] right-8 z-30 flex size-18 items-center justify-center rounded-full bg-action text-white shadow-lg active:scale-95 transition-transform"
       >
-        <Plus size={24} />
+        <Plus size={32} />
       </button>
 
       {/* Undo toast */}
-      {undoState && (
-        <div className="fixed inset-x-4 bottom-20 z-40 flex items-center justify-between gap-3 rounded-2xl bg-foreground px-4 py-3 shadow-lg">
-          <span className="text-sm text-white">Imóvel excluído</span>
-          <button type="button" onClick={handleUndo} className="text-sm font-semibold text-action">
+      {pendingDeleteId && (
+        <div className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] z-40 flex items-center justify-between gap-3 rounded-full bg-foreground px-2 mb-4 shadow-lg">
+          <span className="text-2xl ml-4 text-white">Imóvel excluído</span>
+          <button
+            type="button"
+            onClick={handleUndo}
+            className="text-xl p-4 font-semibold text-action"
+          >
             Desfazer
           </button>
         </div>
       )}
-    </div>
-  );
-}
-
-function StatCard({
-  icon,
-  value,
-  label,
-  small,
-}: {
-  icon: React.ReactNode;
-  value: string;
-  label: string;
-  small?: boolean;
-}) {
-  return (
-    <div className="flex flex-col gap-1 rounded-2xl bg-surface-raised p-4 shadow-sm">
-      {icon}
-      <span className={twMerge('font-bold text-foreground', small ? 'text-base' : 'text-xl')}>
-        {value}
-      </span>
-      <span className="text-xs text-muted-foreground leading-tight">{label}</span>
     </div>
   );
 }

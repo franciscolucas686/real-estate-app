@@ -1,6 +1,6 @@
 import type { ApiErrorResponse } from '../types/api';
 
-const API_BASE = 'https://api-real-estate-in76.onrender.com';
+const API_BASE = import.meta.env.DEV ? '/api' : 'https://api-real-estate-in76.onrender.com/api';
 
 let isRefreshing = false;
 let pendingRefresh: Promise<boolean> | null = null;

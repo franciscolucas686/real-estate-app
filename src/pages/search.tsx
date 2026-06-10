@@ -37,15 +37,16 @@ export function Search() {
               activeCount > 0 ? 'text-action' : 'text-muted-foreground',
             )}
           >
-            {'Buscar imóveis'}
+            {activeCount > 0
+              ? `${activeCount} Filtro${activeCount !== 1 ? 's' : ''} de imóvel`
+              : 'Buscar imóveis'}
           </span>
         </button>
       </PageContainer>
 
       {/* Active filter summary */}
       {activeCount > 0 && (
-        <PageContainer className="flex shrink-0 items-center justify-between pb-4 bg-background">
-          <span className="text-md text-foreground-subtle">Filtros de imóvel: {activeCount}</span>
+        <PageContainer className="flex shrink-0 items-center justify-end pb-4 bg-background">
           <button type="button" onClick={resetFilters} className="text-md text-action">
             Limpar filtros
           </button>

@@ -1,17 +1,32 @@
 import { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
-import { ChevronLeft, Plus, Trash2, Upload, Pencil, Check, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  Plus,
+  Trash2,
+  Upload,
+  Pencil,
+  Check,
+  X,
+  Loader2,
+  Image as ImageIcon,
+  MoveRight,
+} from 'lucide-react';
 import { useProperty } from '../hooks/use-property';
 import { PageContainer } from '../components/ui/page-container';
 import { PropertyDetailSkeleton } from '../components/ui/skeletons';
+import { twMerge } from 'tailwind-merge';
 import {
   createRoom,
   deleteRoom,
   uploadPropertyImages,
   deletePropertyImage,
+  reorderPropertyImages,
 } from '../services/property-service';
 import type { PropertyImageDto, PropertyRoomDto } from '../types/api';
+
+type Mode = 'view' | 'photo-select';
 
 interface GallerySection {
   roomId: string | null;
@@ -25,14 +40,17 @@ export function GalleryManagement() {
   const queryClient = useQueryClient();
   const { data: property, isLoading } = useProperty(id!);
 
+  // State machine
+  const [mode, setMode] = useState<Mode>('view');
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
+
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [newRoomName, setNewRoomName] = useState('');
   const [addingRoom, setAddingRoom] = useState(false);
   const [addRoomName, setAddRoomName] = useState('');
   const [uploading, setUploading] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
-
-  const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const [showMoveDialog, setShowMoveDialog] = useState(false);
 
   if (isLoading) return <PropertyDetailSkeleton />;
 
@@ -61,6 +79,46 @@ export function GalleryManagement() {
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ['property', id] });
+  }
+
+  // Selection handlers
+  function togglePhotoSelection(imageId: string) {
+    setSelectedPhotoIds((prev) =>
+      prev.includes(imageId) ? prev.filter((id) => id !== imageId) : [...prev, imageId],
+    );
+  }
+
+  function exitSelectMode() {
+    setMode('view');
+    setSelectedPhotoIds([]);
+  }
+
+  async function handleDeleteSelected() {
+    if (selectedPhotoIds.length === 0) return;
+    try {
+      await Promise.all(selectedPhotoIds.map((imgId) => deletePropertyImage(id!, imgId)));
+      exitSelectMode();
+      invalidate();
+    } catch (e) {
+      console.error('Failed to delete images', e);
+    }
+  }
+
+  async function handleMoveToRoom(targetRoomId: string | null) {
+    if (selectedPhotoIds.length === 0) return;
+    try {
+      const items = selectedPhotoIds.map((imageId, idx) => ({
+        imageId,
+        order: idx,
+        roomId: targetRoomId,
+      }));
+      await reorderPropertyImages(id!, { items });
+      setShowMoveDialog(false);
+      exitSelectMode();
+      invalidate();
+    } catch (e) {
+      console.error('Failed to move images', e);
+    }
   }
 
   async function handleUpload(roomId: string | null, files: FileList | null) {
@@ -118,137 +176,59 @@ export function GalleryManagement() {
       <PageContainer withSafeAreaTop className="flex items-center gap-3 py-4">
         <button
           type="button"
-          onClick={() => navigate(-1)}
+          onClick={() => (mode === 'photo-select' ? exitSelectMode() : navigate(-1))}
           aria-label="Voltar"
           className="flex size-10 items-center justify-center rounded-full text-foreground active:scale-90 transition-transform"
         >
-          <ChevronLeft size={24} />
+          {mode === 'photo-select' ? <X size={24} /> : <ChevronLeft size={24} />}
         </button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-bold text-foreground truncate">Gerenciar fotos</h1>
+          <h1 className="text-lg font-bold text-foreground truncate">
+            {mode === 'photo-select' ? 'Selecionar fotos' : 'Gerenciar fotos'}
+          </h1>
           <p className="text-xs text-foreground-subtle">
-            Cód. {property.code} · {totalImages} foto{totalImages !== 1 ? 's' : ''}
+            {mode === 'photo-select' && selectedPhotoIds.length > 0
+              ? `${selectedPhotoIds.length} selecionada${selectedPhotoIds.length !== 1 ? 's' : ''}`
+              : `Cód. ${property.code} · ${totalImages} foto${totalImages !== 1 ? 's' : ''}`}
           </p>
         </div>
+        {mode === 'view' && totalImages > 0 && (
+          <button
+            type="button"
+            onClick={() => setMode('photo-select')}
+            className="flex items-center gap-1.5 rounded-full bg-action px-3 py-1.5 text-xs font-medium text-white active:bg-action-hover"
+          >
+            <ImageIcon size={14} />
+            Selecionar
+          </button>
+        )}
       </PageContainer>
 
       {/* Sections */}
       <div className="flex flex-col gap-6 px-4">
-        {sections.map((section) => {
-          const uploadKey = section.roomId ?? 'unassigned';
-          const isUploading = uploading === uploadKey;
-
-          return (
-            <div key={uploadKey} className="flex flex-col gap-3">
-              {/* Section header */}
-              <div className="flex items-center gap-2">
-                {section.roomId && editingRoomId === section.roomId ? (
-                  <>
-                    <input
-                      autoFocus
-                      value={newRoomName}
-                      onChange={(e) => setNewRoomName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleRenameRoom(section.roomId!);
-                        if (e.key === 'Escape') setEditingRoomId(null);
-                      }}
-                      className="flex-1 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-sm text-foreground outline-none focus:border-action"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleRenameRoom(section.roomId!)}
-                      className="flex size-8 items-center justify-center rounded-full bg-action text-white"
-                    >
-                      <Check size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setEditingRoomId(null)}
-                      className="flex size-8 items-center justify-center rounded-full bg-border text-foreground"
-                    >
-                      <X size={16} />
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <span className="flex-1 text-sm font-semibold text-foreground">
-                      {section.name}
-                      <span className="ml-1.5 text-xs font-normal text-foreground-subtle">
-                        ({section.images.length})
-                      </span>
-                    </span>
-                    {section.roomId && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingRoomId(section.roomId);
-                            setNewRoomName(section.name);
-                          }}
-                          aria-label="Renomear ambiente"
-                          className="flex size-8 items-center justify-center rounded-full text-foreground-subtle active:bg-border"
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteRoom(section.roomId!)}
-                          aria-label="Excluir ambiente"
-                          className="flex size-8 items-center justify-center rounded-full text-danger active:bg-danger/10"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {/* Images grid */}
-              <div className="grid grid-cols-3 gap-2">
-                {section.images.map((img) => (
-                  <div key={img.id} className="relative aspect-square">
-                    <img
-                      src={img.url}
-                      alt={img.label ?? ''}
-                      className="h-full w-full rounded-xl object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteImage(img.id)}
-                      disabled={deleting === img.id}
-                      aria-label="Excluir foto"
-                      className="absolute right-1.5 top-1.5 flex size-7 items-center justify-center rounded-full bg-black/60 text-white active:scale-90 transition-transform disabled:opacity-50"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                ))}
-
-                {/* Upload button */}
-                <button
-                  type="button"
-                  onClick={() => fileInputRefs.current[uploadKey]?.click()}
-                  disabled={isUploading}
-                  className="flex aspect-square items-center justify-center rounded-xl border-2 border-dashed border-border bg-surface text-foreground-subtle active:bg-surface-raised disabled:opacity-50"
-                >
-                  {isUploading ? <span className="text-xs">...</span> : <Upload size={20} />}
-                </button>
-
-                <input
-                  ref={(el) => {
-                    fileInputRefs.current[uploadKey] = el;
-                  }}
-                  type="file"
-                  accept="image/*"
-                  multiple
-                  className="hidden"
-                  onChange={(e) => handleUpload(section.roomId, e.target.files)}
-                />
-              </div>
-            </div>
-          );
-        })}
+        {sections.map((section) => (
+          <RoomSection
+            key={section.roomId ?? 'unassigned'}
+            section={section}
+            propertyId={id!}
+            mode={mode}
+            selectedPhotoIds={selectedPhotoIds}
+            uploading={uploading}
+            deleting={deleting}
+            editingRoomId={editingRoomId}
+            newRoomName={newRoomName}
+            onToggleSelection={togglePhotoSelection}
+            onUpload={handleUpload}
+            onDeleteImage={handleDeleteImage}
+            onStartEdit={(roomId, name) => {
+              setEditingRoomId(roomId);
+              setNewRoomName(name);
+            }}
+            onCancelEdit={() => setEditingRoomId(null)}
+            onRenameRoom={handleRenameRoom}
+            onDeleteRoom={handleDeleteRoom}
+          />
+        ))}
 
         {/* Add room */}
         {addingRoom ? (
@@ -297,14 +277,275 @@ export function GalleryManagement() {
         )}
       </div>
 
-      {/* Done button */}
-      <div className="fixed bottom-0 inset-x-0 bg-background/90 p-4 backdrop-blur-sm">
+      {/* Contextual Bottom Bar */}
+      {mode === 'photo-select' ? (
+        <div className="fixed bottom-0 inset-x-0 bg-background/95 p-4 backdrop-blur-md border-t border-border">
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={handleDeleteSelected}
+              disabled={selectedPhotoIds.length === 0}
+              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full border border-danger text-danger font-semibold disabled:opacity-40 disabled:cursor-not-allowed active:bg-danger/10"
+            >
+              <Trash2 size={18} />
+              Excluir ({selectedPhotoIds.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowMoveDialog(true)}
+              disabled={selectedPhotoIds.length === 0}
+              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-action text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed active:bg-action-hover"
+            >
+              <MoveRight size={18} />
+              Mover
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="fixed bottom-0 inset-x-0 bg-background/90 p-4 backdrop-blur-sm">
+          <button
+            type="button"
+            onClick={() => navigate(`/properties/${id}`)}
+            className="flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white active:bg-action-hover"
+          >
+            Concluir
+          </button>
+        </div>
+      )}
+
+      {/* Move Dialog */}
+      {showMoveDialog && (
+        <MoveDialog
+          sections={sections}
+          onMove={handleMoveToRoom}
+          onClose={() => setShowMoveDialog(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── GalleryImage Component ──────────────────────────────────────────────────
+interface GalleryImageProps {
+  image: PropertyImageDto;
+  mode: Mode;
+  isSelected: boolean;
+  isDeleting: boolean;
+  onToggleSelection: (id: string) => void;
+  onDelete: (id: string) => void;
+}
+
+function GalleryImage({ image, mode, isSelected, onToggleSelection }: GalleryImageProps) {
+  return (
+    <div
+      className="relative aspect-square"
+      onClick={() => mode === 'photo-select' && onToggleSelection(image.id)}
+    >
+      <img
+        src={image.url}
+        alt={image.label ?? ''}
+        className={twMerge(
+          'h-full w-full rounded-xl object-cover transition-all',
+          mode === 'photo-select' && 'cursor-pointer',
+          isSelected && 'ring-4 ring-action ring-offset-2',
+        )}
+      />
+
+      {/* Checkbox for photo-select mode */}
+      {mode === 'photo-select' && (
+        <div className="absolute left-2 top-2 flex size-6 items-center justify-center rounded-full bg-white shadow-md">
+          {isSelected && (
+            <div className="flex size-5 items-center justify-center rounded-full bg-action">
+              <Check size={14} className="text-white" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Delete button for view mode */}
+    </div>
+  );
+}
+
+// ─── RoomSection Component ───────────────────────────────────────────────────
+interface RoomSectionProps {
+  section: GallerySection;
+  propertyId: string;
+  mode: Mode;
+  selectedPhotoIds: string[];
+  uploading: string | null;
+  deleting: string | null;
+  editingRoomId: string | null;
+  newRoomName: string;
+  onToggleSelection: (id: string) => void;
+  onUpload: (roomId: string | null, files: FileList | null) => void;
+  onDeleteImage: (id: string) => void;
+  onStartEdit: (roomId: string, name: string) => void;
+  onCancelEdit: () => void;
+  onRenameRoom: (roomId: string) => void;
+  onDeleteRoom: (roomId: string) => void;
+}
+
+function RoomSection({
+  section,
+  mode,
+  selectedPhotoIds,
+  uploading,
+  deleting,
+  editingRoomId,
+  newRoomName,
+  onToggleSelection,
+  onUpload,
+  onDeleteImage,
+  onStartEdit,
+  onCancelEdit,
+  onRenameRoom,
+  onDeleteRoom,
+}: RoomSectionProps) {
+  const uploadKey = section.roomId ?? 'unassigned';
+  const isUploading = uploading === uploadKey;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/* Section header */}
+      <div className="flex items-center gap-2">
+        {section.roomId && editingRoomId === section.roomId ? (
+          <>
+            <input
+              autoFocus
+              value={newRoomName}
+              onChange={(e) => onStartEdit(section.roomId!, e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onRenameRoom(section.roomId!);
+                if (e.key === 'Escape') onCancelEdit();
+              }}
+              className="flex-1 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-sm text-foreground outline-none focus:border-action"
+            />
+            <button
+              type="button"
+              onClick={() => onRenameRoom(section.roomId!)}
+              className="flex size-8 items-center justify-center rounded-full bg-action text-white"
+            >
+              <Check size={16} />
+            </button>
+            <button
+              type="button"
+              onClick={onCancelEdit}
+              className="flex size-8 items-center justify-center rounded-full bg-border text-foreground"
+            >
+              <X size={16} />
+            </button>
+          </>
+        ) : (
+          <>
+            <span className="flex-1 text-sm font-semibold text-foreground">
+              {section.name}
+              <span className="ml-1.5 text-xs font-normal text-foreground-subtle">
+                ({section.images.length})
+              </span>
+            </span>
+            {section.roomId && mode === 'view' && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onStartEdit(section.roomId!, section.name)}
+                  aria-label="Renomear ambiente"
+                  className="flex size-8 items-center justify-center rounded-full text-foreground-subtle active:bg-border"
+                >
+                  <Pencil size={15} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDeleteRoom(section.roomId!)}
+                  aria-label="Excluir ambiente"
+                  className="flex size-8 items-center justify-center rounded-full text-danger active:bg-danger/10"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Images grid */}
+      <div className="grid grid-cols-3 gap-2">
+        {section.images.map((img) => (
+          <GalleryImage
+            key={img.id}
+            image={img}
+            mode={mode}
+            isSelected={selectedPhotoIds.includes(img.id)}
+            isDeleting={deleting === img.id}
+            onToggleSelection={onToggleSelection}
+            onDelete={onDeleteImage}
+          />
+        ))}
+
+        {/* Upload button - only in view mode */}
+        {mode === 'view' && (
+          <>
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="flex aspect-square items-center justify-center rounded-xl border-2 border-dashed border-border bg-surface text-foreground-subtle active:bg-surface-raised disabled:opacity-50"
+            >
+              {isUploading ? <Loader2 size={20} className="animate-spin" /> : <Upload size={20} />}
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              multiple
+              className="hidden"
+              onChange={(e) => onUpload(section.roomId, e.target.files)}
+            />
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── MoveDialog Component ────────────────────────────────────────────────────
+interface MoveDialogProps {
+  sections: GallerySection[];
+  onMove: (roomId: string | null) => void;
+  onClose: () => void;
+}
+
+function MoveDialog({ sections, onMove, onClose }: MoveDialogProps) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-2xl bg-surface-raised p-6 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h3 className="mb-4 text-lg font-semibold text-foreground">Mover para</h3>
+        <div className="flex flex-col gap-2">
+          {sections.map((section) => (
+            <button
+              key={section.roomId ?? 'unassigned'}
+              onClick={() => onMove(section.roomId)}
+              className="flex h-12 items-center justify-between rounded-xl border border-border bg-surface px-4 text-sm font-medium text-foreground active:bg-border"
+            >
+              <span>{section.name}</span>
+              <span className="text-xs text-foreground-subtle">({section.images.length})</span>
+            </button>
+          ))}
+        </div>
         <button
           type="button"
-          onClick={() => navigate(`/properties/${id}`)}
-          className="flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white active:bg-action-hover"
+          onClick={onClose}
+          className="mt-4 flex h-12 w-full items-center justify-center rounded-xl bg-border text-sm font-semibold text-foreground"
         >
-          Concluir
+          Cancelar
         </button>
       </div>
     </div>

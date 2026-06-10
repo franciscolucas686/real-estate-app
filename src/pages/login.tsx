@@ -10,7 +10,7 @@ export function Login() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     try {
       await login.mutateAsync({ email, password });
@@ -42,7 +42,7 @@ export function Login() {
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="email" className="text-sm font-medium text-foreground">
+            <label htmlFor="email" className="text-md font-medium text-foreground">
               E-mail
             </label>
             <input
@@ -53,12 +53,12 @@ export function Login() {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="seu@email.com"
-              className="h-12 rounded-xl border border-border bg-surface-raised px-4 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-action"
+              className="h-16 rounded-xl border border-border bg-surface-raised px-4 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-action"
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="password" className="text-sm font-medium text-foreground">
+            <label htmlFor="password" className="text-md font-medium text-foreground">
               Senha
             </label>
             <div className="relative">
@@ -70,15 +70,15 @@ export function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••"
-                className="h-12 w-full rounded-xl border border-border bg-surface-raised px-4 pr-12 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-action"
+                className="h-16 w-full rounded-xl border border-border bg-surface-raised px-4 pr-12 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-action"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                className="absolute right-4 p-2 ml-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                 aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                {showPassword ? <EyeOff size={28} /> : <Eye size={28} />}
               </button>
             </div>
           </div>

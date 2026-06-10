@@ -4,6 +4,7 @@ export interface PropertyFilters {
   businessType?: BusinessType;
   types: PropertyType[];
   saleTypes: SaleType[];
+  code: string;
   city: string;
   state: string;
   neighborhood: string;
@@ -26,6 +27,7 @@ export const DEFAULT_FILTERS: PropertyFilters = {
   businessType: undefined,
   types: [],
   saleTypes: [],
+  code: '',
   city: '',
   state: '',
   neighborhood: '',
@@ -49,6 +51,7 @@ export function filtersToApiParams(filters: PropertyFilters, take = 20): FilterP
     ...(filters.businessType && { businessType: filters.businessType }),
     ...(filters.types.length > 0 && { types: filters.types }),
     ...(filters.saleTypes.length > 0 && { saleTypes: filters.saleTypes }),
+    ...(filters.code && { code: filters.code }),
     ...(filters.city && { city: filters.city }),
     ...(filters.state && { state: filters.state }),
     ...(filters.neighborhood && { neighborhood: filters.neighborhood }),
@@ -74,6 +77,7 @@ export function countActiveFilters(filters: PropertyFilters): number {
   if (filters.businessType) count++;
   if (filters.types.length > 0) count++;
   if (filters.saleTypes.length > 0) count++;
+  if (filters.code) count++;
   if (filters.city) count++;
   if (filters.state) count++;
   if (filters.neighborhood) count++;

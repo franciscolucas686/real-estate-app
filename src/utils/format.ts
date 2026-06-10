@@ -1,6 +1,7 @@
 import {
   BusinessType,
   type PropertyCardDto,
+  PropertyStatus,
   PropertyType,
   SaleType,
   SunPosition,
@@ -56,7 +57,6 @@ export function formatZoning(zoning: Zoning): string {
 }
 
 export function formatPrice(value: string | null): string {
-  if (!value) return '—';
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
@@ -91,4 +91,24 @@ export function buildWhatsAppUrl(contact: string, propertyCode?: string): string
 
 export function isPending(property: PropertyCardDto): boolean {
   return property.previewImages.length === 0;
+}
+
+export const PropertyStatusLabel: Record<PropertyStatus, string> = {
+  DRAFT: 'Rascunho',
+  PENDING: 'Pendente',
+  ACTIVE: 'Ativo',
+  INACTIVE: 'Inativo',
+};
+
+export function getStatusColors(status: PropertyStatus): { bg: string; text: string } {
+  switch (status) {
+    case PropertyStatus.ACTIVE:
+      return { bg: 'bg-emerald-500', text: 'text-white' };
+    case PropertyStatus.DRAFT:
+      return { bg: 'bg-foreground/20', text: 'text-foreground' };
+    case PropertyStatus.PENDING:
+      return { bg: 'bg-amber-400', text: 'text-foreground' };
+    case PropertyStatus.INACTIVE:
+      return { bg: 'bg-foreground/70', text: 'text-white' };
+  }
 }

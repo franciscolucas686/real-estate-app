@@ -43,6 +43,7 @@ export function useProperty(id: string) {
           })),
         },
         details: null,
+        location: null,
         whatsappContact: null,
         userId: '',
         createdAt: '',
