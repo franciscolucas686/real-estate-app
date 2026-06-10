@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
-import { Home as HomeIcon, Search as SearchIcon, Phone, User } from 'lucide-react';
+import { Search as SearchIcon, Phone, User, LayoutDashboard } from 'lucide-react';
 import { BottomNav, BottomNavItem } from './components/ui/bottom-nav';
 import { PageWrapper } from './components/ui/page-wrapper';
 import { ProtectedRoute } from './components/ui/protected-route';
 import { FilterProvider } from './contexts/filter-context';
 import { SplashScreen } from './components/ui/splash-screen';
 import { useShowBottomNav } from './config/navigation';
+import { useMe } from './hooks/use-auth';
 
 import { Home } from './pages/home';
 import { Search } from './pages/search';
@@ -17,8 +18,26 @@ import { Filters } from './pages/filters';
 import { PropertyDetails } from './pages/property-details';
 import { Login } from './pages/login';
 import { Dashboard } from './pages/dashboard';
+import { Settings } from './pages/settings';
 import { PropertyForm } from './pages/property-form';
 import { GalleryManagement } from './pages/gallery-management';
+
+function AppBottomNav() {
+  const { data: user } = useMe();
+  const isAuth = Boolean(user);
+
+  return (
+    <BottomNav>
+      <BottomNavItem icon={<SearchIcon size={24} />} label="Explorar" to="/search" />
+      <BottomNavItem icon={<Phone size={24} />} label="Contato" to="/contact" />
+      {isAuth ? (
+        <BottomNavItem icon={<LayoutDashboard size={24} />} label="Dashboard" to="/dashboard" />
+      ) : (
+        <BottomNavItem icon={<User size={24} />} label="Entrar" to="/login" />
+      )}
+    </BottomNav>
+  );
+}
 
 function AppRoutes() {
   const location = useLocation();
@@ -113,6 +132,16 @@ function AppRoutes() {
             }
           />
           <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <PageWrapper>
+                  <Settings />
+                </PageWrapper>
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/properties/new"
             element={
               <ProtectedRoute>
@@ -145,14 +174,7 @@ function AppRoutes() {
         </Routes>
       </AnimatePresence>
 
-      {showBottomNav && (
-        <BottomNav>
-          <BottomNavItem icon={<HomeIcon size={24} />} label="Início" to="/" />
-          <BottomNavItem icon={<SearchIcon size={24} />} label="Buscar" to="/search" />
-          <BottomNavItem icon={<Phone size={24} />} label="Contato" to="/contact" />
-          <BottomNavItem icon={<User size={24} />} label="Perfil" to="/profile" />
-        </BottomNav>
-      )}
+      {showBottomNav && <AppBottomNav />}
     </LayoutGroup>
   );
 }
