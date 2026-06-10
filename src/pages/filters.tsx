@@ -61,7 +61,10 @@ export function Filters() {
   return (
     <div data-slot="page-filters" className="flex h-dvh flex-col bg-background">
       {/* Header - FORA do scroll context */}
-      <PageContainer withSafeAreaTop className="flex shrink-0 items-center justify-between gap-3 bg-background pb-2 pt-4">
+      <PageContainer
+        withSafeAreaTop
+        className="flex shrink-0 items-center justify-between gap-3 bg-background pb-2 pt-4"
+      >
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -80,6 +83,18 @@ export function Filters() {
       <ScrollableContent hasFixedBottomButton={true}>
         <PageContainer>
           <div className="flex flex-col gap-8 py-2">
+            {/* Código do imóvel */}
+            <FilterSection title="Código do imóvel">
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="Ex: 575301"
+                value={filters.code}
+                onChange={(e) => updateFilter('code', e.target.value)}
+                className="h-12 rounded-xl border border-border bg-surface-raised px-4 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-action"
+              />
+            </FilterSection>
+
             {/* Tipo de negócio */}
             <FilterSection title="Tipo de negócio">
               <div className="inline-flex self-start rounded-full bg-surface p-1">
