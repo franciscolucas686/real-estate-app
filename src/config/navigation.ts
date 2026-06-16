@@ -5,7 +5,6 @@ export const ROUTES_WITHOUT_BOTTOM_NAV = [
   '/properties/new',
   '/properties/:id/edit',
   '/properties/:id/gallery',
-  '/login',
   '/search/filters',
   '/settings',
 ] as const;
