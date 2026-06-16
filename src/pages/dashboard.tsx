@@ -1,10 +1,10 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, HelpCircle, Settings } from 'lucide-react';
 import { useProperties } from '../hooks/use-properties';
 import { usePropertyStatusCounts } from '../hooks/use-property-status-counts';
 import { PropertyAdminCard } from '../components/features/property-admin-card';
-import { PropertyAdminCardSkeleton } from '../components/ui/skeletons';
+import { DashboardStatsSkeleton, PropertyAdminCardSkeleton } from '../components/ui/skeletons';
 import { PageContainer } from '../components/ui/page-container';
 import { BottomSheet } from '../components/ui/bottom-sheet';
 import { softDeleteProperty, updatePropertyStatus } from '../services/property-service';
@@ -18,59 +18,27 @@ export function Dashboard() {
   const [statusFilter, setStatusFilter] = useState<PropertyStatus | null>(null);
   const [codeSearch, setCodeSearch] = useState('');
   const [helpOpen, setHelpOpen] = useState(false);
-  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
-  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set());
-  const deleteTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const counts = usePropertyStatusCounts(true);
+  const { counts, isLoading: countsLoading } = usePropertyStatusCounts(true);
 
   const { data, isLoading } = useProperties({
     take: 100,
     ...(statusFilter ? { status: statusFilter } : {}),
   });
-  const allProperties = data?.data ?? [];
-
-  // Exclude recently soft-deleted from display
-  const visibleProperties = allProperties.filter((p) => !deletedIds.has(p.id));
+  const allProperties = useMemo(() => data?.data ?? [], [data]);
 
   const displayProperties = codeSearch.trim()
-    ? visibleProperties.filter((p) => p.code.includes(codeSearch.trim()))
-    : visibleProperties;
+    ? allProperties.filter((p) => p.code.includes(codeSearch.trim()))
+    : allProperties;
 
   const handleDelete = useCallback(
-    (id: string) => {
-      if (deleteTimerRef.current) {
-        clearTimeout(deleteTimerRef.current);
-        deleteTimerRef.current = null;
-      }
-
-      setDeletedIds((prev) => new Set([...prev, id]));
-      setPendingDeleteId(id);
-
-      deleteTimerRef.current = setTimeout(async () => {
-        try {
-          await softDeleteProperty(id);
-          await queryClient.refetchQueries({ queryKey: ['properties'] });
-        } catch {
-          setDeletedIds((prev) => {
-            const s = new Set(prev);
-            s.delete(id);
-            return s;
-          });
-        } finally {
-          setPendingDeleteId(null);
-          deleteTimerRef.current = null;
-        }
-      }, 6000);
-    },
-    [queryClient],
-  );
-
-  const handleDeactivate = useCallback(
     async (id: string) => {
       try {
-        await updatePropertyStatus(id, PropertyStatus.INACTIVE);
-        await queryClient.refetchQueries({ queryKey: ['properties'] });
+        await softDeleteProperty(id);
+        await Promise.all([
+          queryClient.refetchQueries({ queryKey: ['properties'] }),
+          queryClient.refetchQueries({ queryKey: ['property-status-counts'] }),
+        ]);
       } catch {
         /* silent */
       }
@@ -78,17 +46,41 @@ export function Dashboard() {
     [queryClient],
   );
 
-  const handleUndo = useCallback(() => {
-    if (!pendingDeleteId || !deleteTimerRef.current) return;
-    clearTimeout(deleteTimerRef.current);
-    deleteTimerRef.current = null;
-    setDeletedIds((prev) => {
-      const s = new Set(prev);
-      s.delete(pendingDeleteId);
-      return s;
-    });
-    setPendingDeleteId(null);
-  }, [pendingDeleteId]);
+  const handleActivate = useCallback(
+    async (id: string) => {
+      const property = allProperties.find((p) => p.id === id);
+      if (!property) return;
+      const target =
+        property.status === PropertyStatus.INACTIVE
+          ? PropertyStatus.PENDING
+          : PropertyStatus.ACTIVE;
+      try {
+        await updatePropertyStatus(id, target);
+        await Promise.all([
+          queryClient.refetchQueries({ queryKey: ['properties'] }),
+          queryClient.refetchQueries({ queryKey: ['property-status-counts'] }),
+        ]);
+      } catch {
+        /* silent */
+      }
+    },
+    [allProperties, queryClient],
+  );
+
+  const handleDeactivate = useCallback(
+    async (id: string) => {
+      try {
+        await updatePropertyStatus(id, PropertyStatus.INACTIVE);
+        await Promise.all([
+          queryClient.refetchQueries({ queryKey: ['properties'] }),
+          queryClient.refetchQueries({ queryKey: ['property-status-counts'] }),
+        ]);
+      } catch {
+        /* silent */
+      }
+    },
+    [queryClient],
+  );
 
   return (
     <div data-slot="page-dashboard" className="flex min-h-dvh flex-col pb-24">
@@ -117,10 +109,17 @@ export function Dashboard() {
       <BottomSheet open={helpOpen} onClose={() => setHelpOpen(false)} title="Status dos imóveis">
         <div className="flex flex-col gap-4 px-6 pb-4">
           {[
-            { emoji: '🟢', label: 'Ativo', desc: 'Publicado e visível para todos' },
-            { emoji: '🩶', label: 'Rascunho', desc: 'Não publicado, sem imagens' },
-            { emoji: '🟨', label: 'Pendente', desc: 'Aguardando revisão' },
-            { emoji: '⬛', label: 'Inativo', desc: 'Desativado manualmente' },
+            { emoji: '🟩', label: 'Ativo', desc: 'Publicado e visível para todos' },
+            {
+              emoji: '🟨',
+              label: 'Pendente',
+              desc: 'Sem fotos. Ativado automaticamente ao adicionar a primeira foto',
+            },
+            {
+              emoji: '⬛',
+              label: 'Inativo',
+              desc: 'Desativado manualmente. Restaure para voltar ao fluxo automático',
+            },
           ].map(({ emoji, label, desc }) => (
             <div key={label} className="flex items-center gap-3">
               <span className="text-xl">{emoji}</span>
@@ -133,43 +132,52 @@ export function Dashboard() {
         </div>
       </BottomSheet>
 
-      {/* Status cards */}
+      {/* Stats cards */}
       <PageContainer className="pb-4">
-        <div className="grid grid-cols-4 gap-2">
-          {(
-            [
-              { key: 'ACTIVE', label: 'Ativos', color: 'text-emerald-500' },
-              { key: 'DRAFT', label: 'Rascunhos', color: 'text-muted-foreground' },
-              { key: 'PENDING', label: 'Pendentes', color: 'text-amber-500' },
-              { key: 'INACTIVE', label: 'Inativos', color: 'text-foreground-subtle' },
-            ] as const
-          ).map(({ key, label, color }) => (
+        {countsLoading || !counts ? (
+          <DashboardStatsSkeleton />
+        ) : (
+          <div className="grid grid-cols-4 gap-2">
             <button
-              key={key}
               type="button"
-              onClick={() => setStatusFilter(statusFilter === key ? null : key)}
+              onClick={() => setStatusFilter(null)}
               className={twMerge(
                 'flex flex-col items-center gap-1 rounded-2xl border p-3 text-center transition-colors',
-                statusFilter === key
+                statusFilter === null
                   ? 'border-action bg-action/10'
                   : 'border-border bg-surface-raised',
               )}
             >
-              <span className={twMerge('text-xl font-bold', color)}>{counts[key]}</span>
-              <span className="text-[10px] text-muted-foreground leading-tight">{label}</span>
+              <span className="text-xl font-bold text-foreground">
+                {Object.values(counts).reduce((a, b) => a + b, 0)}
+              </span>
+              <span className="text-[10px] text-muted-foreground leading-tight">Total</span>
             </button>
-          ))}
-        </div>
-      </PageContainer>
 
-      {/* Total stats */}
-      <PageContainer className="pb-3">
-        <div className="rounded-2xl border border-border bg-surface-raised px-4 py-3">
-          <p className="text-xs text-muted-foreground">Total de imóveis</p>
-          <p className="text-2xl font-bold text-foreground">
-            {Object.values(counts).reduce((a, b) => a + b, 0)}
-          </p>
-        </div>
+            {(
+              [
+                { key: 'ACTIVE', label: 'Ativos', color: 'text-emerald-500' },
+                { key: 'PENDING', label: 'Pendentes', color: 'text-amber-500' },
+                { key: 'INACTIVE', label: 'Inativos', color: 'text-foreground-subtle' },
+              ] as const
+            ).map(({ key, label, color }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setStatusFilter(statusFilter === key ? null : key)}
+                className={twMerge(
+                  'flex flex-col items-center gap-1 rounded-2xl border p-3 text-center transition-colors',
+                  statusFilter === key
+                    ? 'border-action bg-action/10'
+                    : 'border-border bg-surface-raised',
+                )}
+              >
+                <span className={twMerge('text-xl font-bold', color)}>{counts[key]}</span>
+                <span className="text-[10px] text-muted-foreground leading-tight">{label}</span>
+              </button>
+            ))}
+          </div>
+        )}
       </PageContainer>
 
       {/* Code search */}
@@ -196,10 +204,16 @@ export function Dashboard() {
           <div className="flex flex-col items-center gap-4 py-16">
             <p className="text-center text-base font-medium text-foreground">
               {codeSearch.trim()
-                ? 'Nenhum imóvel encontrado com esse código'
-                : 'Nenhum imóvel cadastrado'}
+                ? 'Nenhum imóvel com esse código'
+                : statusFilter === 'ACTIVE'
+                  ? 'Nenhum imóvel ativo'
+                  : statusFilter === 'PENDING'
+                    ? 'Nenhum imóvel pendente'
+                    : statusFilter === 'INACTIVE'
+                      ? 'Nenhum imóvel inativo'
+                      : 'Nenhum imóvel cadastrado'}
             </p>
-            {!codeSearch.trim() && (
+            {!codeSearch.trim() && statusFilter === null && (
               <button
                 type="button"
                 onClick={() => navigate('/properties/new')}
@@ -216,6 +230,7 @@ export function Dashboard() {
                 key={property.id}
                 property={property}
                 onDelete={handleDelete}
+                onActivate={handleActivate}
                 onDeactivate={handleDeactivate}
               />
             ))}
@@ -232,20 +247,6 @@ export function Dashboard() {
       >
         <Plus size={32} />
       </button>
-
-      {/* Undo toast */}
-      {pendingDeleteId && (
-        <div className="fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom,0px)+80px)] z-40 flex items-center justify-between gap-3 rounded-full bg-foreground px-2 mb-4 shadow-lg">
-          <span className="text-2xl ml-4 text-white">Imóvel excluído</span>
-          <button
-            type="button"
-            onClick={handleUndo}
-            className="text-xl p-4 font-semibold text-action"
-          >
-            Desfazer
-          </button>
-        </div>
-      )}
     </div>
   );
 }
