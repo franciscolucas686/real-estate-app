@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, MapPin } from 'lucide-react';
@@ -287,6 +287,14 @@ function PropertyFormInner({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [mapOpen, setMapOpen] = useState(false);
+  const errorRef = useRef<HTMLParagraphElement>(null);
+
+  useEffect(() => {
+    if (!error) return;
+    requestAnimationFrame(() => {
+      errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  }, [error]);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -394,7 +402,14 @@ function PropertyFormInner({
       <PageContainer className="sticky top-0 z-10 flex items-center gap-3 bg-background pt-[env(safe-area-inset-top,16px)] pb-3">
         <button
           type="button"
-          onClick={() => (step > 1 ? setStep((s) => s - 1) : navigate(-1))}
+          onClick={() => {
+            if (step > 1) {
+              setError('');
+              setStep((s) => s - 1);
+            } else {
+              navigate(-1);
+            }
+          }}
           className="flex size-11 items-center justify-center rounded-full"
           aria-label="Voltar"
         >
@@ -427,23 +442,28 @@ function PropertyFormInner({
           {step === 3 && <Step3 form={form} set={set} />}
 
           {error && (
-            <p className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
+            <p
+              ref={errorRef}
+              className="scroll-mb-28 rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger"
+            >
               {error}
             </p>
           )}
         </div>
       </PageContainer>
 
-      <LocationPickerOverlay
-        open={mapOpen}
-        onClose={() => setMapOpen(false)}
-        onConfirm={handleMapConfirm}
-        initialCenter={
-          form.latitude !== null && form.longitude !== null
-            ? [form.latitude, form.longitude]
-            : undefined
-        }
-      />
+      {mapOpen && (
+        <LocationPickerOverlay
+          onClose={() => setMapOpen(false)}
+          onConfirm={handleMapConfirm}
+          initialCenter={
+            form.latitude !== null && form.longitude !== null
+              ? [form.latitude, form.longitude]
+              : undefined
+          }
+          initialAddress={{ city: form.city, state: form.state, neighborhood: form.neighborhood }}
+        />
+      )}
 
       {/* Footer */}
       <PageContainer className="fixed inset-x-0 bottom-0 z-40 bg-background/90 pb-[calc(env(safe-area-inset-bottom,16px)+16px)] pt-3 backdrop-blur-sm">
@@ -565,7 +585,7 @@ function Step1({ form, set }: { form: FormState; set: Setter }) {
 
   return (
     <>
-      <Field label="Tipo de imóvel">
+      <Field label="Tipo de imóvel *">
         <Select
           value={form.type}
           onChange={(v) => set('type', v)}
@@ -574,7 +594,7 @@ function Step1({ form, set }: { form: FormState; set: Setter }) {
         />
       </Field>
 
-      <Field label="Tipo de negócio">
+      <Field label="Tipo de negócio *">
         <div className="grid grid-cols-2 gap-2">
           {[BusinessType.SALE, BusinessType.RENT].map((bt) => (
             <button
@@ -595,7 +615,7 @@ function Step1({ form, set }: { form: FormState; set: Setter }) {
       </Field>
 
       {form.businessType === BusinessType.SALE && (
-        <Field label="Modalidade de venda">
+        <Field label="Modalidade de venda *">
           <div className="flex flex-wrap gap-2">
             {Object.values(SaleType).map((st) => {
               const sel = form.saleTypes.includes(st);
@@ -624,7 +644,7 @@ function Step1({ form, set }: { form: FormState; set: Setter }) {
         </Field>
       )}
 
-      <Field label="Preço">
+      <Field label="Preço *">
         <Input
           type="text"
           inputMode="numeric"
@@ -655,6 +675,10 @@ function Step1({ form, set }: { form: FormState; set: Setter }) {
           onChange={(v) => set('condoFee', v.replace(/\D/g, ''))}
         />
       </Field>
+
+      <span className="text-xs text-muted-foreground">
+        * Campos marcados com asterisco são obrigatórios.
+      </span>
     </>
   );
 }
@@ -678,22 +702,69 @@ function MapClickHandler({ onClick }: { onClick: (lat: number, lng: number) => v
 }
 
 interface LocationPickerOverlayProps {
-  open: boolean;
   onClose: () => void;
   onConfirm: (lat: number, lng: number, city: string, state: string, neighborhood: string) => void;
   initialCenter?: [number, number];
+  initialAddress?: { city: string; state: string; neighborhood: string };
 }
 
 function LocationPickerOverlay({
-  open,
   onClose,
   onConfirm,
   initialCenter,
+  initialAddress,
 }: LocationPickerOverlayProps) {
-  const DEFAULT_CENTER: [number, number] = initialCenter ?? [-23.5505, -46.6333];
+  const needsGeocode =
+    !initialCenter &&
+    Boolean(initialAddress?.city || initialAddress?.state || initialAddress?.neighborhood);
+
   const [markerPos, setMarkerPos] = useState<[number, number] | null>(initialCenter ?? null);
-  const [resolved, setResolved] = useState<GeoResult | null>(null);
+  const [resolved, setResolved] = useState<GeoResult | null>(
+    initialAddress?.city || initialAddress?.state || initialAddress?.neighborhood
+      ? {
+          neighborhood: initialAddress?.neighborhood || undefined,
+          city: initialAddress?.city || undefined,
+          state: initialAddress?.state || undefined,
+        }
+      : null,
+  );
   const [loading, setLoading] = useState(false);
+  const [geocoding, setGeocoding] = useState(needsGeocode);
+  const [geocodedCenter, setGeocodedCenter] = useState<[number, number] | null>(null);
+
+  useEffect(() => {
+    if (!needsGeocode) return;
+
+    const parts = [
+      initialAddress?.neighborhood,
+      initialAddress?.city,
+      initialAddress?.state,
+      'Brasil',
+    ].filter(Boolean);
+
+    let cancelled = false;
+
+    fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(parts.join(', '))}`,
+    )
+      .then((r) => r.json())
+      .then((results: Array<{ lat: string; lon: string }>) => {
+        if (cancelled) return;
+        if (results.length > 0) {
+          setGeocodedCenter([parseFloat(results[0].lat), parseFloat(results[0].lon)]);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (!cancelled) setGeocoding(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // Component remounts fresh on every open (parent uses {mapOpen && <.../>}), so deps are stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleClick = useCallback(async (lat: number, lng: number) => {
     setMarkerPos([lat, lng]);
@@ -711,9 +782,29 @@ function LocationPickerOverlay({
     }
   }, []);
 
-  if (!open) return null;
+  if (geocoding) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col bg-background">
+        <div className="flex shrink-0 items-center gap-3 bg-background px-4 pt-[env(safe-area-inset-top,16px)] pb-3">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex size-11 items-center justify-center rounded-full"
+            aria-label="Fechar mapa"
+          >
+            <ChevronLeft size={24} />
+          </button>
+          <p className="text-sm font-semibold text-foreground">Selecionar localização</p>
+        </div>
+        <div className="flex flex-1 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-action" />
+        </div>
+      </div>
+    );
+  }
 
-  const center: LatLngExpression = markerPos ?? DEFAULT_CENTER;
+  const effectiveCenter: [number, number] = initialCenter ?? geocodedCenter ?? [-23.5505, -46.6333];
+  const center: LatLngExpression = markerPos ?? effectiveCenter;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
@@ -808,11 +899,6 @@ function Step2({ form, set, onOpenMap }: { form: FormState; set: Setter; onOpenM
         <MapPin size={18} className="text-action" />
         {form.latitude !== null ? 'Alterar localização no mapa' : 'Selecionar localização no mapa'}
       </button>
-      {form.latitude !== null && form.longitude !== null && (
-        <p className="text-xs text-muted-foreground">
-          Coordenadas: {form.latitude.toFixed(5)}, {form.longitude.toFixed(5)}
-        </p>
-      )}
     </>
   );
 }
@@ -907,7 +993,7 @@ function Step3({ form, set }: { form: FormState; set: Setter }) {
 function HouseFields({ form, set }: { form: FormState; set: Setter }) {
   return (
     <>
-      <Field label="Número de andares *">
+      <Field label="Número de andares">
         <Input
           type="number"
           inputMode="numeric"

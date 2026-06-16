@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { twMerge } from 'tailwind-merge';
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Images, MoreVertical, PowerOff, Trash2 } from 'lucide-react';
+import { Pencil, Images, MoreVertical, PowerOff, Power, Trash2 } from 'lucide-react';
 import type { PropertyCardDto } from '../../types/api';
-import { BusinessType } from '../../types/api';
+import { BusinessType, PropertyStatus } from '../../types/api';
 import { formatMainPrice, PropertyTypeLabel, BusinessTypeLabel } from '../../utils/format';
 import { StatusBadge } from '../ui/status-badge';
 import { BottomSheet } from '../ui/bottom-sheet';
@@ -11,6 +11,7 @@ import { BottomSheet } from '../ui/bottom-sheet';
 interface PropertyAdminCardProps {
   property: PropertyCardDto;
   onDelete: (id: string) => void;
+  onActivate: (id: string) => void;
   onDeactivate: (id: string) => void;
   className?: string;
 }
@@ -18,6 +19,7 @@ interface PropertyAdminCardProps {
 export function PropertyAdminCard({
   property,
   onDelete,
+  onActivate,
   onDeactivate,
   className,
 }: PropertyAdminCardProps) {
@@ -124,17 +126,33 @@ export function PropertyAdminCard({
       <BottomSheet open={moreOpen} onClose={closeMore}>
         {!confirmDelete ? (
           <div className="flex flex-col px-6 pb-4">
-            <button
-              type="button"
-              onClick={() => {
-                onDeactivate(property.id);
-                closeMore();
-              }}
-              className="flex h-14 items-center gap-3 text-sm text-foreground"
-            >
-              <PowerOff size={20} className="text-muted-foreground" />
-              Desativar imóvel
-            </button>
+            {property.status !== PropertyStatus.INACTIVE && (
+              <button
+                type="button"
+                onClick={() => {
+                  onDeactivate(property.id);
+                  closeMore();
+                }}
+                className="flex h-14 items-center gap-3 text-sm text-foreground"
+              >
+                <PowerOff size={20} className="text-muted-foreground" />
+                Desativar imóvel
+              </button>
+            )}
+            {property.status !== PropertyStatus.ACTIVE &&
+              property.status !== PropertyStatus.PENDING && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onActivate(property.id);
+                    closeMore();
+                  }}
+                  className="flex h-14 items-center gap-3 text-sm text-foreground"
+                >
+                  <Power size={20} className="text-muted-foreground" />
+                  Ativar imóvel
+                </button>
+              )}
             <button
               type="button"
               onClick={() => setConfirmDelete(true)}

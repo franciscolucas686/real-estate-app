@@ -74,19 +74,19 @@ export function PropertyCard({ property, className }: PropertyCardProps) {
           <div className="flex items-center gap-5 font-bold text-sm text-foreground-subtle">
             {property.bedrooms != null && (
               <span className="flex items-center gap-1">
-                <Bed size={18} />
+                <Bed size={18} className="max-[380px]:hidden" />
                 {property.bedrooms} {property.bedrooms === 1 ? 'quarto' : 'quartos'}
               </span>
             )}
             {property.bathrooms != null && (
               <span className="flex items-center gap-1">
-                <Bath size={18} />
+                <Bath size={18} className="max-[380px]:hidden" />
                 {property.bathrooms} {property.bathrooms === 1 ? 'banheiro' : 'banheiros'}
               </span>
             )}
             {property.parkingSpaces != null && (
               <span className="flex items-center gap-1">
-                <Car size={18} />
+                <Car size={18} className="max-[380px]:hidden" />
                 {property.parkingSpaces} {property.parkingSpaces === 1 ? 'Vaga' : 'Vagas'}
               </span>
             )}

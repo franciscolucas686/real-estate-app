@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLogin } from '../hooks/use-auth';
-import { Eye, EyeOff, ChevronLeft } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 
 export function Login() {
   const navigate = useNavigate();
@@ -22,15 +22,15 @@ export function Login() {
 
   return (
     <div className="relative flex min-h-dvh max-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-4">
-      <button
+      {/* <button
         type="button"
         onClick={() => navigate(-1)}
         aria-label="Voltar"
         className="absolute left-3 top-[calc(env(safe-area-inset-top,16px)+12px)] z-10 flex size-14 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-transform active:scale-90"
       >
         <ChevronLeft size={24} />
-      </button>
-      <div className="w-full max-w-sm">
+      </button> */}
+      <div className="w-full max-w-sm mb-16">
         {/* Logo */}
         <div className="mb-10 flex justify-center">
           <img src="/logo.png" alt="Logo" className="h-20 object-contain" />

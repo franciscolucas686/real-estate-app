@@ -46,6 +46,7 @@ import {
 } from '../utils/format';
 import {
   PropertyType,
+  PropertyStatus,
   BusinessType,
   type PropertyDetailDto,
   type PropertyImageDto,
@@ -56,6 +57,7 @@ import {
   type SmallFarmDetailsDto,
   type CountryHouseDetailsDto,
 } from '../types/api';
+import { useMe } from '../hooks/use-auth';
 import { twMerge } from 'tailwind-merge';
 
 function flattenGallery(property: PropertyDetailDto): PropertyImageDto[] {
@@ -75,7 +77,10 @@ function hasCoords(
 export function PropertyDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: property, isLoading } = useProperty(id!);
+  const { data: property, isLoading: propertyLoading } = useProperty(id!);
+  const { data: me, isLoading: authLoading } = useMe();
+  const isLoading = propertyLoading || authLoading;
+  const isAuthenticated = Boolean(me);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const [mapFullscreen, setMapFullscreen] = useState(false);
@@ -113,6 +118,14 @@ export function PropertyDetails() {
   if (isLoading) return <PropertyDetailSkeleton />;
 
   if (!property) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center p-4">
+        <p className="text-sm text-foreground-subtle">Imóvel não encontrado.</p>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated && property.status !== PropertyStatus.ACTIVE) {
     return (
       <div className="flex min-h-dvh items-center justify-center p-4">
         <p className="text-sm text-foreground-subtle">Imóvel não encontrado.</p>

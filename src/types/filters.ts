@@ -1,4 +1,4 @@
-import { BusinessType, type FilterPropertyDto, PropertyType, type SaleType } from './api';
+import { BusinessType, type FilterPropertyDto, PropertyStatus, PropertyType, type SaleType } from './api';
 
 export interface PropertyFilters {
   businessType?: BusinessType;
@@ -69,6 +69,7 @@ export function filtersToApiParams(filters: PropertyFilters, take = 20): FilterP
     ...(filters.maxParkingSpaces != null && { maxParkingSpaces: filters.maxParkingSpaces }),
     sort: filters.sort,
     take,
+    status: PropertyStatus.ACTIVE,
   };
 }
 
