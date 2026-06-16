@@ -94,7 +94,6 @@ export function isPending(property: PropertyCardDto): boolean {
 }
 
 export const PropertyStatusLabel: Record<PropertyStatus, string> = {
-  DRAFT: 'Rascunho',
   PENDING: 'Pendente',
   ACTIVE: 'Ativo',
   INACTIVE: 'Inativo',
@@ -104,8 +103,6 @@ export function getStatusColors(status: PropertyStatus): { bg: string; text: str
   switch (status) {
     case PropertyStatus.ACTIVE:
       return { bg: 'bg-emerald-500', text: 'text-white' };
-    case PropertyStatus.DRAFT:
-      return { bg: 'bg-foreground/20', text: 'text-foreground' };
     case PropertyStatus.PENDING:
       return { bg: 'bg-amber-400', text: 'text-foreground' };
     case PropertyStatus.INACTIVE:

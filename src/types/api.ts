@@ -53,7 +53,6 @@ export interface PreviewImageDto {
 }
 
 export const PropertyStatus = {
-  DRAFT: 'DRAFT',
   PENDING: 'PENDING',
   ACTIVE: 'ACTIVE',
   INACTIVE: 'INACTIVE',
@@ -164,6 +163,7 @@ export interface PropertyDetailDto {
   code: string;
   type: PropertyType;
   businessType: BusinessType;
+  status: PropertyStatus;
   saleTypes: PropertySaleTypeDto[];
   price: string;
   rentPrice: string | null;
