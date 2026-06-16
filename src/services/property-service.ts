@@ -5,6 +5,7 @@ import type {
   FilterPropertyDto,
   PropertyDetailDto,
   PropertyListResponseDto,
+  PropertyStatus,
   ReorderImagesDto,
 } from '../types/api';
 
@@ -112,12 +113,13 @@ export async function reorderPropertyImages(propertyId: string, payload: Reorder
   });
 }
 
-export async function updatePropertyStatus(
-  id: string,
-  status: import('../types/api').PropertyStatus,
-) {
-  return apiFetch<import('../types/api').PropertyDetailDto>(`/properties/${id}/status`, {
+export async function updatePropertyStatus(id: string, status: PropertyStatus) {
+  return apiFetch<PropertyDetailDto>(`/properties/${id}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });
+}
+
+export async function fetchStatusCounts(): Promise<Record<PropertyStatus, number>> {
+  return apiFetch<Record<PropertyStatus, number>>('/properties/status-counts');
 }
