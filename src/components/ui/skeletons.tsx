@@ -71,6 +71,33 @@ export function PropertyAdminCardSkeleton({ className }: { className?: string })
   );
 }
 
+export function SettingsSkeleton() {
+  return (
+    <div className="flex min-h-dvh flex-col bg-background pb-10">
+      <div className="flex items-center gap-3 px-4 pt-[env(safe-area-inset-top,16px)] pb-3">
+        <Skeleton className="size-11 rounded-full" />
+        <Skeleton className="h-5 w-32" />
+      </div>
+      <div className="flex flex-col gap-6 px-6 pt-4">
+        <div className="flex flex-col gap-2">
+          <Skeleton className="mb-1 h-3 w-48" />
+          <Skeleton className="h-14 w-full rounded-xl" />
+          <Skeleton className="h-11 w-full rounded-xl" />
+        </div>
+        <div className="flex flex-col gap-3">
+          <Skeleton className="mb-1 h-3 w-36" />
+          <Skeleton className="h-11 w-full rounded-xl" />
+          <Skeleton className="h-11 w-full rounded-xl" />
+          <Skeleton className="h-11 w-full rounded-xl" />
+          <Skeleton className="h-11 w-full rounded-xl" />
+          <Skeleton className="h-12 w-full rounded-full" />
+        </div>
+        <Skeleton className="h-12 w-full rounded-full" />
+      </div>
+    </div>
+  );
+}
+
 export function DashboardStatsSkeleton() {
   return (
     <div className="grid grid-cols-4 gap-2">
