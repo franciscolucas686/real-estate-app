@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { AnimatePresence } from 'motion/react';
 import { motion } from 'motion/react';
 import {
   ChevronLeft,
+  Pencil,
+  CheckCircle,
   Bed,
   Bath,
   Car,
@@ -77,6 +79,10 @@ function hasCoords(
 export function PropertyDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+  const locationState = location.state as { context?: string; showSplash?: boolean } | null;
+  const isPostCreate = locationState?.context === 'post-create';
+
   const { data: property, isLoading: propertyLoading } = useProperty(id!);
   const { data: me, isLoading: authLoading } = useMe();
   const isLoading = propertyLoading || authLoading;
@@ -86,7 +92,15 @@ export function PropertyDetails() {
   const [mapFullscreen, setMapFullscreen] = useState(false);
   const [stickyCtaVisible, setStickyCtaVisible] = useState(false);
   const [stickyHeaderVisible, setStickyHeaderVisible] = useState(false);
+  const [splashVisible, setSplashVisible] = useState(Boolean(locationState?.showSplash));
   const ctaRef = useRef<HTMLDivElement>(null);
+  const stickyHeaderRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!splashVisible) return;
+    const t = setTimeout(() => setSplashVisible(false), 2000);
+    return () => clearTimeout(t);
+  }, [splashVisible]);
 
   const allImages = property ? flattenGallery(property) : [];
 
@@ -99,18 +113,14 @@ export function PropertyDetails() {
   }, [property]);
 
   useEffect(() => {
-    if (!property?.whatsappContact) return;
-    const el = ctaRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(([entry]) => setStickyCtaVisible(!entry.isIntersecting), {
-      threshold: 0,
-    });
-    obs.observe(el);
-    return () => obs.disconnect();
-  }, [property?.whatsappContact]);
-
-  useEffect(() => {
-    const handleScroll = () => setStickyHeaderVisible(window.scrollY > 10);
+    const handleScroll = () => {
+      setStickyHeaderVisible(window.scrollY > 2);
+      if (ctaRef.current) {
+        const ctaBottom = ctaRef.current.getBoundingClientRect().bottom;
+        const headerH = stickyHeaderRef.current?.getBoundingClientRect().height ?? 0;
+        setStickyCtaVisible(ctaBottom < headerH);
+      }
+    };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
@@ -146,14 +156,28 @@ export function PropertyDetails() {
           onOpenGallery={() => setGalleryOpen(true)}
           showDots={false}
         />
-        <button
-          type="button"
-          onClick={() => navigate(-1)}
-          aria-label="Voltar"
-          className="absolute left-3 top-[calc(env(safe-area-inset-top,20px)+12px)] z-10 flex size-14 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-transform active:scale-90"
-        >
-          <ChevronLeft size={24} />
-        </button>
+        {isPostCreate ? (
+          <button
+            type="button"
+            onClick={() =>
+              navigate(`/properties/${id}/edit`, { state: { context: 'post-create' } })
+            }
+            aria-label="Editar imóvel"
+            className="absolute left-3 top-[calc(env(safe-area-inset-top,20px)+12px)] z-10 flex h-10 items-center gap-2 rounded-full bg-black/40 px-4 text-sm font-semibold text-white backdrop-blur-sm transition-transform active:scale-90"
+          >
+            <Pencil size={15} />
+            Editar imóvel
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            aria-label="Voltar"
+            className="absolute left-3 top-[calc(env(safe-area-inset-top,20px)+12px)] z-10 flex size-14 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-transform active:scale-90"
+          >
+            <ChevronLeft size={24} />
+          </button>
+        )}
       </div>
 
       {/* Main content */}
@@ -436,24 +460,71 @@ export function PropertyDetails() {
         )}
       </AnimatePresence>
 
+      {/* post-create: Finalizar imóvel CTA */}
+      {isPostCreate && !mapFullscreen && (
+        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/90 px-4 pb-[calc(env(safe-area-inset-bottom,20px)+12px)] pt-3 backdrop-blur-sm">
+          <button
+            type="button"
+            onClick={() => navigate('/dashboard')}
+            className="flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white transition-transform active:scale-[0.98]"
+          >
+            Finalizar imóvel
+          </button>
+        </div>
+      )}
+
+      {/* post-create: success splash */}
+      <AnimatePresence>
+        {splashVisible && (
+          <motion.div
+            key="success-splash"
+            initial={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.4 }}
+            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-4 bg-background"
+          >
+            <CheckCircle size={64} className="text-action" />
+            <div className="flex flex-col items-center gap-1 text-center">
+              <p className="text-xl font-bold text-foreground">Imóvel criado!</p>
+              <p className="text-sm text-muted-foreground">Adicione fotos e finalize o cadastro.</p>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Sticky back button header — appears when carousel scrolls out of view */}
       <AnimatePresence>
         {stickyHeaderVisible && !mapFullscreen && (
           <motion.div
+            ref={stickyHeaderRef}
             initial={{ y: '-100%' }}
             animate={{ y: 0 }}
             exit={{ y: '-100%' }}
             transition={{ type: 'spring', damping: 40, stiffness: 400 }}
             className="fixed inset-x-0 top-0 z-40 flex items-center gap-3 border-b border-border bg-surface-raised px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)] shadow-sm"
           >
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              aria-label="Voltar"
-              className="flex size-10 items-center justify-center rounded-full text-foreground transition-transform active:scale-90"
-            >
-              <ChevronLeft size={24} />
-            </button>
+            {isPostCreate ? (
+              <button
+                type="button"
+                onClick={() =>
+                  navigate(`/properties/${id}/edit`, { state: { context: 'post-create' } })
+                }
+                aria-label="Editar imóvel"
+                className="flex h-10 items-center gap-2 rounded-full text-sm font-medium text-foreground transition-transform active:scale-90"
+              >
+                <Pencil size={16} />
+                Editar imóvel
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                aria-label="Voltar"
+                className="flex size-10 items-center justify-center rounded-full text-foreground transition-transform active:scale-90"
+              >
+                <ChevronLeft size={24} />
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
