@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   ChevronLeft,
@@ -37,7 +37,16 @@ interface GallerySection {
 export function GalleryManagement() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
+  const locationState = location.state as {
+    from?: string;
+    context?: string;
+    showSplash?: boolean;
+  } | null;
+  const fromDashboard = locationState?.from === 'dashboard';
+  const fromContext = locationState?.context;
+  const showSplash = Boolean(locationState?.showSplash);
   const { data: property, isLoading } = useProperty(id!);
 
   // State machine
@@ -305,10 +314,18 @@ export function GalleryManagement() {
         <div className="fixed bottom-0 inset-x-0 bg-background/90 p-4 backdrop-blur-sm">
           <button
             type="button"
-            onClick={() => navigate(`/properties/${id}`)}
+            onClick={() => {
+              if (fromDashboard) {
+                navigate('/dashboard');
+              } else if (fromContext === 'post-create') {
+                navigate(`/properties/${id}`, { state: { context: 'post-create', showSplash } });
+              } else {
+                navigate(`/properties/${id}`);
+              }
+            }}
             className="flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white active:bg-action-hover"
           >
-            Concluir
+            Adicionar fotos e concluir
           </button>
         </div>
       )}
