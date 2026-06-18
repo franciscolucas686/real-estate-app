@@ -481,7 +481,7 @@ export function PropertyDetails() {
             initial={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.4 }}
-            className="fixed inset-0 z-[9999] flex flex-col items-center justify-center gap-4 bg-background"
+            className="fixed inset-0 z-100 flex flex-col items-center justify-center gap-4 bg-background"
           >
             <CheckCircle size={64} className="text-action" />
             <div className="flex flex-col items-center gap-1 text-center">
