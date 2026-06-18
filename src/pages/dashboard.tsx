@@ -48,14 +48,8 @@ export function Dashboard() {
 
   const handleActivate = useCallback(
     async (id: string) => {
-      const property = allProperties.find((p) => p.id === id);
-      if (!property) return;
-      const target =
-        property.status === PropertyStatus.INACTIVE
-          ? PropertyStatus.PENDING
-          : PropertyStatus.ACTIVE;
       try {
-        await updatePropertyStatus(id, target);
+        await updatePropertyStatus(id, PropertyStatus.ACTIVE);
         await Promise.all([
           queryClient.refetchQueries({ queryKey: ['properties'] }),
           queryClient.refetchQueries({ queryKey: ['property-status-counts'] }),
@@ -64,7 +58,7 @@ export function Dashboard() {
         /* silent */
       }
     },
-    [allProperties, queryClient],
+    [queryClient],
   );
 
   const handleDeactivate = useCallback(

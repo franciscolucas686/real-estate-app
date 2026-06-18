@@ -3,44 +3,65 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Plus, Trash2, Check } from 'lucide-react';
 import { useLogout } from '../hooks/use-auth';
 import { PageContainer } from '../components/ui/page-container';
-import { getContactConfig, saveContactConfig } from './contact';
 import {
   fetchWhatsappNumbers,
   createWhatsappNumber,
   deleteWhatsappNumber,
 } from '../services/whatsapp-service';
-import type { WhatsappNumber } from '../types/api';
-import { useQueryClient } from '@tanstack/react-query';
+import { fetchSiteSettings, updateSiteSettings } from '../services/site-settings-service';
+import { formatPhone, formatPhoneAdaptive } from '../utils/format';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { SettingsSkeleton } from '../components/ui/skeletons';
 
 export function Settings() {
   const navigate = useNavigate();
   const logout = useLogout();
   const queryClient = useQueryClient();
 
-  const contact = getContactConfig();
-  const [email, setEmail] = useState(contact.email);
-  const [phone, setPhone] = useState(contact.phone);
-  const [hours, setHours] = useState(contact.hours);
-  const [whatsapp, setWhatsapp] = useState(contact.whatsapp);
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [hours, setHours] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
   const [saved, setSaved] = useState(false);
+  const [initialized, setInitialized] = useState(false);
 
-  const [numbers, setNumbers] = useState<WhatsappNumber[]>([]);
   const [newNumber, setNewNumber] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [addingNumber, setAddingNumber] = useState(false);
 
-  useEffect(() => {
-    fetchWhatsappNumbers()
-      .then(setNumbers)
-      .catch(() => {
-        // admin secret not configured — skip silently
-      });
-  }, []);
+  const { data: numbers = [], isLoading } = useQuery({
+    queryKey: ['whatsapp-numbers'],
+    queryFn: fetchWhatsappNumbers,
+    retry: false,
+  });
 
-  function handleSaveContact() {
-    saveContactConfig({ email, phone, hours, whatsapp });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const { data: siteSettings, isLoading: loadingSettings } = useQuery({
+    queryKey: ['site-settings'],
+    queryFn: fetchSiteSettings,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (siteSettings && !initialized) {
+      setEmail(siteSettings.email);
+      setPhone(siteSettings.phone.replace(/\D/g, '').slice(0, 11));
+      setHours(siteSettings.hours);
+      setWhatsapp(siteSettings.whatsapp.replace(/\D/g, '').slice(0, 11));
+      setInitialized(true);
+    }
+  }, [siteSettings, initialized]);
+
+  async function handleSaveContact() {
+    try {
+      await updateSiteSettings({ email, phone, hours, whatsapp });
+      await queryClient.invalidateQueries({ queryKey: ['site-settings'] });
+      setSaved(true);
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 800);
+    } catch {
+      // silent
+    }
   }
 
   async function handleAddNumber() {
@@ -52,13 +73,15 @@ export function Settings() {
         label: newLabel.trim() || undefined,
         isActive: true,
       });
-      setNumbers((prev) => [...prev, created]);
       if (numbers.length === 0) {
-        setWhatsapp(created.number);
-        saveContactConfig({ whatsapp: created.number });
+        const num = created.number.replace(/\D/g, '').slice(0, 11);
+        setWhatsapp(num);
+        await updateSiteSettings({ whatsapp: created.number });
+        await queryClient.invalidateQueries({ queryKey: ['site-settings'] });
       }
       setNewNumber('');
       setNewLabel('');
+      await queryClient.refetchQueries({ queryKey: ['whatsapp-numbers'] });
     } catch {
       // silent
     } finally {
@@ -69,7 +92,7 @@ export function Settings() {
   async function handleDeleteNumber(id: string) {
     try {
       await deleteWhatsappNumber(id);
-      setNumbers((prev) => prev.filter((n) => n.id !== id));
+      await queryClient.refetchQueries({ queryKey: ['whatsapp-numbers'] });
     } catch {
       // silent
     }
@@ -80,6 +103,8 @@ export function Settings() {
     queryClient.clear();
     navigate('/login', { replace: true });
   }
+
+  if (isLoading || loadingSettings) return <SettingsSkeleton />;
 
   return (
     <div className="flex min-h-dvh flex-col bg-background pb-10">
@@ -99,7 +124,7 @@ export function Settings() {
         {/* WhatsApp numbers (API) */}
         <section>
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            WhatsApp
+            WhatsApp da página dos imóveis
           </p>
           <div className="flex flex-col gap-2">
             {numbers.map((n) => (
@@ -108,7 +133,7 @@ export function Settings() {
                 className="flex items-center gap-3 rounded-xl border border-border bg-surface-raised px-4 py-3"
               >
                 <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">{n.number}</p>
+                  <p className="text-sm font-medium text-foreground">{formatPhone(n.number)}</p>
                   {n.label && <p className="text-xs text-muted-foreground">{n.label}</p>}
                 </div>
                 <button
@@ -124,9 +149,10 @@ export function Settings() {
 
             <div className="flex gap-2">
               <input
-                placeholder="Número (ex: 5511999999999)"
-                value={newNumber}
-                onChange={(e) => setNewNumber(e.target.value)}
+                inputMode="numeric"
+                placeholder="(11) 99999-9999"
+                value={formatPhone(newNumber)}
+                onChange={(e) => setNewNumber(e.target.value.replace(/\D/g, '').slice(0, 11))}
                 className="h-11 flex-1 rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action"
               />
               <button
@@ -142,7 +168,7 @@ export function Settings() {
           </div>
         </section>
 
-        {/* Contact config (localStorage) */}
+        {/* Contact config (API) */}
         <section>
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Dados de contato
@@ -150,12 +176,13 @@ export function Settings() {
           <div className="flex flex-col gap-3">
             <div>
               <label className="mb-1 block text-xs text-muted-foreground">
-                WhatsApp de contato
+                WhatsApp da página de contato
               </label>
               <input
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                placeholder="5511999999999"
+                inputMode="numeric"
+                value={formatPhone(whatsapp)}
+                onChange={(e) => setWhatsapp(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                placeholder="(11) 99999-9999"
                 className="h-11 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action"
               />
             </div>
@@ -171,9 +198,10 @@ export function Settings() {
             <div>
               <label className="mb-1 block text-xs text-muted-foreground">Telefone</label>
               <input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="(15) 9 8819-3239"
+                inputMode="numeric"
+                value={formatPhoneAdaptive(phone)}
+                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                placeholder="(11) 99999-9999"
                 className="h-11 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action"
               />
             </div>

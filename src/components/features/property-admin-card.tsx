@@ -104,7 +104,9 @@ export function PropertyAdminCard({
             </button>
             <button
               type="button"
-              onClick={() => navigate(`/properties/${property.id}/gallery`)}
+              onClick={() =>
+                navigate(`/properties/${property.id}/gallery`, { state: { from: 'dashboard' } })
+              }
               aria-label="Gerenciar galeria"
               className="flex size-9 items-center justify-center rounded-full bg-surface text-foreground-subtle transition-colors active:bg-border"
             >
