@@ -12,12 +12,13 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Minha Imobiliária',
-        short_name: 'Imobiliária',
+        name: 'Gestão Imobiliária',
+        short_name: 'Imob Francine',
+        start_url: '.',
         display: 'standalone',
-        start_url: '/',
-        theme_color: '#2563EB',
         background_color: '#ffffff',
+        theme_color: '#00072D',
+        lang: 'pt-BR',
       },
     }),
   ],
@@ -31,16 +32,6 @@ export default defineConfig({
         changeOrigin: true,
         secure: true,
       },
-      // '/auth': {
-      //   target: BACKEND_URL,
-      //   changeOrigin: true,
-      //   secure: true,
-      // },
-      // '/properties': {
-      //   target: BACKEND_URL,
-      //   changeOrigin: true,
-      //   secure: true,
-      // },
     },
   },
 });
