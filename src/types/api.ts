@@ -236,7 +236,7 @@ export interface CreatePropertyDto {
   type: PropertyType;
   businessType: BusinessType;
   saleTypes?: SaleType[];
-  price: string;
+  price?: string;
   rentPrice?: string;
   condoFee?: string;
   neighborhood: string;
@@ -296,4 +296,20 @@ export interface CreateWhatsappNumberDto {
   label?: string;
   isActive?: boolean;
   order?: number;
+}
+
+export interface SiteSettings {
+  id: string;
+  whatsapp: string;
+  email: string;
+  phone: string;
+  hours: string;
+  updatedAt: string;
+}
+
+export interface UpdateSiteSettingsDto {
+  whatsapp?: string;
+  email?: string;
+  phone?: string;
+  hours?: string;
 }
