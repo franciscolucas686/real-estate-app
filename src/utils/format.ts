@@ -81,6 +81,24 @@ export function formatMainPrice(
   return formatPrice(price);
 }
 
+export function formatPhone(raw: string): string {
+  const d = raw.replace(/\D/g, '').slice(0, 11);
+  if (d.length === 0) return '';
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
+// Adapts to landline (10 digits → 4-4) or mobile (11 digits → 5-4)
+export function formatPhoneAdaptive(raw: string): string {
+  const d = raw.replace(/\D/g, '').slice(0, 11);
+  if (d.length === 0) return '';
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
+
 export function buildWhatsAppUrl(contact: string, propertyCode?: string): string {
   const number = `55${contact.replace(/\D/g, '')}`;
   const message = propertyCode
@@ -108,4 +126,19 @@ export function getStatusColors(status: PropertyStatus): { bg: string; text: str
     case PropertyStatus.INACTIVE:
       return { bg: 'bg-foreground/70', text: 'text-white' };
   }
+}
+
+const PLACE_STOP_WORDS = new Set([
+  'de', 'da', 'do', 'das', 'dos', 'e', 'em', 'na', 'no', 'nas', 'nos',
+]);
+
+export function toPlaceCase(value: string): string {
+  return value
+    .split(' ')
+    .map((word, index) => {
+      const lower = word.toLowerCase();
+      if (index > 0 && PLACE_STOP_WORDS.has(lower)) return lower;
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join(' ');
 }
