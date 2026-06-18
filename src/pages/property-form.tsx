@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, MapPin } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
@@ -16,6 +16,7 @@ import {
   ZoningLabel,
   TopographyLabel,
   WaterSourceLabel,
+  toPlaceCase,
 } from '../utils/format';
 import {
   PropertyType,
@@ -128,14 +129,14 @@ function buildPayload(f: FormState): CreatePropertyDto {
   const base: CreatePropertyDto = {
     type: f.type as PropertyType,
     businessType: f.businessType as BusinessType,
-    price: f.price,
     neighborhood: f.neighborhood.trim(),
     city: f.city.trim(),
     state: f.state.trim().toUpperCase(),
     description: f.description,
+    ...(f.businessType === BusinessType.SALE && { price: f.price }),
     ...(f.businessType === BusinessType.SALE &&
       f.saleTypes.length > 0 && { saleTypes: f.saleTypes }),
-    ...(f.businessType === BusinessType.RENT && f.rentPrice && { rentPrice: f.rentPrice }),
+    ...(f.businessType === BusinessType.RENT && { rentPrice: f.rentPrice }),
     ...(f.condoFee && { condoFee: f.condoFee }),
     ...(f.bedrooms && { bedrooms: n(f.bedrooms) }),
     ...(f.bathrooms && { bathrooms: n(f.bathrooms) }),
@@ -280,12 +281,15 @@ function PropertyFormInner({
   initialData: PropertyDetailDto | undefined;
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const fromContext = (location.state as { context?: string } | null)?.context;
   const [step, setStep] = useState(1);
   const [form, setForm] = useState<FormState>(() =>
     initialData ? propertyToFormState(initialData) : INITIAL,
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [submitCount, setSubmitCount] = useState(0);
   const [mapOpen, setMapOpen] = useState(false);
   const errorRef = useRef<HTMLParagraphElement>(null);
 
@@ -294,7 +298,7 @@ function PropertyFormInner({
     requestAnimationFrame(() => {
       errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
-  }, [error]);
+  }, [error, submitCount]);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -324,23 +328,20 @@ function PropertyFormInner({
       if (!form.businessType) return 'Selecione o tipo de negócio.';
       if (form.businessType === BusinessType.SALE && form.saleTypes.length === 0)
         return 'Selecione ao menos uma modalidade de venda.';
-      if (!form.price) return 'Informe o preço.';
+      if (form.businessType === BusinessType.SALE && !form.price) return 'Informe o preço.';
+      if (form.businessType === BusinessType.RENT && !form.rentPrice)
+        return 'Informe o valor do aluguel.';
 
-      // Validate condoFee cannot be greater than price or rentPrice
       if (form.condoFee) {
         const condoFeeNum = Number(form.condoFee);
-        const priceNum = Number(form.price);
-        const rentPriceNum = form.rentPrice ? Number(form.rentPrice) : 0;
-
-        if (priceNum > 0 && condoFeeNum > priceNum) {
-          return 'O valor do condomínio não pode ser maior que o preço.';
-        }
-        if (
-          form.businessType === BusinessType.RENT &&
-          rentPriceNum > 0 &&
-          condoFeeNum > rentPriceNum
-        ) {
-          return 'O valor do condomínio não pode ser maior que o valor do aluguel.';
+        if (form.businessType === BusinessType.SALE) {
+          const priceNum = Number(form.price);
+          if (priceNum > 0 && condoFeeNum > priceNum)
+            return 'O valor do condomínio não pode ser maior que o preço.';
+        } else {
+          const rentPriceNum = Number(form.rentPrice);
+          if (rentPriceNum > 0 && condoFeeNum > rentPriceNum)
+            return 'O valor do condomínio não pode ser maior que o valor do aluguel.';
         }
       }
     }
@@ -369,6 +370,8 @@ function PropertyFormInner({
   async function handleNext() {
     const err = validateStep();
     if (err) {
+      setError('');
+      setSubmitCount((c) => c + 1);
       setError(err);
       return;
     }
@@ -380,10 +383,16 @@ function PropertyFormInner({
         const payload = buildPayload(form);
         if (isEdit && id) {
           await updateProperty(id, payload);
-          navigate(`/properties/${id}/gallery`);
+          if (fromContext === 'post-create') {
+            navigate(`/properties/${id}/gallery`, { state: { context: 'post-create' } });
+          } else {
+            navigate('/dashboard');
+          }
         } else {
           const created = await createProperty(payload);
-          navigate(`/properties/${created.id}/gallery`);
+          navigate(`/properties/${created.id}/gallery`, {
+            state: { context: 'post-create', showSplash: true },
+          });
         }
       } catch (e: unknown) {
         const msg = (e as { message?: string })?.message;
@@ -644,18 +653,20 @@ function Step1({ form, set }: { form: FormState; set: Setter }) {
         </Field>
       )}
 
-      <Field label="Preço *">
-        <Input
-          type="text"
-          inputMode="numeric"
-          placeholder="Ex: R$ 450.000"
-          value={formatPrice(form.price)}
-          onChange={(v) => set('price', v.replace(/\D/g, ''))}
-        />
-      </Field>
+      {form.businessType !== BusinessType.RENT && (
+        <Field label="Preço *">
+          <Input
+            type="text"
+            inputMode="numeric"
+            placeholder="Ex: R$ 450.000"
+            value={formatPrice(form.price)}
+            onChange={(v) => set('price', v.replace(/\D/g, ''))}
+          />
+        </Field>
+      )}
 
       {form.businessType === BusinessType.RENT && (
-        <Field label="Valor do aluguel">
+        <Field label="Valor do aluguel *">
           <Input
             type="text"
             inputMode="numeric"
@@ -873,7 +884,11 @@ function Step2({ form, set, onOpenMap }: { form: FormState; set: Setter; onOpenM
   return (
     <>
       <Field label="Cidade *">
-        <Input placeholder="Ex: Sorocaba" value={form.city} onChange={(v) => set('city', v)} />
+        <Input
+          placeholder="Ex: Sorocaba"
+          value={form.city}
+          onChange={(v) => set('city', toPlaceCase(v))}
+        />
       </Field>
       <Field label="Estado *">
         <Input
@@ -887,7 +902,7 @@ function Step2({ form, set, onOpenMap }: { form: FormState; set: Setter; onOpenM
         <Input
           placeholder="Ex: Centro"
           value={form.neighborhood}
-          onChange={(v) => set('neighborhood', v)}
+          onChange={(v) => set('neighborhood', toPlaceCase(v))}
         />
       </Field>
 
