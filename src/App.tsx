@@ -10,7 +10,6 @@ import { SplashScreen } from './components/ui/splash-screen';
 import { useShowBottomNav } from './config/navigation';
 import { useMe } from './hooks/use-auth';
 
-import { Home } from './pages/home';
 import { Search } from './pages/search';
 import { Contact } from './pages/contact';
 import { Profile } from './pages/profile';
@@ -28,7 +27,7 @@ function AppBottomNav() {
 
   return (
     <BottomNav>
-      <BottomNavItem icon={<SearchIcon size={24} />} label="Explorar" to="/search" />
+      <BottomNavItem icon={<SearchIcon size={24} />} label="Explorar" to="/" />
       <BottomNavItem icon={<Phone size={24} />} label="Contato" to="/contact" />
       {isAuth ? (
         <BottomNavItem icon={<LayoutDashboard size={24} />} label="Dashboard" to="/dashboard" />
@@ -60,14 +59,6 @@ function AppRoutes() {
           {/* Public */}
           <Route
             path="/"
-            element={
-              <PageWrapper>
-                <Home />
-              </PageWrapper>
-            }
-          />
-          <Route
-            path="/search"
             element={
               <PageWrapper>
                 <Search />
