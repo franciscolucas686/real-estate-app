@@ -10,15 +10,16 @@ import { BottomSheet } from '../components/ui/bottom-sheet';
 import { softDeleteProperty, updatePropertyStatus } from '../services/property-service';
 import { PropertyStatus } from '../types/api';
 import { twMerge } from 'tailwind-merge';
-import { useQueryClient } from '@tanstack/react-query';
+import { usePropertyMutationRefresh } from '../hooks/use-property-mutation-refresh';
+import { BOTTOM_NAV_PADDING } from '../config/layout';
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<PropertyStatus | null>(null);
   const [codeSearch, setCodeSearch] = useState('');
   const [helpOpen, setHelpOpen] = useState(false);
 
+  const refreshPropertyQueries = usePropertyMutationRefresh();
   const { counts, isLoading: countsLoading } = usePropertyStatusCounts(true);
 
   const { data, isLoading } = useProperties({
@@ -35,49 +36,43 @@ export function Dashboard() {
     async (id: string) => {
       try {
         await softDeleteProperty(id);
-        await Promise.all([
-          queryClient.refetchQueries({ queryKey: ['properties'] }),
-          queryClient.refetchQueries({ queryKey: ['property-status-counts'] }),
-        ]);
+        await refreshPropertyQueries();
       } catch {
         /* silent */
       }
     },
-    [queryClient],
+    [refreshPropertyQueries],
   );
 
   const handleActivate = useCallback(
     async (id: string) => {
       try {
         await updatePropertyStatus(id, PropertyStatus.ACTIVE);
-        await Promise.all([
-          queryClient.refetchQueries({ queryKey: ['properties'] }),
-          queryClient.refetchQueries({ queryKey: ['property-status-counts'] }),
-        ]);
+        await refreshPropertyQueries();
       } catch {
         /* silent */
       }
     },
-    [queryClient],
+    [refreshPropertyQueries],
   );
 
   const handleDeactivate = useCallback(
     async (id: string) => {
       try {
         await updatePropertyStatus(id, PropertyStatus.INACTIVE);
-        await Promise.all([
-          queryClient.refetchQueries({ queryKey: ['properties'] }),
-          queryClient.refetchQueries({ queryKey: ['property-status-counts'] }),
-        ]);
+        await refreshPropertyQueries();
       } catch {
         /* silent */
       }
     },
-    [queryClient],
+    [refreshPropertyQueries],
   );
 
   return (
-    <div data-slot="page-dashboard" className="flex min-h-dvh flex-col pb-24">
+    <div
+      data-slot="page-dashboard"
+      className={twMerge('flex min-h-dvh flex-col', BOTTOM_NAV_PADDING)}
+    >
       {/* Header */}
       <PageContainer withSafeAreaTop className="flex items-center justify-between py-4">
         <h1 className="text-xl font-bold text-foreground">Dashboard</h1>
@@ -85,16 +80,16 @@ export function Dashboard() {
           <button
             type="button"
             onClick={() => setHelpOpen(true)}
-            className="flex size-10 items-center justify-center rounded-full border border-border text-foreground-subtle active:bg-border"
+            className="flex size-12 items-center justify-center rounded-full border border-border text-foreground-subtle active:bg-border"
           >
-            <HelpCircle size={20} />
+            <HelpCircle size={24} />
           </button>
           <button
             type="button"
             onClick={() => navigate('/settings')}
-            className="flex size-10 items-center justify-center rounded-full border border-border text-foreground-subtle active:bg-border"
+            className="flex size-12 items-center justify-center rounded-full border border-border text-foreground-subtle active:bg-border"
           >
-            <Settings size={20} />
+            <Settings size={24} />
           </button>
         </div>
       </PageContainer>

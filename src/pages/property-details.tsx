@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { AnimatePresence } from 'motion/react';
+import { AnimatePresence, useIsPresent } from 'motion/react';
 import { motion } from 'motion/react';
 import {
   ChevronLeft,
@@ -32,6 +33,7 @@ import { PropertyMediaGallery } from '../components/media/property-media-gallery
 import { PropertyMediaViewer } from '../components/media/property-media-viewer';
 import { PropertyDetailSkeleton } from '../components/ui/skeletons';
 import { PageContainer } from '../components/ui/page-container';
+import { SuccessSplash } from '../components/ui/success-splash';
 import { PropertyMap } from '../components/property-map';
 import {
   formatPrice,
@@ -60,14 +62,17 @@ import {
   type CountryHouseDetailsDto,
 } from '../types/api';
 import { useMe } from '../hooks/use-auth';
+import { useScrollLock } from '../hooks/use-scroll-lock';
 import { twMerge } from 'tailwind-merge';
+import { usePropertyMutationRefresh } from '../hooks/use-property-mutation-refresh';
 
 function flattenGallery(property: PropertyDetailDto): PropertyImageDto[] {
-  const roomImages = property.gallery.rooms.flatMap((r) =>
-    r.images.map((img) => ({ ...img, roomName: r.name })),
+  const rooms = [...property.gallery.rooms].sort((a, b) => a.order - b.order);
+  const roomImages = rooms.flatMap((r) =>
+    [...r.images].sort((a, b) => a.order - b.order).map((img) => ({ ...img, roomName: r.name })),
   );
-  const unassigned = property.gallery.unassigned ?? [];
-  return [...roomImages, ...unassigned].sort((a, b) => a.order - b.order);
+  const unassigned = [...(property.gallery.unassigned ?? [])].sort((a, b) => a.order - b.order);
+  return [...roomImages, ...unassigned];
 }
 
 function hasCoords(
@@ -80,12 +85,17 @@ export function PropertyDetails() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
+  const refreshPropertyQueries = usePropertyMutationRefresh();
   const locationState = location.state as { context?: string; showSplash?: boolean } | null;
   const isPostCreate = locationState?.context === 'post-create';
 
-  const { data: property, isLoading: propertyLoading } = useProperty(id!);
+  const { data: property, isLoading: propertyLoading, isPlaceholderData } = useProperty(id!);
   const { data: me, isLoading: authLoading } = useMe();
-  const isLoading = propertyLoading || authLoading;
+  // isPlaceholderData: useProperty seeds the query with a stale preview card
+  // (from the list cache) whose whatsappContact is always null. Treat that
+  // placeholder the same as "still loading" so the WhatsApp CTA and gallery
+  // don't render from stale data and then pop in once the real fetch resolves.
+  const isLoading = propertyLoading || authLoading || isPlaceholderData;
   const isAuthenticated = Boolean(me);
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
@@ -93,8 +103,11 @@ export function PropertyDetails() {
   const [stickyCtaVisible, setStickyCtaVisible] = useState(false);
   const [stickyHeaderVisible, setStickyHeaderVisible] = useState(false);
   const [splashVisible, setSplashVisible] = useState(Boolean(locationState?.showSplash));
+  const [finalizeSplashVisible, setFinalizeSplashVisible] = useState(false);
+  const [coverReady, setCoverReady] = useState(false);
   const ctaRef = useRef<HTMLDivElement>(null);
   const stickyHeaderRef = useRef<HTMLDivElement>(null);
+  const isPresent = useIsPresent();
 
   useEffect(() => {
     if (!splashVisible) return;
@@ -102,7 +115,25 @@ export function PropertyDetails() {
     return () => clearTimeout(t);
   }, [splashVisible]);
 
+  useEffect(() => {
+    if (!finalizeSplashVisible) return;
+    const t = setTimeout(() => navigate('/dashboard'), 2000);
+    return () => clearTimeout(t);
+  }, [finalizeSplashVisible, navigate]);
+
+  useScrollLock(galleryOpen);
+  useScrollLock(mapFullscreen);
+
   const allImages = property ? flattenGallery(property) : [];
+  const coverUrl = allImages[0]?.url;
+
+  useEffect(() => {
+    if (!coverUrl) return;
+    const img = new Image();
+    img.onload = () => setCoverReady(true);
+    img.onerror = () => setCoverReady(true);
+    img.src = coverUrl;
+  }, [coverUrl]);
 
   // Memoize map coordinates to prevent re-renders during gestures
   const mapCenter = useMemo<[number, number] | undefined>(() => {
@@ -112,7 +143,13 @@ export function PropertyDetails() {
     return undefined;
   }, [property]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    // Once AnimatePresence marks this page as exiting (back navigation), the
+    // incoming route's scroll restoration can still dispatch a 'scroll' event
+    // while this component is kept mounted for its exit animation. Without this
+    // guard that stray event would flip the sticky header/CTA visibility and
+    // fire a second, conflicting exit animation on top of the page slide-out.
+    if (!isPresent) return;
     const handleScroll = () => {
       setStickyHeaderVisible(window.scrollY > 2);
       if (ctaRef.current) {
@@ -123,9 +160,12 @@ export function PropertyDetails() {
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [isPresent]);
 
-  if (isLoading) return <PropertyDetailSkeleton />;
+  // Keep the skeleton up until the cover photo has actually loaded, so the
+  // user never sees the page (incl. the WhatsApp CTA) before its first
+  // visible image is ready.
+  if (isLoading || (allImages.length > 0 && !coverReady)) return <PropertyDetailSkeleton />;
 
   if (!property) {
     return (
@@ -163,7 +203,7 @@ export function PropertyDetails() {
               navigate(`/properties/${id}/edit`, { state: { context: 'post-create' } })
             }
             aria-label="Editar imóvel"
-            className="absolute left-3 top-[calc(env(safe-area-inset-top,20px)+12px)] z-10 flex h-10 items-center gap-2 rounded-full bg-black/40 px-4 text-sm font-semibold text-white backdrop-blur-sm transition-transform active:scale-90"
+            className="absolute left-6 top-[calc(env(safe-area-inset-top,20px)+12px)] z-10 flex h-10 items-center gap-2 rounded-full bg-black/40 px-4 text-sm font-semibold text-white backdrop-blur-sm transition-transform active:scale-90"
           >
             <Pencil size={15} />
             Editar imóvel
@@ -179,7 +219,6 @@ export function PropertyDetails() {
           </button>
         )}
       </div>
-
       {/* Main content */}
       <PageContainer className="flex flex-col gap-4 py-6">
         {/* Price */}
@@ -345,189 +384,217 @@ export function PropertyDetails() {
           </>
         )}
       </PageContainer>
-
-      {/* Gallery overlay */}
-      <AnimatePresence>
-        {galleryOpen && (
-          <motion.div
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 40, stiffness: 400 }}
-            className="fixed inset-0 z-50 flex flex-col bg-background overflow-y-auto"
-          >
-            <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)]">
-              <button
-                type="button"
-                onClick={() => setGalleryOpen(false)}
-                aria-label="Voltar"
-                className="flex size-10 items-center justify-center rounded-full text-foreground active:scale-90 transition-transform"
-              >
-                <ChevronLeft size={24} />
-              </button>
-              <span className="text-base font-semibold text-foreground">
-                Fotos ({allImages.length})
-              </span>
-            </div>
-            <PropertyMediaGallery
-              images={allImages}
-              onImageClick={(i) => {
-                setViewerIndex(i);
-              }}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Fullscreen viewer */}
-      <AnimatePresence>
-        {viewerIndex !== null && (
-          <PropertyMediaViewer
-            images={allImages}
-            initialIndex={viewerIndex}
-            onClose={() => setViewerIndex(null)}
-          />
-        )}
-      </AnimatePresence>
-
-      {/* Fullscreen map overlay */}
-      <AnimatePresence>
-        {mapFullscreen && hasCoords(property.location) && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 flex flex-col bg-background"
-            style={{
-              zIndex: 1000,
-              touchAction: 'none',
-              WebkitOverflowScrolling: 'touch',
-              isolation: 'isolate',
-            }}
-          >
-            {/* Header - fixed height */}
-            <div className="flex-none flex items-center gap-3 border-b border-border bg-background px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)] relative z-20">
-              <button
-                type="button"
-                onClick={() => setMapFullscreen(false)}
-                aria-label="Voltar"
-                className="flex size-10 items-center justify-center rounded-full text-foreground active:scale-90 transition-transform"
-              >
-                <ChevronLeft size={24} />
-              </button>
-              <span className="text-base font-semibold text-foreground">Localização</span>
-            </div>
-
-            {/* Map container - fills remaining space */}
-            <div className="flex-1 relative overflow-hidden">
-              {mapCenter && (
-                <PropertyMap center={mapCenter} interactive={true} className="h-full w-full" />
-              )}
-            </div>
-
-            {/* Footer - fixed height */}
-            <div className="flex-none px-4 py-3 border-t border-border bg-background relative z-20">
-              <p className="text-sm text-foreground-subtle">
-                {property.location.neighborhood}, {property.location.city} —{' '}
-                {property.location.state}
-              </p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* WhatsApp CTA 2 — sticky, appears when CTA1 is covered by sticky header */}
-      <AnimatePresence>
-        {whatsUrl && stickyCtaVisible && stickyHeaderVisible && !mapFullscreen && (
-          <motion.div
-            initial={{ y: '100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 400 }}
-            className="fixed inset-x-0 bottom-0 z-40 px-4 pb-[calc(env(safe-area-inset-bottom,20px)+12px)] pt-3 bg-surface-raised border-t border-border shadow-lg"
-          >
-            <a
-              href={whatsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-action text-base font-semibold text-white transition-transform active:scale-[0.98]"
+      {/* Gallery overlay — portaled to escape the route-transition transform, which would
+          otherwise become the containing block for this fixed overlay. */}
+      {createPortal(
+        <AnimatePresence>
+          {galleryOpen && (
+            <motion.div
+              initial={{ x: '100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 40, stiffness: 400 }}
+              className="fixed inset-0 z-50 flex flex-col bg-background overflow-y-auto"
             >
-              <FaWhatsapp size={22} />
-              Conversar conosco agora
-            </a>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)]">
+                <button
+                  type="button"
+                  onClick={() => setGalleryOpen(false)}
+                  aria-label="Voltar"
+                  className="flex size-10 items-center justify-center rounded-full text-foreground active:scale-90 transition-transform"
+                >
+                  <ChevronLeft size={24} />
+                </button>
+                <span className="text-base font-semibold text-foreground">
+                  Fotos ({allImages.length})
+                </span>
+              </div>
+              <PropertyMediaGallery
+                images={allImages}
+                onImageClick={(i) => {
+                  setViewerIndex(i);
+                }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
+      {/* Fullscreen viewer — portaled to escape the route-transition transform, which would
+          otherwise become the containing block for this fixed overlay. */}
+      {createPortal(
+        <AnimatePresence>
+          {viewerIndex !== null && (
+            <PropertyMediaViewer
+              images={allImages}
+              initialIndex={viewerIndex}
+              onClose={() => setViewerIndex(null)}
+            />
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
+      {/* Fullscreen map overlay — portaled to escape the route-transition transform, which
+          would otherwise become the containing block for this fixed overlay. */}
+      {createPortal(
+        <AnimatePresence>
+          {mapFullscreen && hasCoords(property.location) && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 flex flex-col bg-background"
+              style={{
+                zIndex: 1000,
+                touchAction: 'none',
+                WebkitOverflowScrolling: 'touch',
+                isolation: 'isolate',
+              }}
+            >
+              {/* Header - fixed height */}
+              <div className="flex-none flex items-center gap-3 border-b border-border bg-background px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)] relative z-20">
+                <button
+                  type="button"
+                  onClick={() => setMapFullscreen(false)}
+                  aria-label="Voltar"
+                  className="flex size-10 items-center justify-center rounded-full text-foreground active:scale-90 transition-transform"
+                >
+                  <ChevronLeft size={24} />
+                </button>
+                <span className="text-base font-semibold text-foreground">Localização</span>
+              </div>
 
-      {/* post-create: Finalizar imóvel CTA */}
-      {isPostCreate && !mapFullscreen && (
-        <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/90 px-4 pb-[calc(env(safe-area-inset-bottom,20px)+12px)] pt-3 backdrop-blur-sm">
-          <button
-            type="button"
-            onClick={() => navigate('/dashboard')}
-            className="flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white transition-transform active:scale-[0.98]"
-          >
-            Finalizar imóvel
-          </button>
-        </div>
+              {/* Map container - fills remaining space */}
+              <div className="flex-1 relative overflow-hidden">
+                {mapCenter && (
+                  <PropertyMap center={mapCenter} interactive={true} className="h-full w-full" />
+                )}
+              </div>
+
+              {/* Footer - fixed height */}
+              <div className="flex-none px-4 py-3 border-t border-border bg-background relative z-20">
+                <p className="text-sm text-foreground-subtle">
+                  {property.location.neighborhood}, {property.location.city} —{' '}
+                  {property.location.state}
+                </p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
+      {/* WhatsApp CTA 2 — sticky, appears when CTA1 is covered by sticky header.
+          Portaled to escape the route-transition transform, which would otherwise
+          become the containing block for this fixed overlay. */}
+      {createPortal(
+        <AnimatePresence>
+          {isPresent &&
+            whatsUrl &&
+            stickyCtaVisible &&
+            stickyHeaderVisible &&
+            !mapFullscreen &&
+            !isPostCreate && (
+              <motion.div
+                initial={{ y: '100%' }}
+                animate={{ y: 0 }}
+                exit={{ y: '100%' }}
+                transition={{ type: 'spring', damping: 30, stiffness: 400 }}
+                className="fixed inset-x-0 bottom-0 z-40 px-4 pb-[calc(env(safe-area-inset-bottom,20px)+12px)] pt-3 bg-surface-raised border-t border-border shadow-lg"
+              >
+                <a
+                  href={whatsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-action text-base font-semibold text-white transition-transform active:scale-[0.98]"
+                >
+                  <FaWhatsapp size={22} />
+                  Conversar conosco agora
+                </a>
+              </motion.div>
+            )}
+        </AnimatePresence>,
+        document.body,
       )}
 
+      {/* post-create: Finalizar imóvel CTA — portaled to escape the route-transition
+          transform, which would otherwise become the containing block for this fixed overlay */}
+      {isPostCreate &&
+        !mapFullscreen &&
+        createPortal(
+          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/90 px-4 pb-[calc(env(safe-area-inset-bottom,20px)+12px)] pt-3 backdrop-blur-sm">
+            <button
+              type="button"
+              onClick={() => {
+                refreshPropertyQueries();
+                setFinalizeSplashVisible(true);
+              }}
+              className="flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white transition-transform active:scale-[0.98]"
+            >
+              Finalizar imóvel
+            </button>
+          </div>,
+          document.body,
+        )}
       {/* post-create: success splash */}
-      <AnimatePresence>
-        {splashVisible && (
-          <motion.div
-            key="success-splash"
-            initial={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.4 }}
-            className="fixed inset-0 z-100 flex flex-col items-center justify-center gap-4 bg-background"
-          >
-            <CheckCircle size={64} className="text-action" />
-            <div className="flex flex-col items-center gap-1 text-center">
-              <p className="text-xl font-bold text-foreground">Imóvel criado!</p>
-              <p className="text-sm text-muted-foreground">Adicione fotos e finalize o cadastro.</p>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Sticky back button header — appears when carousel scrolls out of view */}
-      <AnimatePresence>
-        {stickyHeaderVisible && !mapFullscreen && (
-          <motion.div
-            ref={stickyHeaderRef}
-            initial={{ y: '-100%' }}
-            animate={{ y: 0 }}
-            exit={{ y: '-100%' }}
-            transition={{ type: 'spring', damping: 40, stiffness: 400 }}
-            className="fixed inset-x-0 top-0 z-40 flex items-center gap-3 border-b border-border bg-surface-raised px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)] shadow-sm"
-          >
-            {isPostCreate ? (
-              <button
-                type="button"
-                onClick={() =>
-                  navigate(`/properties/${id}/edit`, { state: { context: 'post-create' } })
-                }
-                aria-label="Editar imóvel"
-                className="flex h-10 items-center gap-2 rounded-full text-sm font-medium text-foreground transition-transform active:scale-90"
-              >
-                <Pencil size={16} />
-                Editar imóvel
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                aria-label="Voltar"
-                className="flex size-10 items-center justify-center rounded-full text-foreground transition-transform active:scale-90"
-              >
-                <ChevronLeft size={24} />
-              </button>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <SuccessSplash visible={splashVisible}>
+        <CheckCircle size={64} className="text-action" />
+        <div className="flex flex-col items-center gap-1 text-center">
+          <p className="text-xl font-bold text-foreground">Imóvel criado!</p>
+          <p className="text-sm text-muted-foreground">Revise o imóvel e finalize o cadastro.</p>
+        </div>
+      </SuccessSplash>
+      {/* post-create: finalize success splash */}
+      <SuccessSplash visible={finalizeSplashVisible}>
+        <CheckCircle size={64} className="text-action" />
+        <div className="flex flex-col items-center gap-1 text-center">
+          <p className="text-xl font-bold text-foreground">
+            Imóvel {property.code} <br />
+            finalizado com sucesso!
+          </p>
+        </div>
+      </SuccessSplash>
+      {/* Sticky back button header — appears when carousel scrolls out of view.
+          Portaled to escape the route-transition transform, which would otherwise
+          become the containing block for this fixed overlay. */}
+      {createPortal(
+        <AnimatePresence>
+          {isPresent && stickyHeaderVisible && !mapFullscreen && (
+            <motion.div
+              ref={stickyHeaderRef}
+              initial={{ y: '-100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '-100%' }}
+              transition={{ type: 'spring', damping: 40, stiffness: 400 }}
+              className="fixed inset-x-0 top-0 z-40 flex items-center gap-3 border-b border-border bg-surface-raised px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)] shadow-sm"
+            >
+              {isPostCreate ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(`/properties/${id}/edit`, { state: { context: 'post-create' } })
+                  }
+                  aria-label="Editar imóvel"
+                  className="flex h-10 items-center px-4 ml-2 gap-2 rounded-full text-sm font-medium bg-black/40 text-white transition-transform active:scale-90"
+                >
+                  <Pencil size={16} />
+                  Editar imóvel
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  aria-label="Voltar"
+                  className="flex size-10 items-center justify-center rounded-full bg-black/40 text-white transition-transform active:scale-90"
+                >
+                  <ChevronLeft size={24} />
+                </button>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </div>
   );
 }
