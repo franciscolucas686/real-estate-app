@@ -1,4 +1,10 @@
-import { BusinessType, type FilterPropertyDto, PropertyStatus, PropertyType, type SaleType } from './api';
+import {
+  BusinessType,
+  type FilterPropertyDto,
+  PropertyStatus,
+  PropertyType,
+  type SaleType,
+} from './api';
 
 export interface PropertyFilters {
   businessType?: BusinessType;

@@ -129,7 +129,17 @@ export function getStatusColors(status: PropertyStatus): { bg: string; text: str
 }
 
 const PLACE_STOP_WORDS = new Set([
-  'de', 'da', 'do', 'das', 'dos', 'e', 'em', 'na', 'no', 'nas', 'nos',
+  'de',
+  'da',
+  'do',
+  'das',
+  'dos',
+  'e',
+  'em',
+  'na',
+  'no',
+  'nas',
+  'nos',
 ]);
 
 export function toPlaceCase(value: string): string {
