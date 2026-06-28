@@ -4,6 +4,7 @@ import { twMerge } from 'tailwind-merge';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
 import type { PropertyImageDto } from '../../types/api';
 import { useCarouselSwipe } from '../../hooks/use-carousel-swipe';
+import { useScrollLock } from '../../hooks/use-scroll-lock';
 
 interface PropertyMediaViewerProps extends Omit<HTMLMotionProps<'div'>, 'children'> {
   images: PropertyImageDto[];
@@ -22,12 +23,7 @@ export function PropertyMediaViewer({
     { totalSlides: images.length, initialIndex },
   );
 
-  useEffect(() => {
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, []);
+  useScrollLock(true);
 
   useEffect(() => {
     [current - 1, current + 1]
