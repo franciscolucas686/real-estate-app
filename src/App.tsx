@@ -184,8 +184,20 @@ function AppRoutes() {
 
 const SESSION_KEY = '__splash_shown__';
 
+function isAndroidStandalone() {
+  try {
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as { standalone?: boolean }).standalone === true;
+    return isStandalone && /android/i.test(navigator.userAgent);
+  } catch {
+    return false;
+  }
+}
+
 function App() {
   const [splashVisible, setSplashVisible] = useState(() => {
+    if (isAndroidStandalone()) return false;
     if (sessionStorage.getItem(SESSION_KEY)) return false;
     sessionStorage.setItem(SESSION_KEY, '1');
     return true;
