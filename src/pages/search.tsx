@@ -1,3 +1,4 @@
+import { useLayoutEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SlidersHorizontal } from 'lucide-react';
 import { PropertyList } from '../components/features/property-list';
@@ -7,10 +8,24 @@ import { useFilters } from '../hooks/use-filters';
 import { countActiveFilters } from '../types/filters';
 import { twMerge } from 'tailwind-merge';
 
+// Lives outside the component because the page unmounts/remounts on every
+// navigation (App.tsx keys routes by pathname), unlike a regular ref.
+let savedScrollTop = 0;
+
 export function Search() {
   const navigate = useNavigate();
   const { filters, resetFilters } = useFilters();
   const activeCount = countActiveFilters(filters);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = savedScrollTop;
+    return () => {
+      savedScrollTop = el.scrollTop;
+    };
+  }, []);
 
   return (
     <div data-slot="page-search" className="flex h-dvh flex-col bg-background">
@@ -54,7 +69,7 @@ export function Search() {
       )}
 
       {/* Scrollable content - COM scroll isolado */}
-      <ScrollableContent>
+      <ScrollableContent ref={scrollRef}>
         <PageContainer>
           <PropertyList />
         </PageContainer>
