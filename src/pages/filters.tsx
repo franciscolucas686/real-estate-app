@@ -8,6 +8,7 @@ import { PageContainer } from '../components/ui/page-container';
 import { ScrollableContent } from '../components/ui/scrollable-content';
 import { PropertyTypeLabel, BusinessTypeLabel, SaleTypeLabel } from '../utils/format';
 import { BusinessType, PropertyType, SaleType } from '../types/api';
+import { useDisablePullToRefresh } from '../hooks/use-disable-pull-to-refresh';
 
 const PROPERTY_TYPE_OPTIONS = Object.values(PropertyType).map((v) => ({
   label: PropertyTypeLabel[v],
@@ -39,6 +40,7 @@ function numToPrice(v: number): string {
 }
 
 export function Filters() {
+  useDisablePullToRefresh();
   const navigate = useNavigate();
   const { filters, updateFilter, resetFilters } = useFilters();
 
