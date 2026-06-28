@@ -7,6 +7,7 @@ import { BusinessType, PropertyStatus } from '../../types/api';
 import { formatMainPrice, PropertyTypeLabel, BusinessTypeLabel } from '../../utils/format';
 import { StatusBadge } from '../ui/status-badge';
 import { BottomSheet } from '../ui/bottom-sheet';
+import { ConfirmBottomSheetContent } from '../ui/confirm-bottom-sheet';
 
 interface PropertyAdminCardProps {
   property: PropertyCardDto;
@@ -47,60 +48,62 @@ export function PropertyAdminCard({
           className,
         )}
       >
-        {/* Thumbnail */}
-        <div
-          className="relative h-36 cursor-pointer"
-          onClick={() => navigate(`/properties/${property.id}`)}
-        >
-          {firstImage ? (
-            <img
-              src={firstImage.url}
-              alt={PropertyTypeLabel[property.type]}
-              loading="lazy"
-              className="h-full w-full object-cover"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center bg-border">
-              <span className="text-xs text-muted-foreground">Sem fotos</span>
-            </div>
-          )}
+        {/* Clickable area: thumbnail through price */}
+        <div className="cursor-pointer" onClick={() => navigate(`/properties/${property.id}`)}>
+          {/* Thumbnail */}
+          <div className="relative h-36">
+            {firstImage ? (
+              <img
+                src={firstImage.url}
+                alt={PropertyTypeLabel[property.type]}
+                loading="lazy"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-border">
+                <span className="text-xs text-muted-foreground">Sem fotos</span>
+              </div>
+            )}
 
-          <StatusBadge status={property.status} className="absolute left-2 top-2" />
-        </div>
-
-        {/* Info */}
-        <div className="flex flex-col gap-1 p-3">
-          <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-mono font-medium text-muted-foreground">
-              Cód: {property.code}
-            </span>
-            <span
-              className={twMerge(
-                'rounded-full px-2 py-0.5 text-[10px] font-semibold text-white',
-                property.businessType === BusinessType.SALE ? 'bg-action' : 'bg-accent',
-              )}
-            >
-              {BusinessTypeLabel[property.businessType]}
-            </span>
+            <StatusBadge status={property.status} className="absolute left-2 top-2" />
           </div>
 
-          <span className="text-sm font-medium text-foreground line-clamp-1">
-            {PropertyTypeLabel[property.type]} · {property.neighborhood}
-          </span>
+          {/* Info */}
+          <div className="flex flex-col gap-1 p-3 pb-0">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs font-mono font-medium text-muted-foreground">
+                Cód: {property.code}
+              </span>
+              <span
+                className={twMerge(
+                  'rounded-full px-2 py-0.5 text-[10px] font-semibold text-white',
+                  property.businessType === BusinessType.SALE ? 'bg-action' : 'bg-accent',
+                )}
+              >
+                {BusinessTypeLabel[property.businessType]}
+              </span>
+            </div>
 
-          <span className="text-base font-bold text-foreground">
-            {formatMainPrice(property.businessType, property.price, property.rentPrice)}
-          </span>
+            <span className="text-sm font-medium text-foreground line-clamp-1">
+              {PropertyTypeLabel[property.type]} · {property.neighborhood}
+            </span>
 
-          {/* Actions */}
+            <span className="text-base font-bold text-foreground">
+              {formatMainPrice(property.businessType, property.price, property.rentPrice)}
+            </span>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="p-3 pt-1">
           <div className="mt-1 flex justify-around border-t border-border pt-2">
             <button
               type="button"
               onClick={() => navigate(`/properties/${property.id}/edit`)}
               aria-label="Editar imóvel"
-              className="flex size-9 items-center justify-center rounded-full bg-surface text-foreground-subtle transition-colors active:bg-border"
+              className="flex size-10 items-center justify-center rounded-full bg-surface text-foreground-subtle transition-colors active:bg-border"
             >
-              <Pencil size={16} />
+              <Pencil size={20} />
             </button>
             <button
               type="button"
@@ -108,17 +111,17 @@ export function PropertyAdminCard({
                 navigate(`/properties/${property.id}/gallery`, { state: { from: 'dashboard' } })
               }
               aria-label="Gerenciar galeria"
-              className="flex size-9 items-center justify-center rounded-full bg-surface text-foreground-subtle transition-colors active:bg-border"
+              className="flex size-10 items-center justify-center rounded-full bg-surface text-foreground-subtle transition-colors active:bg-border"
             >
-              <Images size={16} />
+              <Images size={20} />
             </button>
             <button
               type="button"
               onClick={openMore}
               aria-label="Mais opções"
-              className="flex size-9 items-center justify-center rounded-full bg-surface text-foreground-subtle transition-colors active:bg-border"
+              className="flex size-10 items-center justify-center rounded-full bg-surface text-foreground-subtle transition-colors active:bg-border"
             >
-              <MoreVertical size={16} />
+              <MoreVertical size={20} />
             </button>
           </div>
         </div>
@@ -165,28 +168,14 @@ export function PropertyAdminCard({
             </button>
           </div>
         ) : (
-          <div className="flex flex-col gap-3 px-6 pb-4">
-            <p className="text-sm text-foreground-subtle">
-              Tem certeza que deseja excluir este imóvel?
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                onDelete(property.id);
-                closeMore();
-              }}
-              className="h-12 rounded-full bg-danger text-sm font-semibold text-white"
-            >
-              Sim, excluir
-            </button>
-            <button
-              type="button"
-              onClick={() => setConfirmDelete(false)}
-              className="h-12 rounded-full border border-border text-sm text-foreground"
-            >
-              Cancelar
-            </button>
-          </div>
+          <ConfirmBottomSheetContent
+            message="Tem certeza que deseja excluir este imóvel?"
+            onConfirm={() => {
+              onDelete(property.id);
+              closeMore();
+            }}
+            onClose={() => setConfirmDelete(false)}
+          />
         )}
       </BottomSheet>
     </>
