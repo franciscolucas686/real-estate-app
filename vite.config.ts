@@ -18,7 +18,7 @@ export default defineConfig({
         display: 'standalone',
         background_color: '#ffffff',
         theme_color: '#00072D',
-        lang: 'pt-BR',
+        lang: 'pt-br',
       },
     }),
   ],

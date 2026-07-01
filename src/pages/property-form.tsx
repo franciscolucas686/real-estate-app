@@ -28,6 +28,7 @@ import {
   WaterSource,
 } from '../types/api';
 import { createProperty, updateProperty, fetchPropertyById } from '../services/property-service';
+import { useDisablePullToRefresh } from '../hooks/use-disable-pull-to-refresh';
 import type { CreatePropertyDto, PropertyDetailDto } from '../types/api';
 
 // ─── Form state ──────────────────────────────────────────────────────────────
@@ -248,6 +249,7 @@ function propertyToFormState(p: PropertyDetailDto): FormState {
 
 // ─── Component ───────────────────────────────────────────────────────────────
 export function PropertyForm() {
+  useDisablePullToRefresh();
   const { id } = useParams<{ id?: string }>();
   const isEdit = Boolean(id);
 
@@ -311,6 +313,7 @@ function PropertyFormInner({
     state: string,
     neighborhood: string,
   ) {
+    setError('');
     setForm((prev) => ({
       ...prev,
       latitude: lat,
@@ -352,10 +355,9 @@ function PropertyFormInner({
       if (!form.neighborhood) return 'Informe o bairro.';
     }
     if (step === 3) {
-      if (!form.description) return 'Informe a descrição.';
       if (form.type === PropertyType.APARTMENT) {
-        if (!form.sunPosition) return 'Selecione a posição do sol.';
         if (!form.isGroundFloor && !form.floor) return 'Informe o andar.';
+        if (!form.sunPosition) return 'Selecione a posição do sol.';
       }
       if (form.type === PropertyType.LAND) {
         if (!form.zoning) return 'Selecione o zoneamento.';
@@ -363,6 +365,7 @@ function PropertyFormInner({
       }
       if (form.type === PropertyType.SMALL_FARM && !form.waterSource)
         return 'Selecione a fonte de água.';
+      if (!form.description) return 'Informe a descrição.';
     }
     return '';
   }
@@ -408,7 +411,7 @@ function PropertyFormInner({
   return (
     <div data-slot="page-property-form" className="flex min-h-dvh flex-col bg-background">
       {/* Header */}
-      <PageContainer className="sticky top-0 z-10 flex items-center gap-3 bg-background pt-[env(safe-area-inset-top,16px)] pb-3">
+      <PageContainer className="sticky top-0 z-10 flex items-center gap-3 bg-background pt-[calc(env(safe-area-inset-top,16px)+12px)] pb-3">
         <button
           type="button"
           onClick={() => {
@@ -416,7 +419,7 @@ function PropertyFormInner({
               setError('');
               setStep((s) => s - 1);
             } else {
-              navigate(-1);
+              navigate(`/dashboard`);
             }
           }}
           className="flex size-11 items-center justify-center rounded-full"
@@ -424,11 +427,26 @@ function PropertyFormInner({
         >
           <ChevronLeft size={24} />
         </button>
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <span className="text-base font-semibold text-foreground">
             {isEdit ? 'Editar imóvel' : 'Novo imóvel'}
           </span>
-          <div className="flex items-center gap-1 mt-1">
+          {isEdit && initialData && form.type ? (
+            <p className="mt-1 truncate text-xs text-foreground-subtle">
+              {PropertyTypeLabel[form.type]} · Cód. {initialData.code}
+            </p>
+          ) : (
+            !isEdit &&
+            step >= 2 &&
+            form.type &&
+            form.businessType && (
+              <p className="mt-1 truncate text-xs text-foreground-subtle">
+                {PropertyTypeLabel[form.type]} · {BusinessTypeLabel[form.businessType]}
+                {step === 3 && form.city ? ` · ${form.city}` : ''}
+              </p>
+            )
+          )}
+          <div className="flex items-center gap-1 mt-2">
             {[1, 2, 3].map((s) => (
               <div
                 key={s}
@@ -446,8 +464,10 @@ function PropertyFormInner({
       {/* Content */}
       <PageContainer className="flex-1 overflow-y-auto pb-28">
         <div className="flex flex-col gap-5 py-2">
-          {step === 1 && <Step1 form={form} set={set} />}
-          {step === 2 && <Step2 form={form} set={set} onOpenMap={() => setMapOpen(true)} />}
+          {step === 1 && <Step1 form={form} set={set} onSubmit={handleNext} />}
+          {step === 2 && (
+            <Step2 form={form} set={set} onOpenMap={() => setMapOpen(true)} onSubmit={handleNext} />
+          )}
           {step === 3 && <Step3 form={form} set={set} />}
 
           {error && (
@@ -463,7 +483,10 @@ function PropertyFormInner({
 
       {mapOpen && (
         <LocationPickerOverlay
-          onClose={() => setMapOpen(false)}
+          onClose={() => {
+            setError('');
+            setMapOpen(false);
+          }}
           onConfirm={handleMapConfirm}
           initialCenter={
             form.latitude !== null && form.longitude !== null
@@ -487,7 +510,7 @@ function PropertyFormInner({
             : step === 3
               ? isEdit
                 ? 'Salvar alterações'
-                : 'Criar e ir para fotos'
+                : 'Criar e ir para Galeria'
               : 'Continuar'}
         </button>
       </PageContainer>
@@ -586,7 +609,7 @@ function Toggle({
 }
 
 // ─── Step 1: Basic info ───────────────────────────────────────────────────────
-function Step1({ form, set }: { form: FormState; set: Setter }) {
+function Step1({ form, set, onSubmit }: { form: FormState; set: Setter; onSubmit: () => void }) {
   const typeOptions = Object.values(PropertyType).map((v) => ({
     label: PropertyTypeLabel[v],
     value: v,
@@ -684,6 +707,10 @@ function Step1({ form, set }: { form: FormState; set: Setter }) {
           placeholder="Ex: R$ 800"
           value={formatPrice(form.condoFee)}
           onChange={(v) => set('condoFee', v.replace(/\D/g, ''))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onSubmit();
+          }}
+          enterKeyHint="go"
         />
       </Field>
 
@@ -746,23 +773,20 @@ function LocationPickerOverlay({
   useEffect(() => {
     if (!needsGeocode) return;
 
-    const parts = [
-      initialAddress?.neighborhood,
-      initialAddress?.city,
-      initialAddress?.state,
-      'Brasil',
-    ].filter(Boolean);
-
     let cancelled = false;
 
-    fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(parts.join(', '))}`,
-    )
-      .then((r) => r.json())
-      .then((results: Array<{ lat: string; lon: string }>) => {
+    apiFetch<{ latitude: number; longitude: number } | null>('/geocode/forward', {
+      method: 'POST',
+      body: JSON.stringify({
+        neighborhood: initialAddress?.neighborhood ?? '',
+        city: initialAddress?.city ?? '',
+        state: initialAddress?.state ?? '',
+      }),
+    })
+      .then((result) => {
         if (cancelled) return;
-        if (results.length > 0) {
-          setGeocodedCenter([parseFloat(results[0].lat), parseFloat(results[0].lon)]);
+        if (result) {
+          setGeocodedCenter([result.latitude, result.longitude]);
         }
       })
       .catch(() => {})
@@ -796,7 +820,7 @@ function LocationPickerOverlay({
   if (geocoding) {
     return (
       <div className="fixed inset-0 z-50 flex flex-col bg-background">
-        <div className="flex shrink-0 items-center gap-3 bg-background px-4 pt-[env(safe-area-inset-top,16px)] pb-3">
+        <div className="flex shrink-0 items-center gap-3 bg-background px-4 pt-[calc(env(safe-area-inset-top,16px)+12px)] pb-3">
           <button
             type="button"
             onClick={onClose}
@@ -820,7 +844,7 @@ function LocationPickerOverlay({
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
       {/* Header */}
-      <div className="flex shrink-0 items-center gap-3 bg-background px-4 pt-[env(safe-area-inset-top,16px)] pb-3">
+      <div className="flex shrink-0 items-center gap-3 bg-background px-4 pt-[calc(env(safe-area-inset-top,16px)+12px)] pb-3">
         <button
           type="button"
           onClick={onClose}
@@ -839,27 +863,10 @@ function LocationPickerOverlay({
             </p>
           )}
         </div>
-        <button
-          type="button"
-          disabled={!markerPos}
-          onClick={() => {
-            if (!markerPos) return;
-            onConfirm(
-              markerPos[0],
-              markerPos[1],
-              resolved?.city ?? '',
-              resolved?.state ?? '',
-              resolved?.neighborhood ?? '',
-            );
-          }}
-          className="rounded-full bg-action px-4 py-2 text-sm font-semibold text-white disabled:opacity-40"
-        >
-          Confirmar
-        </button>
       </div>
 
       {/* Map */}
-      <div className="flex-1">
+      <div className="relative flex-1">
         <MapContainer
           center={center}
           zoom={13}
@@ -874,13 +881,43 @@ function LocationPickerOverlay({
           <MapClickHandler onClick={handleClick} />
           {markerPos && <Marker position={markerPos} />}
         </MapContainer>
+
+        <div className="absolute inset-x-0 bottom-0 z-1000 flex justify-center pb-[calc(env(safe-area-inset-bottom,16px)+16px)]">
+          <button
+            type="button"
+            disabled={!markerPos || loading || !resolved?.neighborhood}
+            onClick={() => {
+              if (!markerPos || !resolved?.neighborhood) return;
+              onConfirm(
+                markerPos[0],
+                markerPos[1],
+                resolved?.city ?? '',
+                resolved?.state ?? '',
+                resolved?.neighborhood ?? '',
+              );
+            }}
+            className="flex h-14 w-[90%] items-center justify-center rounded-full bg-action text-base font-semibold text-white shadow-lg disabled:opacity-60"
+          >
+            Confirmar
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
 // ─── Step 2: Location ─────────────────────────────────────────────────────────
-function Step2({ form, set, onOpenMap }: { form: FormState; set: Setter; onOpenMap: () => void }) {
+function Step2({
+  form,
+  set,
+  onOpenMap,
+  onSubmit,
+}: {
+  form: FormState;
+  set: Setter;
+  onOpenMap: () => void;
+  onSubmit: () => void;
+}) {
   return (
     <>
       <Field label="Cidade *">
@@ -903,6 +940,10 @@ function Step2({ form, set, onOpenMap }: { form: FormState; set: Setter; onOpenM
           placeholder="Ex: Centro"
           value={form.neighborhood}
           onChange={(v) => set('neighborhood', toPlaceCase(v))}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') onSubmit();
+          }}
+          enterKeyHint="go"
         />
       </Field>
 
@@ -1052,16 +1093,16 @@ function ApartmentFields({ form, set }: { form: FormState; set: Setter }) {
   }));
   return (
     <>
-      <Toggle
-        label="É térreo"
-        value={form.isGroundFloor}
-        onChange={(v) => {
-          set('isGroundFloor', v);
-          if (v) set('floor', ''); // Clear floor when ground floor is selected
-        }}
-      />
-      {!form.isGroundFloor && (
-        <Field label="Andar *">
+      <Field label="Andar *">
+        <Toggle
+          label="É térreo"
+          value={form.isGroundFloor}
+          onChange={(v) => {
+            set('isGroundFloor', v);
+            if (v) set('floor', ''); // Clear floor when ground floor is selected
+          }}
+        />
+        {!form.isGroundFloor && (
           <Input
             type="number"
             inputMode="numeric"
@@ -1069,8 +1110,8 @@ function ApartmentFields({ form, set }: { form: FormState; set: Setter }) {
             value={form.floor}
             onChange={(v) => set('floor', v)}
           />
-        </Field>
-      )}
+        )}
+      </Field>
       <Field label="Posição do sol *">
         <Select
           value={form.sunPosition}

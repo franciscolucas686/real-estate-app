@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, Plus, Trash2, Check } from 'lucide-react';
+import { ChevronLeft, Plus, Trash2, Check, CheckCircle, Loader2 } from 'lucide-react';
 import { useLogout } from '../hooks/use-auth';
 import { PageContainer } from '../components/ui/page-container';
 import {
@@ -12,6 +12,7 @@ import { fetchSiteSettings, updateSiteSettings } from '../services/site-settings
 import { formatPhone, formatPhoneAdaptive } from '../utils/format';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { SettingsSkeleton } from '../components/ui/skeletons';
+import { SuccessSplash } from '../components/ui/success-splash';
 
 export function Settings() {
   const navigate = useNavigate();
@@ -24,10 +25,13 @@ export function Settings() {
   const [whatsapp, setWhatsapp] = useState('');
   const [saved, setSaved] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  const [splashVisible, setSplashVisible] = useState(false);
+  const [savingContact, setSavingContact] = useState(false);
 
   const [newNumber, setNewNumber] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [addingNumber, setAddingNumber] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const { data: numbers = [], isLoading } = useQuery({
     queryKey: ['whatsapp-numbers'],
@@ -52,15 +56,19 @@ export function Settings() {
   }, [siteSettings, initialized]);
 
   async function handleSaveContact() {
+    setSavingContact(true);
     try {
       await updateSiteSettings({ email, phone, hours, whatsapp });
       await queryClient.invalidateQueries({ queryKey: ['site-settings'] });
       setSaved(true);
+      setSplashVisible(true);
       setTimeout(() => {
         navigate('/dashboard');
-      }, 800);
+      }, 1500);
     } catch {
       // silent
+    } finally {
+      setSavingContact(false);
     }
   }
 
@@ -79,9 +87,9 @@ export function Settings() {
         await updateSiteSettings({ whatsapp: created.number });
         await queryClient.invalidateQueries({ queryKey: ['site-settings'] });
       }
+      await queryClient.refetchQueries({ queryKey: ['whatsapp-numbers'] });
       setNewNumber('');
       setNewLabel('');
-      await queryClient.refetchQueries({ queryKey: ['whatsapp-numbers'] });
     } catch {
       // silent
     } finally {
@@ -90,11 +98,14 @@ export function Settings() {
   }
 
   async function handleDeleteNumber(id: string) {
+    setDeletingId(id);
     try {
       await deleteWhatsappNumber(id);
       await queryClient.refetchQueries({ queryKey: ['whatsapp-numbers'] });
     } catch {
       // silent
+    } finally {
+      setDeletingId(null);
     }
   }
 
@@ -108,7 +119,7 @@ export function Settings() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-background pb-10">
-      <PageContainer className="sticky top-0 z-10 flex items-center gap-3 bg-background pt-[env(safe-area-inset-top,16px)] pb-3">
+      <PageContainer className="sticky top-0 z-10 flex items-center gap-3 bg-background pt-[calc(env(safe-area-inset-top,16px)+12px)] pb-3">
         <button
           type="button"
           onClick={() => navigate(-1)}
@@ -139,10 +150,15 @@ export function Settings() {
                 <button
                   type="button"
                   onClick={() => handleDeleteNumber(n.id)}
-                  className="text-danger active:opacity-70"
+                  disabled={deletingId === n.id}
+                  className="text-danger active:opacity-70 disabled:opacity-60"
                   aria-label="Remover número"
                 >
-                  <Trash2 size={16} />
+                  {deletingId === n.id ? (
+                    <Loader2 size={24} className="animate-spin" />
+                  ) : (
+                    <Trash2 size={24} />
+                  )}
                 </button>
               </div>
             ))}
@@ -153,7 +169,8 @@ export function Settings() {
                 placeholder="(11) 99999-9999"
                 value={formatPhone(newNumber)}
                 onChange={(e) => setNewNumber(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                className="h-11 flex-1 rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action"
+                disabled={addingNumber}
+                className="h-11 flex-1 rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action disabled:opacity-60"
               />
               <button
                 type="button"
@@ -162,7 +179,7 @@ export function Settings() {
                 aria-label="Adicionar número"
                 className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-action text-white disabled:opacity-60"
               >
-                <Plus size={18} />
+                {addingNumber ? <Loader2 size={24} className="animate-spin" /> : <Plus size={24} />}
               </button>
             </div>
           </div>
@@ -189,6 +206,7 @@ export function Settings() {
             <div>
               <label className="mb-1 block text-xs text-muted-foreground">E-mail</label>
               <input
+                type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="contato@imobiliaria.com"
@@ -216,34 +234,44 @@ export function Settings() {
                 className="h-11 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action"
               />
             </div>
-            <button
-              type="button"
-              onClick={handleSaveContact}
-              className="flex h-12 items-center justify-center gap-2 rounded-full bg-action text-sm font-semibold text-white transition-colors active:bg-action-hover"
-            >
-              {saved ? (
-                <>
-                  <Check size={18} /> Salvo
-                </>
-              ) : (
-                'Salvar dados de contato'
-              )}
-            </button>
+            <div className="pt-2 flex items-center justify-center">
+              <button
+                type="button"
+                onClick={handleSaveContact}
+                disabled={savingContact}
+                className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-action text-sm font-semibold text-white transition-colors active:bg-action-hover disabled:opacity-60"
+              >
+                {savingContact ? (
+                  <Loader2 size={24} className="animate-spin" />
+                ) : saved ? (
+                  <>
+                    <Check size={24} /> Salvo
+                  </>
+                ) : (
+                  'Salvar dados de contato'
+                )}
+              </button>
+            </div>
           </div>
         </section>
 
         {/* Logout */}
-        <section className="pt-2">
+        <section>
           <button
             type="button"
             onClick={handleLogout}
             disabled={logout.isPending}
-            className="flex h-12 w-full items-center justify-center rounded-full border border-danger text-sm font-semibold text-danger active:bg-danger/10 disabled:opacity-60"
+            className="flex h-14 w-full items-center justify-center rounded-full border border-danger text-sm font-semibold text-danger active:bg-danger/10 disabled:opacity-60"
           >
             {logout.isPending ? 'Saindo...' : 'Sair da conta'}
           </button>
         </section>
       </div>
+
+      <SuccessSplash visible={splashVisible}>
+        <CheckCircle size={64} className="text-action" />
+        <p className="text-xl font-bold text-foreground">Dados de contato salvos!</p>
+      </SuccessSplash>
     </div>
   );
 }

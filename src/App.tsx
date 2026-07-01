@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
-import { AnimatePresence, LayoutGroup, motion } from 'motion/react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Routes, Route, useLocation, matchPath } from 'react-router-dom';
+import { AnimatePresence, motion } from 'motion/react';
 import { Search as SearchIcon, Phone, User, LayoutDashboard } from 'lucide-react';
 import { BottomNav, BottomNavItem } from './components/ui/bottom-nav';
 import { PageWrapper } from './components/ui/page-wrapper';
@@ -43,8 +43,20 @@ function AppRoutes() {
   const showBottomNav = useShowBottomNav();
   const scrollPositions = useRef<Record<string, number>>({});
 
-  useEffect(() => {
+  // useLayoutEffect (not useEffect) so the scroll position is corrected before
+  // paint. Routes without their own enter animation (e.g. Dashboard) would
+  // otherwise flash at the leftover scroll position from the previous page for
+  // one frame, then visibly jump once the restoration ran post-paint.
+  useLayoutEffect(() => {
     const path = location.pathname;
+
+    // The gallery management screen always starts at the top and never
+    // remembers scroll position — unlike every other route.
+    if (matchPath('/properties/:id/gallery', path)) {
+      window.scrollTo(0, 0);
+      return;
+    }
+
     const savedPositions = scrollPositions.current;
     window.scrollTo(0, savedPositions[path] ?? 0);
     return () => {
@@ -53,7 +65,7 @@ function AppRoutes() {
   }, [location.pathname]);
 
   return (
-    <LayoutGroup>
+    <>
       <AnimatePresence mode="popLayout">
         <Routes location={location} key={location.pathname}>
           {/* Public */}
@@ -166,14 +178,26 @@ function AppRoutes() {
       </AnimatePresence>
 
       {showBottomNav && <AppBottomNav />}
-    </LayoutGroup>
+    </>
   );
 }
 
 const SESSION_KEY = '__splash_shown__';
 
+function isAndroidStandalone() {
+  try {
+    const isStandalone =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as { standalone?: boolean }).standalone === true;
+    return isStandalone && /android/i.test(navigator.userAgent);
+  } catch {
+    return false;
+  }
+}
+
 function App() {
   const [splashVisible, setSplashVisible] = useState(() => {
+    if (isAndroidStandalone()) return false;
     if (sessionStorage.getItem(SESSION_KEY)) return false;
     sessionStorage.setItem(SESSION_KEY, '1');
     return true;

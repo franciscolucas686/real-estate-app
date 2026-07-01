@@ -102,7 +102,10 @@ export function DashboardStatsSkeleton() {
   return (
     <div className="grid grid-cols-4 gap-2">
       {Array.from({ length: 4 }).map((_, i) => (
-        <div key={i} className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface-raised p-3">
+        <div
+          key={i}
+          className="flex flex-col items-center gap-2 rounded-2xl border border-border bg-surface-raised p-3"
+        >
           <Skeleton className="h-7 w-10" />
           <Skeleton className="h-2.5 w-full" />
         </div>
