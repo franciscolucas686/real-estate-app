@@ -1,35 +1,36 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useLogin } from '../hooks/use-auth';
 import { Eye, EyeOff } from 'lucide-react';
+import { loginSchema, type LoginFormValues } from '../schemas/auth.schema';
+import { getErrorMessage } from '../utils/api-error';
 
 export function Login() {
   const navigate = useNavigate();
   const login = useLogin();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { email: '', password: '' },
+  });
 
-  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function onSubmit(values: LoginFormValues) {
     try {
-      await login.mutateAsync({ email, password });
+      await login.mutateAsync(values);
       navigate('/dashboard', { replace: true });
     } catch {
-      // error handled by login.isError
+      // error handled below via login.error
     }
   }
 
   return (
     <div className="relative flex min-h-dvh max-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-4">
-      {/* <button
-        type="button"
-        onClick={() => navigate(-1)}
-        aria-label="Voltar"
-        className="absolute left-3 top-[calc(env(safe-area-inset-top,16px)+12px)] z-10 flex size-14 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-transform active:scale-90"
-      >
-        <ChevronLeft size={24} />
-      </button> */}
       <div className="w-full max-w-sm mb-16">
         {/* Logo */}
         <div className="mb-10 flex justify-center">
@@ -40,7 +41,7 @@ export function Login() {
           Entrar na plataforma
         </h1>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
           <div className="flex flex-col gap-1.5">
             <label htmlFor="email" className="text-md font-medium text-foreground">
               E-mail
@@ -49,12 +50,13 @@ export function Login() {
               id="email"
               type="email"
               autoComplete="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
               placeholder="seu@email.com"
               className="h-16 rounded-xl border border-border bg-surface-raised px-4 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-action"
+              {...register('email')}
             />
+            {errors.email && (
+              <p className="text-sm font-medium text-danger">{errors.email.message}</p>
+            )}
           </div>
 
           <div className="flex flex-col gap-1.5">
@@ -66,11 +68,9 @@ export function Login() {
                 id="password"
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••"
                 className="h-16 w-full rounded-xl border border-border bg-surface-raised px-4 pr-12 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-action"
+                {...register('password')}
               />
               <button
                 type="button"
@@ -81,11 +81,14 @@ export function Login() {
                 {showPassword ? <EyeOff size={28} /> : <Eye size={28} />}
               </button>
             </div>
+            {errors.password && (
+              <p className="text-sm font-medium text-danger">{errors.password.message}</p>
+            )}
           </div>
 
           {login.isError && (
             <p className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
-              E-mail ou senha incorretos.
+              {getErrorMessage(login.error)}
             </p>
           )}
 
