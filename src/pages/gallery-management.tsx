@@ -25,6 +25,8 @@ import { twMerge } from 'tailwind-merge';
 import { executeGalleryPatch } from '../services/gallery-patch-service';
 import { buildGalleryPatch, type DraftRoom, type DraftImage } from '../utils/gallery-draft';
 import type { PropertyImageDto } from '../types/api';
+import { galleryRoomSchema, isImageFile } from '../schemas/gallery-room.schema';
+import { getErrorMessage } from '../utils/api-error';
 
 type Mode = 'view' | 'photo-select';
 
@@ -60,11 +62,14 @@ export function GalleryManagement() {
 
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
   const [newRoomName, setNewRoomName] = useState('');
+  const [renameRoomError, setRenameRoomError] = useState('');
   const [addingRoom, setAddingRoom] = useState(false);
   const [addRoomName, setAddRoomName] = useState('');
+  const [addRoomError, setAddRoomError] = useState('');
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [addRoomInputFocused, setAddRoomInputFocused] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState('');
   const [roomToDelete, setRoomToDelete] = useState<{ id: string; name: string } | null>(null);
   const [confirmDeletePhotosOpen, setConfirmDeletePhotosOpen] = useState(false);
 
@@ -160,7 +165,6 @@ export function GalleryManagement() {
 
   const totalImages = sections.reduce((sum, s) => sum + s.images.length, 0);
 
-
   // Selection handlers
   function togglePhotoSelection(imageId: string) {
     setSelectedPhotoIds((prev) =>
@@ -202,7 +206,11 @@ export function GalleryManagement() {
 
   function handleUpload(roomId: string | null, files: FileList | null) {
     if (!files || files.length === 0) return;
-    const newImages: DraftImage[] = Array.from(files).map((file) => ({
+    // accept="image/*" already scopes the native picker; this only guards
+    // against drag-and-drop or a picker that lets non-images through.
+    const imageFiles = Array.from(files).filter(isImageFile);
+    if (imageFiles.length === 0) return;
+    const newImages: DraftImage[] = imageFiles.map((file) => ({
       id: crypto.randomUUID(),
       url: URL.createObjectURL(file),
       label: null,
@@ -230,23 +238,44 @@ export function GalleryManagement() {
   }
 
   function handleAddRoom() {
-    const name = addRoomName.trim();
-    if (!name) return;
+    const result = galleryRoomSchema.safeParse({ name: addRoomName });
+    if (!result.success) {
+      setAddRoomError(result.error.issues[0]?.message ?? 'Nome inválido.');
+      return;
+    }
+    setAddRoomError('');
     setDraftRooms((prev) => [
       ...prev,
-      { id: `temp-${crypto.randomUUID()}`, name, originalName: null, isNew: true, deleted: false },
+      {
+        id: `temp-${crypto.randomUUID()}`,
+        name: result.data.name,
+        originalName: null,
+        isNew: true,
+        deleted: false,
+      },
     ]);
     setAddingRoom(false);
     setAddRoomName('');
   }
 
   function handleRenameRoom(roomId: string) {
-    const name = newRoomName.trim();
-    if (!name) {
+    // An empty name means "give up renaming", not a validation error — same
+    // as before. Anything else goes through the shared schema so both add
+    // and rename enforce the exact same rule (mirrors CreatePropertyRoomDto).
+    if (!newRoomName.trim()) {
+      setRenameRoomError('');
       setEditingRoomId(null);
       return;
     }
-    setDraftRooms((prev) => prev.map((r) => (r.id === roomId ? { ...r, name } : r)));
+    const result = galleryRoomSchema.safeParse({ name: newRoomName });
+    if (!result.success) {
+      setRenameRoomError(result.error.issues[0]?.message ?? 'Nome inválido.');
+      return;
+    }
+    setRenameRoomError('');
+    setDraftRooms((prev) =>
+      prev.map((r) => (r.id === roomId ? { ...r, name: result.data.name } : r)),
+    );
     setEditingRoomId(null);
     setNewRoomName('');
   }
@@ -272,13 +301,14 @@ export function GalleryManagement() {
 
   async function handleConfirm() {
     setConfirming(true);
+    setConfirmError('');
     try {
       const patch = buildGalleryPatch(draftRooms, draftImages);
       await executeGalleryPatch(id!, patch);
       refreshPropertyQueries(id);
       navigateAfterFinish();
     } catch (e) {
-      console.error('Failed to save gallery', e);
+      setConfirmError(getErrorMessage(e));
       setConfirming(false);
     }
   }
@@ -350,11 +380,16 @@ export function GalleryManagement() {
             newRoomName={newRoomName}
             onUpload={handleUpload}
             onDeleteImage={handleDeleteImage}
+            renameError={renameRoomError}
             onStartEdit={(roomId, name) => {
               setEditingRoomId(roomId);
               setNewRoomName(name);
+              setRenameRoomError('');
             }}
-            onCancelEdit={() => setEditingRoomId(null)}
+            onCancelEdit={() => {
+              setEditingRoomId(null);
+              setRenameRoomError('');
+            }}
             onRenameRoom={handleRenameRoom}
             onDeleteRoom={(roomId, name) => setRoomToDelete({ id: roomId, name })}
           />
@@ -362,40 +397,50 @@ export function GalleryManagement() {
 
         {/* Add room */}
         {addingRoom ? (
-          <div ref={addRoomInputRef} className="flex items-center gap-2 scroll-mb-28">
-            <input
-              autoFocus
-              value={addRoomName}
-              onChange={(e) => setAddRoomName(e.target.value)}
-              onFocus={() => setAddRoomInputFocused(true)}
-              onBlur={() => setAddRoomInputFocused(false)}
-              placeholder="Nome do ambiente"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleAddRoom();
-                if (e.key === 'Escape') {
+          <div ref={addRoomInputRef} className="flex flex-col gap-1.5 scroll-mb-28">
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                value={addRoomName}
+                onChange={(e) => {
+                  setAddRoomName(e.target.value);
+                  setAddRoomError('');
+                }}
+                onFocus={() => setAddRoomInputFocused(true)}
+                onBlur={() => setAddRoomInputFocused(false)}
+                placeholder="Nome do ambiente"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleAddRoom();
+                  if (e.key === 'Escape') {
+                    setAddingRoom(false);
+                    setAddRoomName('');
+                    setAddRoomError('');
+                  }
+                }}
+                className="flex-1 rounded-xl border border-border bg-surface-raised px-4 py-2.5 text-sm text-foreground outline-none focus:border-action placeholder:text-muted-foreground"
+              />
+              <button
+                type="button"
+                onClick={handleAddRoom}
+                aria-label="Confirmar novo ambiente"
+                className="flex size-10 items-center justify-center rounded-full bg-action text-white"
+              >
+                <Check size={24} />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
                   setAddingRoom(false);
                   setAddRoomName('');
-                }
-              }}
-              className="flex-1 rounded-xl border border-border bg-surface-raised px-4 py-2.5 text-sm text-foreground outline-none focus:border-action placeholder:text-muted-foreground"
-            />
-            <button
-              type="button"
-              onClick={handleAddRoom}
-              className="flex size-10 items-center justify-center rounded-full bg-action text-white"
-            >
-              <Check size={24} />
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setAddingRoom(false);
-                setAddRoomName('');
-              }}
-              className="flex size-10 items-center justify-center rounded-full bg-border text-foreground"
-            >
-              <X size={24} />
-            </button>
+                  setAddRoomError('');
+                }}
+                aria-label="Cancelar novo ambiente"
+                className="flex size-10 items-center justify-center rounded-full bg-border text-foreground"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            {addRoomError && <p className="text-sm font-medium text-danger">{addRoomError}</p>}
           </div>
         ) : (
           <button
@@ -434,7 +479,12 @@ export function GalleryManagement() {
           </div>
         </div>
       ) : !addRoomInputFocused ? (
-        <div className="fixed bottom-0 inset-x-0 bg-background/90 p-4 backdrop-blur-sm">
+        <div className="fixed bottom-0 inset-x-0 flex flex-col gap-2 bg-background/90 p-4 backdrop-blur-sm">
+          {confirmError && (
+            <p className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
+              {confirmError}
+            </p>
+          )}
           <button
             type="button"
             onClick={handleConfirm}
@@ -531,6 +581,7 @@ interface RoomSectionProps {
   selectedPhotoIds: string[];
   editingRoomId: string | null;
   newRoomName: string;
+  renameError: string;
   onUpload: (roomId: string | null, files: FileList | null) => void;
   onDeleteImage: (id: string) => void;
   onStartEdit: (roomId: string, name: string) => void;
@@ -545,6 +596,7 @@ function RoomSection({
   selectedPhotoIds,
   editingRoomId,
   newRoomName,
+  renameError,
   onUpload,
   onStartEdit,
   onCancelEdit,
@@ -558,32 +610,37 @@ function RoomSection({
       {/* Section header */}
       <div className="flex items-center gap-2">
         {section.roomId && editingRoomId === section.roomId ? (
-          <>
-            <input
-              autoFocus
-              value={newRoomName}
-              onChange={(e) => onStartEdit(section.roomId!, e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') onRenameRoom(section.roomId!);
-                if (e.key === 'Escape') onCancelEdit();
-              }}
-              className="flex-1 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-lg text-foreground outline-none focus:border-action"
-            />
-            <button
-              type="button"
-              onClick={() => onRenameRoom(section.roomId!)}
-              className="flex size-10 items-center justify-center rounded-full bg-action text-white"
-            >
-              <Check size={24} />
-            </button>
-            <button
-              type="button"
-              onClick={onCancelEdit}
-              className="flex size-10 items-center justify-center rounded-full bg-border text-foreground"
-            >
-              <X size={24} />
-            </button>
-          </>
+          <div className="flex flex-1 flex-col gap-1.5">
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                value={newRoomName}
+                onChange={(e) => onStartEdit(section.roomId!, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') onRenameRoom(section.roomId!);
+                  if (e.key === 'Escape') onCancelEdit();
+                }}
+                className="flex-1 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-lg text-foreground outline-none focus:border-action"
+              />
+              <button
+                type="button"
+                onClick={() => onRenameRoom(section.roomId!)}
+                aria-label="Confirmar novo nome do ambiente"
+                className="flex size-10 items-center justify-center rounded-full bg-action text-white"
+              >
+                <Check size={24} />
+              </button>
+              <button
+                type="button"
+                onClick={onCancelEdit}
+                aria-label="Cancelar renomeação do ambiente"
+                className="flex size-10 items-center justify-center rounded-full bg-border text-foreground"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            {renameError && <p className="text-sm font-medium text-danger">{renameError}</p>}
+          </div>
         ) : (
           <>
             <span className="flex-1 text-lg font-semibold text-foreground">
