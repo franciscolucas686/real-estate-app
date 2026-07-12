@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Plus, Trash2, Check, CheckCircle, Loader2 } from 'lucide-react';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { useLogout } from '../hooks/use-auth';
 import { PageContainer } from '../components/ui/page-container';
 import {
@@ -13,25 +15,29 @@ import { formatPhone, formatPhoneAdaptive } from '../utils/format';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { SettingsSkeleton } from '../components/ui/skeletons';
 import { SuccessSplash } from '../components/ui/success-splash';
+import {
+  siteSettingsSchema,
+  whatsappNumberSchema,
+  type SiteSettingsFormValues,
+  type WhatsappNumberFormValues,
+} from '../schemas/site-settings.schema';
+import { getErrorMessage } from '../utils/api-error';
 
 export function Settings() {
   const navigate = useNavigate();
   const logout = useLogout();
   const queryClient = useQueryClient();
 
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [hours, setHours] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
   const [saved, setSaved] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [splashVisible, setSplashVisible] = useState(false);
   const [savingContact, setSavingContact] = useState(false);
+  const [contactError, setContactError] = useState('');
 
-  const [newNumber, setNewNumber] = useState('');
-  const [newLabel, setNewLabel] = useState('');
   const [addingNumber, setAddingNumber] = useState(false);
+  const [addNumberError, setAddNumberError] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState('');
 
   const { data: numbers = [], isLoading } = useQuery({
     queryKey: ['whatsapp-numbers'],
@@ -45,53 +51,78 @@ export function Settings() {
     retry: false,
   });
 
+  const {
+    control: contactControl,
+    register: registerContact,
+    handleSubmit: handleContactSubmit,
+    setValue: setContactValue,
+    reset: resetContact,
+    formState: { errors: contactErrors },
+  } = useForm<SiteSettingsFormValues>({
+    resolver: zodResolver(siteSettingsSchema),
+    defaultValues: { email: '', phone: '', whatsapp: '', hours: '' },
+  });
+
+  const {
+    control: newNumberControl,
+    register: registerNewNumber,
+    handleSubmit: handleNewNumberSubmit,
+    reset: resetNewNumber,
+    formState: { errors: newNumberErrors },
+  } = useForm<WhatsappNumberFormValues>({
+    resolver: zodResolver(whatsappNumberSchema),
+    defaultValues: { number: '', label: '' },
+  });
+
   useEffect(() => {
     if (siteSettings && !initialized) {
-      setEmail(siteSettings.email);
-      setPhone(siteSettings.phone.replace(/\D/g, '').slice(0, 11));
-      setHours(siteSettings.hours);
-      setWhatsapp(siteSettings.whatsapp.replace(/\D/g, '').slice(0, 11));
+      resetContact({
+        email: siteSettings.email,
+        phone: siteSettings.phone.replace(/\D/g, '').slice(0, 11),
+        whatsapp: siteSettings.whatsapp.replace(/\D/g, '').slice(0, 11),
+        hours: siteSettings.hours,
+      });
       setInitialized(true);
     }
-  }, [siteSettings, initialized]);
+  }, [siteSettings, initialized, resetContact]);
 
-  async function handleSaveContact() {
+  async function onSaveContact(values: SiteSettingsFormValues) {
     setSavingContact(true);
+    setContactError('');
     try {
-      await updateSiteSettings({ email, phone, hours, whatsapp });
+      await updateSiteSettings(values);
       await queryClient.invalidateQueries({ queryKey: ['site-settings'] });
       setSaved(true);
       setSplashVisible(true);
       setTimeout(() => {
         navigate('/dashboard');
       }, 1500);
-    } catch {
-      // silent
+    } catch (e) {
+      setContactError(getErrorMessage(e));
     } finally {
       setSavingContact(false);
     }
   }
 
-  async function handleAddNumber() {
-    if (!newNumber.trim()) return;
+  async function onAddNumber(values: WhatsappNumberFormValues) {
     setAddingNumber(true);
+    setAddNumberError('');
     try {
       const created = await createWhatsappNumber({
-        number: newNumber.replace(/\D/g, ''),
-        label: newLabel.trim() || undefined,
+        number: values.number,
+        label: values.label.trim() || undefined,
         isActive: true,
       });
       if (numbers.length === 0) {
         const num = created.number.replace(/\D/g, '').slice(0, 11);
-        setWhatsapp(num);
+        setContactValue('whatsapp', num);
         await updateSiteSettings({ whatsapp: created.number });
         await queryClient.invalidateQueries({ queryKey: ['site-settings'] });
       }
       await queryClient.refetchQueries({ queryKey: ['whatsapp-numbers'] });
-      setNewNumber('');
-      setNewLabel('');
-    } catch {
-      // silent
+      resetNewNumber({ number: '', label: '' });
+    } catch (e) {
+      setAddNumberError(getErrorMessage(e));
     } finally {
       setAddingNumber(false);
     }
@@ -99,11 +130,12 @@ export function Settings() {
 
   async function handleDeleteNumber(id: string) {
     setDeletingId(id);
+    setDeleteError('');
     try {
       await deleteWhatsappNumber(id);
       await queryClient.refetchQueries({ queryKey: ['whatsapp-numbers'] });
-    } catch {
-      // silent
+    } catch (e) {
+      setDeleteError(getErrorMessage(e));
     } finally {
       setDeletingId(null);
     }
@@ -162,26 +194,58 @@ export function Settings() {
                 </button>
               </div>
             ))}
+            {deleteError && <p className="text-sm font-medium text-danger">{deleteError}</p>}
 
-            <div className="flex gap-2">
+            <form
+              onSubmit={handleNewNumberSubmit(onAddNumber)}
+              className="flex flex-col gap-2"
+              noValidate
+            >
+              <div className="flex gap-2">
+                <Controller
+                  control={newNumberControl}
+                  name="number"
+                  render={({ field }) => (
+                    <input
+                      inputMode="numeric"
+                      placeholder="(11) 99999-9999"
+                      value={formatPhone(field.value)}
+                      onChange={(e) =>
+                        field.onChange(e.target.value.replace(/\D/g, '').slice(0, 11))
+                      }
+                      disabled={addingNumber}
+                      className="h-11 flex-1 rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action disabled:opacity-60"
+                    />
+                  )}
+                />
+                <button
+                  type="submit"
+                  disabled={addingNumber}
+                  aria-label="Adicionar número"
+                  className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-action text-white disabled:opacity-60"
+                >
+                  {addingNumber ? (
+                    <Loader2 size={24} className="animate-spin" />
+                  ) : (
+                    <Plus size={24} />
+                  )}
+                </button>
+              </div>
               <input
-                inputMode="numeric"
-                placeholder="(11) 99999-9999"
-                value={formatPhone(newNumber)}
-                onChange={(e) => setNewNumber(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                placeholder="Rótulo (opcional)"
                 disabled={addingNumber}
-                className="h-11 flex-1 rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action disabled:opacity-60"
+                className="h-11 rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action disabled:opacity-60"
+                {...registerNewNumber('label')}
               />
-              <button
-                type="button"
-                onClick={handleAddNumber}
-                disabled={addingNumber}
-                aria-label="Adicionar número"
-                className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-action text-white disabled:opacity-60"
-              >
-                {addingNumber ? <Loader2 size={24} className="animate-spin" /> : <Plus size={24} />}
-              </button>
-            </div>
+              {(newNumberErrors.number || newNumberErrors.label) && (
+                <p className="text-sm font-medium text-danger">
+                  {newNumberErrors.number?.message ?? newNumberErrors.label?.message}
+                </p>
+              )}
+              {addNumberError && (
+                <p className="text-sm font-medium text-danger">{addNumberError}</p>
+              )}
+            </form>
           </div>
         </section>
 
@@ -190,54 +254,89 @@ export function Settings() {
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             Dados de contato
           </p>
-          <div className="flex flex-col gap-3">
+          <form
+            onSubmit={handleContactSubmit(onSaveContact)}
+            className="flex flex-col gap-3"
+            noValidate
+          >
             <div>
               <label className="mb-1 block text-xs text-muted-foreground">
                 WhatsApp da página de contato
               </label>
-              <input
-                inputMode="numeric"
-                value={formatPhone(whatsapp)}
-                onChange={(e) => setWhatsapp(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                placeholder="(11) 99999-9999"
-                className="h-11 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action"
+              <Controller
+                control={contactControl}
+                name="whatsapp"
+                render={({ field }) => (
+                  <input
+                    inputMode="numeric"
+                    value={formatPhone(field.value)}
+                    onChange={(e) => field.onChange(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    placeholder="(11) 99999-9999"
+                    className="h-11 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action"
+                  />
+                )}
               />
+              {contactErrors.whatsapp && (
+                <p className="mt-1 text-sm font-medium text-danger">
+                  {contactErrors.whatsapp.message}
+                </p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs text-muted-foreground">E-mail</label>
               <input
                 type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 placeholder="contato@imobiliaria.com"
                 className="h-11 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action"
+                {...registerContact('email')}
               />
+              {contactErrors.email && (
+                <p className="mt-1 text-sm font-medium text-danger">
+                  {contactErrors.email.message}
+                </p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs text-muted-foreground">Telefone</label>
-              <input
-                inputMode="numeric"
-                value={formatPhoneAdaptive(phone)}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                placeholder="(11) 99999-9999"
-                className="h-11 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action"
+              <Controller
+                control={contactControl}
+                name="phone"
+                render={({ field }) => (
+                  <input
+                    inputMode="numeric"
+                    value={formatPhoneAdaptive(field.value)}
+                    onChange={(e) => field.onChange(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    placeholder="(11) 99999-9999"
+                    className="h-11 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action"
+                  />
+                )}
               />
+              {contactErrors.phone && (
+                <p className="mt-1 text-sm font-medium text-danger">
+                  {contactErrors.phone.message}
+                </p>
+              )}
             </div>
             <div>
               <label className="mb-1 block text-xs text-muted-foreground">
                 Horário de atendimento
               </label>
               <input
-                value={hours}
-                onChange={(e) => setHours(e.target.value)}
                 placeholder="Seg–Sex: 9h às 18h"
                 className="h-11 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action"
+                {...registerContact('hours')}
               />
             </div>
+
+            {contactError && (
+              <p className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
+                {contactError}
+              </p>
+            )}
+
             <div className="pt-2 flex items-center justify-center">
               <button
-                type="button"
-                onClick={handleSaveContact}
+                type="submit"
                 disabled={savingContact}
                 className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-action text-sm font-semibold text-white transition-colors active:bg-action-hover disabled:opacity-60"
               >
@@ -252,7 +351,7 @@ export function Settings() {
                 )}
               </button>
             </div>
-          </div>
+          </form>
         </section>
 
         {/* Logout */}
