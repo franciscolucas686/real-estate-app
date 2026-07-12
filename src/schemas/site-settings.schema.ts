@@ -24,10 +24,9 @@ export const siteSettingsSchema = z.object({
 export type SiteSettingsFormValues = z.infer<typeof siteSettingsSchema>;
 
 // Mirrors CreateWhatsappNumberDto (src/whatsapp/dto/create-whatsapp-number.dto.ts):
-// @Matches(/^\d{8,15}$/) number, optional label.
+// @Matches(/^\d{8,15}$/) number.
 export const whatsappNumberSchema = z.object({
   number: z.string().regex(/^\d{8,15}$/, 'Número deve ter entre 8 e 15 dígitos.'),
-  label: z.string(),
 });
 
 export type WhatsappNumberFormValues = z.infer<typeof whatsappNumberSchema>;
