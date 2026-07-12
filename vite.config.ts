@@ -1,37 +1,47 @@
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-const BACKEND_URL = 'https://api-real-estate-in76.onrender.com';
+// This proxy target only affects `vite dev` (and `vite preview` of a build
+// made in that mode). It has no effect on the real production deployment —
+// Vercel serves the built static files and routes /api/* via the rewrite in
+// vercel.json instead, since it doesn't run Vite's dev server. Both files
+// read from VITE_API_URL (.env.development / .env.production) so there's a
+// single source of truth per environment, even though two config formats
+// (JS here, static JSON there) both need to know it.
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  const backendUrl = env.VITE_API_URL;
 
-export default defineConfig({
-  plugins: [
-    tailwindcss(),
-    react(),
-    VitePWA({
-      registerType: 'autoUpdate',
-      manifest: {
-        name: 'Gestão Imobiliária',
-        short_name: 'Imob Francine',
-        start_url: '.',
-        display: 'standalone',
-        background_color: '#ffffff',
-        theme_color: '#00072D',
-        lang: 'pt-br',
-      },
-    }),
-  ],
-  server: {
-    host: true,
-    port: 5173,
-    allowedHosts: ['exuvial-transfusable-nidia.ngrok-free.dev'],
-    proxy: {
-      '/api': {
-        target: BACKEND_URL,
-        changeOrigin: true,
-        secure: true,
+  return {
+    plugins: [
+      tailwindcss(),
+      react(),
+      VitePWA({
+        registerType: 'autoUpdate',
+        manifest: {
+          name: 'Gestão Imobiliária',
+          short_name: 'Imob Francine',
+          start_url: '.',
+          display: 'standalone',
+          background_color: '#ffffff',
+          theme_color: '#00072D',
+          lang: 'pt-br',
+        },
+      }),
+    ],
+    server: {
+      host: true,
+      port: 5173,
+      allowedHosts: ['exuvial-transfusable-nidia.ngrok-free.dev'],
+      proxy: {
+        '/api': {
+          target: backendUrl,
+          changeOrigin: true,
+          secure: true,
+        },
       },
     },
-  },
+  };
 });
