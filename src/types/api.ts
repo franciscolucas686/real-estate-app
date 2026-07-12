@@ -284,7 +284,6 @@ export interface ApiErrorResponse {
 export interface WhatsappNumber {
   id: string;
   number: string;
-  label: string | null;
   isActive: boolean;
   order: number;
   createdAt: string;
@@ -293,7 +292,6 @@ export interface WhatsappNumber {
 
 export interface CreateWhatsappNumberDto {
   number: string;
-  label?: string;
   isActive?: boolean;
   order?: number;
 }

@@ -45,22 +45,18 @@ describe('siteSettingsSchema', () => {
 
 describe('whatsappNumberSchema (mirrors CreateWhatsappNumberDto)', () => {
   it('accepts an 8-15 digit number', () => {
-    expect(whatsappNumberSchema.safeParse({ number: '11999990000', label: '' }).success).toBe(true);
+    expect(whatsappNumberSchema.safeParse({ number: '11999990000' }).success).toBe(true);
   });
 
   it('rejects a number shorter than 8 digits', () => {
-    expect(whatsappNumberSchema.safeParse({ number: '1234567', label: '' }).success).toBe(false);
+    expect(whatsappNumberSchema.safeParse({ number: '1234567' }).success).toBe(false);
   });
 
   it('rejects a number longer than 15 digits', () => {
-    expect(whatsappNumberSchema.safeParse({ number: '1'.repeat(16), label: '' }).success).toBe(
-      false,
-    );
+    expect(whatsappNumberSchema.safeParse({ number: '1'.repeat(16) }).success).toBe(false);
   });
 
   it('rejects non-digit characters (input must already be stripped by the caller)', () => {
-    expect(whatsappNumberSchema.safeParse({ number: '(11) 99999-0000', label: '' }).success).toBe(
-      false,
-    );
+    expect(whatsappNumberSchema.safeParse({ number: '(11) 99999-0000' }).success).toBe(false);
   });
 });

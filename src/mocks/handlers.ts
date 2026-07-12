@@ -25,7 +25,6 @@ let whatsappNumbers: WhatsappNumber[] = [
   {
     id: 'wn-1',
     number: '11999990000',
-    label: 'Principal',
     isActive: true,
     order: 0,
     createdAt: new Date().toISOString(),
@@ -53,7 +52,6 @@ export function resetMockData() {
     {
       id: 'wn-1',
       number: '11999990000',
-      label: 'Principal',
       isActive: true,
       order: 0,
       createdAt: new Date().toISOString(),
@@ -96,7 +94,6 @@ export const handlers = [
     const created: WhatsappNumber = {
       id: `wn-${whatsappNumbers.length + 1}`,
       number: body.number,
-      label: body.label ?? null,
       isActive: body.isActive ?? true,
       order: body.order ?? whatsappNumbers.length,
       createdAt: new Date().toISOString(),

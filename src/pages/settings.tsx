@@ -65,13 +65,12 @@ export function Settings() {
 
   const {
     control: newNumberControl,
-    register: registerNewNumber,
     handleSubmit: handleNewNumberSubmit,
     reset: resetNewNumber,
     formState: { errors: newNumberErrors },
   } = useForm<WhatsappNumberFormValues>({
     resolver: zodResolver(whatsappNumberSchema),
-    defaultValues: { number: '', label: '' },
+    defaultValues: { number: '' },
   });
 
   useEffect(() => {
@@ -110,7 +109,6 @@ export function Settings() {
     try {
       const created = await createWhatsappNumber({
         number: values.number,
-        label: values.label.trim() || undefined,
         isActive: true,
       });
       if (numbers.length === 0) {
@@ -120,7 +118,7 @@ export function Settings() {
         await queryClient.invalidateQueries({ queryKey: ['site-settings'] });
       }
       await queryClient.refetchQueries({ queryKey: ['whatsapp-numbers'] });
-      resetNewNumber({ number: '', label: '' });
+      resetNewNumber({ number: '' });
     } catch (e) {
       setAddNumberError(getErrorMessage(e));
     } finally {
@@ -177,7 +175,6 @@ export function Settings() {
               >
                 <div className="flex-1">
                   <p className="text-sm font-medium text-foreground">{formatPhone(n.number)}</p>
-                  {n.label && <p className="text-xs text-muted-foreground">{n.label}</p>}
                 </div>
                 <button
                   type="button"
@@ -231,16 +228,8 @@ export function Settings() {
                   )}
                 </button>
               </div>
-              <input
-                placeholder="Rótulo (opcional)"
-                disabled={addingNumber}
-                className="h-11 rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action disabled:opacity-60"
-                {...registerNewNumber('label')}
-              />
-              {(newNumberErrors.number || newNumberErrors.label) && (
-                <p className="text-sm font-medium text-danger">
-                  {newNumberErrors.number?.message ?? newNumberErrors.label?.message}
-                </p>
+              {newNumberErrors.number && (
+                <p className="text-sm font-medium text-danger">{newNumberErrors.number.message}</p>
               )}
               {addNumberError && (
                 <p className="text-sm font-medium text-danger">{addNumberError}</p>
