@@ -10,7 +10,13 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+coverage
 *.local
+
+# Env files with local/dev secrets — never commit. .env.production only
+# holds a public URL and .env.example is a template, so both are tracked.
+.env.development
+.env.test
 
 # Editor directories and files
 .vscode/*

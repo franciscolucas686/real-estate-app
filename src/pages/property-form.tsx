@@ -1,6 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { ChevronLeft, MapPin } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import type { LatLngExpression } from 'leaflet';
@@ -30,56 +32,18 @@ import {
 import { createProperty, updateProperty, fetchPropertyById } from '../services/property-service';
 import { useDisablePullToRefresh } from '../hooks/use-disable-pull-to-refresh';
 import type { CreatePropertyDto, PropertyDetailDto } from '../types/api';
+import {
+  propertyFormSchema,
+  STEP_FIELDS,
+  type PropertyFormValues,
+} from '../schemas/property.schema';
+import { getErrorMessage } from '../utils/api-error';
 
 // ─── Form state ──────────────────────────────────────────────────────────────
-interface FormState {
-  // Step 1
-  type: PropertyType | '';
-  businessType: BusinessType | '';
-  saleTypes: SaleType[];
-  price: string;
-  rentPrice: string;
-  condoFee: string;
-  description: string;
-  // Step 2
-  city: string;
-  state: string;
-  neighborhood: string;
-  // Step 3
-  bedrooms: string;
-  bathrooms: string;
-  suites: string;
-  parkingSpaces: string;
-  totalArea: string;
-  builtArea: string;
-  // House details
-  floors: string;
-  isInCondominium: boolean;
-  condominiumName: string;
-  condominiumAmenities: string;
-  // Apartment details
-  floor: string;
-  isGroundFloor: boolean;
-  hasElevator: boolean;
-  hasBalcony: boolean;
-  sunPosition: SunPosition | '';
-  aptHasPool: boolean;
-  // Land details
-  zoning: Zoning | '';
-  topography: Topography | '';
-  // Small farm
-  hasHouse: boolean;
-  sfHasPool: boolean;
-  hasLake: boolean;
-  hasFruitTrees: boolean;
-  waterSource: WaterSource | '';
-  // Country house
-  hasRiver: boolean;
-  hasSpring: boolean;
-  // Location coords
-  latitude: number | null;
-  longitude: number | null;
-}
+// Same shape react-hook-form validates via zodResolver(propertyFormSchema) —
+// kept as a local alias so the step components below (which predate the Zod
+// migration) don't need to change a single prop type.
+type FormState = PropertyFormValues;
 
 const INITIAL: FormState = {
   type: '',
@@ -286,9 +250,15 @@ function PropertyFormInner({
   const location = useLocation();
   const fromContext = (location.state as { context?: string } | null)?.context;
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState<FormState>(() =>
-    initialData ? propertyToFormState(initialData) : INITIAL,
-  );
+  const methods = useForm<PropertyFormValues>({
+    resolver: zodResolver(propertyFormSchema),
+    defaultValues: initialData ? propertyToFormState(initialData) : INITIAL,
+  });
+  const { handleSubmit, watch, setValue, getValues } = methods;
+  // Reactive snapshot of the whole form — same read pattern the step
+  // components already used against the old local `form` state, so Step1/
+  // Step2/Step3 and the type-specific field groups don't need any changes.
+  const form = watch();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [submitCount, setSubmitCount] = useState(0);
@@ -303,7 +273,11 @@ function PropertyFormInner({
   }, [error, submitCount]);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    // react-hook-form's setValue() infers its value type per literal path,
+    // which a generic `K extends keyof FormState` wrapper can't satisfy —
+    // the runtime behavior is exactly setValue(key, value), just needs the
+    // escape hatch to type-check through the generic boundary.
+    setValue(key, value as never);
   }
 
   function handleMapConfirm(
@@ -314,98 +288,71 @@ function PropertyFormInner({
     neighborhood: string,
   ) {
     setError('');
-    setForm((prev) => ({
-      ...prev,
-      latitude: lat,
-      longitude: lng,
-      ...(city && { city }),
-      ...(state && { state: state.toUpperCase() }),
-      ...(neighborhood && { neighborhood }),
-    }));
+    setValue('latitude', lat);
+    setValue('longitude', lng);
+    if (city) setValue('city', city);
+    if (state) setValue('state', state.toUpperCase());
+    if (neighborhood) setValue('neighborhood', neighborhood);
     setMapOpen(false);
   }
 
-  function validateStep(): string {
-    if (step === 1) {
-      if (!form.type) return 'Selecione o tipo do imóvel.';
-      if (!form.businessType) return 'Selecione o tipo de negócio.';
-      if (form.businessType === BusinessType.SALE && form.saleTypes.length === 0)
-        return 'Selecione ao menos uma modalidade de venda.';
-      if (form.businessType === BusinessType.SALE && !form.price) return 'Informe o preço.';
-      if (form.businessType === BusinessType.RENT && !form.rentPrice)
-        return 'Informe o valor do aluguel.';
-
-      if (form.condoFee) {
-        const condoFeeNum = Number(form.condoFee);
-        if (form.businessType === BusinessType.SALE) {
-          const priceNum = Number(form.price);
-          if (priceNum > 0 && condoFeeNum > priceNum)
-            return 'O valor do condomínio não pode ser maior que o preço.';
-        } else {
-          const rentPriceNum = Number(form.rentPrice);
-          if (rentPriceNum > 0 && condoFeeNum > rentPriceNum)
-            return 'O valor do condomínio não pode ser maior que o valor do aluguel.';
-        }
-      }
-    }
-    if (step === 2) {
-      if (!form.city) return 'Informe a cidade.';
-      if (!form.state) return 'Informe o estado.';
-      if (form.state.length !== 2) return 'Estado deve ter 2 letras (ex: SP).';
-      if (!form.neighborhood) return 'Informe o bairro.';
-    }
-    if (step === 3) {
-      if (form.type === PropertyType.APARTMENT) {
-        if (!form.isGroundFloor && !form.floor) return 'Informe o andar.';
-        if (!form.sunPosition) return 'Selecione a posição do sol.';
-      }
-      if (form.type === PropertyType.LAND) {
-        if (!form.zoning) return 'Selecione o zoneamento.';
-        if (!form.topography) return 'Selecione a topografia.';
-      }
-      if (form.type === PropertyType.SMALL_FARM && !form.waterSource)
-        return 'Selecione a fonte de água.';
-      if (!form.description) return 'Informe a descrição.';
-    }
-    return '';
+  // Runs the full schema synchronously (no react-hook-form async trigger()
+  // involved, so there's no risk of reading a stale formState snapshot) and
+  // picks the first issue among the fields that belong to the given step.
+  function firstStepError(step: 1 | 2 | 3): string | undefined {
+    const result = propertyFormSchema.safeParse(getValues());
+    if (result.success) return undefined;
+    const stepFields = new Set<string>(STEP_FIELDS[step]);
+    const issue = result.error.issues.find((i) => stepFields.has(String(i.path[0])));
+    return issue?.message;
   }
 
-  async function handleNext() {
-    const err = validateStep();
-    if (err) {
-      setError('');
-      setSubmitCount((c) => c + 1);
-      setError(err);
-      return;
-    }
-    setError('');
-
-    if (step === 3) {
-      setSaving(true);
-      try {
-        const payload = buildPayload(form);
-        if (isEdit && id) {
-          await updateProperty(id, payload);
-          if (fromContext === 'post-create') {
-            navigate(`/properties/${id}/gallery`, { state: { context: 'post-create' } });
-          } else {
-            navigate('/dashboard');
-          }
-        } else {
-          const created = await createProperty(payload);
-          navigate(`/properties/${created.id}/gallery`, {
-            state: { context: 'post-create', showSplash: true },
-          });
-        }
-      } catch (e: unknown) {
-        const msg = (e as { message?: string })?.message;
-        setError(typeof msg === 'string' ? msg : 'Erro ao salvar imóvel.');
-        setSaving(false);
+  function handleNext() {
+    if (step !== 3) {
+      const message = firstStepError(step as 1 | 2);
+      if (message) {
+        setError(message);
+        setSubmitCount((c) => c + 1);
+        return;
       }
+      setError('');
+      setStep((s) => s + 1);
       return;
     }
 
-    setStep((s) => s + 1);
+    void submitStep3();
+  }
+
+  async function submitStep3() {
+    await handleSubmit(
+      async (values) => {
+        setError('');
+        setSaving(true);
+        try {
+          const payload = buildPayload(values);
+          if (isEdit && id) {
+            await updateProperty(id, payload);
+            if (fromContext === 'post-create') {
+              navigate(`/properties/${id}/gallery`, { state: { context: 'post-create' } });
+            } else {
+              navigate('/dashboard');
+            }
+          } else {
+            const created = await createProperty(payload);
+            navigate(`/properties/${created.id}/gallery`, {
+              state: { context: 'post-create', showSplash: true },
+            });
+          }
+        } catch (e: unknown) {
+          setError(getErrorMessage(e));
+          setSaving(false);
+        }
+      },
+      () => {
+        setError(firstStepError(3) ?? 'Verifique os campos preenchidos.');
+        setSubmitCount((c) => c + 1);
+      },
+    )();
   }
 
   return (
