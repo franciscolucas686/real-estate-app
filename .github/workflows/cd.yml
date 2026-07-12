@@ -1,0 +1,41 @@
+# Mirrors api-real-estate's cd.yml: this workflow does NOT deploy anything.
+# Its only purpose is to produce a status check on the exact commit that
+# lands on `main`, in case branch protection or a future Vercel deployment
+# protection rule is configured to require it.
+#
+# Unlike Render (used by the backend, in "After CI Checks Pass" mode),
+# Vercel's default GitHub integration deploys on push independently of
+# GitHub Actions status — it does NOT wait for this check unless Vercel's
+# "Deployment Protection" is explicitly enabled in the project dashboard,
+# which is outside this repo. Do not assume this workflow blocks production
+# deploys unless that's been configured on Vercel's side too.
+name: CD
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  verify:
+    name: verify
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit + integration tests
+        run: npm test
+
+      - name: Typecheck + build
+        run: npm run build
