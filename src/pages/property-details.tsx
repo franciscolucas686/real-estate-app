@@ -34,7 +34,7 @@ import { PropertyMediaViewer } from '../components/media/property-media-viewer';
 import { PropertyDetailSkeleton } from '../components/ui/skeletons';
 import { PageContainer } from '../components/ui/page-container';
 import { SuccessSplash } from '../components/ui/success-splash';
-import { PropertyMap } from '../components/property-map';
+import { PropertyMap } from '../components/ui/property-map';
 import {
   formatPrice,
   formatArea,

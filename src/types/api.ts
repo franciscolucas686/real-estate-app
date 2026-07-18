@@ -277,8 +277,9 @@ export interface ReorderImagesDto {
 
 export interface ApiErrorResponse {
   statusCode: number;
+  code?: string;
   message: string | string[];
-  error: string;
+  error?: string;
 }
 
 export interface WhatsappNumber {

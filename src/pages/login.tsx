@@ -3,14 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLogin } from '../hooks/use-auth';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { loginSchema, type LoginFormValues } from '../schemas/auth.schema';
 import { getErrorMessage } from '../utils/api-error';
+import { SuccessSplash } from '../components/ui/success-splash';
 
 export function Login() {
   const navigate = useNavigate();
   const login = useLogin();
   const [showPassword, setShowPassword] = useState(false);
+  const [splashVisible, setSplashVisible] = useState(false);
   const {
     register,
     handleSubmit,
@@ -23,7 +25,10 @@ export function Login() {
   async function onSubmit(values: LoginFormValues) {
     try {
       await login.mutateAsync(values);
-      navigate('/dashboard', { replace: true });
+      setSplashVisible(true);
+      setTimeout(() => {
+        navigate('/dashboard', { replace: true });
+      }, 900);
     } catch {
       // error handled below via login.error
     }
@@ -94,13 +99,21 @@ export function Login() {
 
           <button
             type="submit"
-            disabled={login.isPending}
+            disabled={login.isPending || splashVisible}
             className="mt-2 flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white transition-colors active:bg-action-hover disabled:opacity-60"
           >
             {login.isPending ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
       </div>
+
+      <SuccessSplash visible={splashVisible}>
+        <CheckCircle size={64} className="text-action" />
+        <div className="flex flex-col items-center gap-1 text-center">
+          <p className="text-xl font-bold text-foreground">Login realizado</p>
+          <p className="text-sm text-muted-foreground">Preparando seu dashboard...</p>
+        </div>
+      </SuccessSplash>
     </div>
   );
 }

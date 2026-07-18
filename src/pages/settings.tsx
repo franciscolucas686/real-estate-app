@@ -31,6 +31,7 @@ export function Settings() {
   const [saved, setSaved] = useState(false);
   const [initialized, setInitialized] = useState(false);
   const [splashVisible, setSplashVisible] = useState(false);
+  const [logoutSplashVisible, setLogoutSplashVisible] = useState(false);
   const [savingContact, setSavingContact] = useState(false);
   const [contactError, setContactError] = useState('');
 
@@ -142,7 +143,10 @@ export function Settings() {
   async function handleLogout() {
     await logout.mutateAsync();
     queryClient.clear();
-    navigate('/login', { replace: true });
+    setLogoutSplashVisible(true);
+    setTimeout(() => {
+      navigate('/login', { replace: true });
+    }, 900);
   }
 
   if (isLoading || loadingSettings) return <SettingsSkeleton />;
@@ -348,7 +352,7 @@ export function Settings() {
           <button
             type="button"
             onClick={handleLogout}
-            disabled={logout.isPending}
+            disabled={logout.isPending || logoutSplashVisible}
             className="flex h-14 w-full items-center justify-center rounded-full border border-danger text-sm font-semibold text-danger active:bg-danger/10 disabled:opacity-60"
           >
             {logout.isPending ? 'Saindo...' : 'Sair da conta'}
@@ -359,6 +363,14 @@ export function Settings() {
       <SuccessSplash visible={splashVisible}>
         <CheckCircle size={64} className="text-action" />
         <p className="text-xl font-bold text-foreground">Dados de contato salvos!</p>
+      </SuccessSplash>
+
+      <SuccessSplash visible={logoutSplashVisible}>
+        <CheckCircle size={64} className="text-action" />
+        <div className="flex flex-col items-center gap-1 text-center">
+          <p className="text-xl font-bold text-foreground">Logout realizado</p>
+          <p className="text-sm text-muted-foreground">Até a próxima!</p>
+        </div>
       </SuccessSplash>
     </div>
   );
