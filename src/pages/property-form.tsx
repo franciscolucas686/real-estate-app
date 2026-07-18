@@ -258,6 +258,9 @@ function PropertyFormInner({
   // Reactive snapshot of the whole form — same read pattern the step
   // components already used against the old local `form` state, so Step1/
   // Step2/Step3 and the type-specific field groups don't need any changes.
+  // watch() defeats React Compiler's memoization analysis; the compiler isn't
+  // enabled in this project's build (see CLAUDE.md), so this is a no-op today.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const form = watch();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
