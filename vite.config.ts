@@ -1,3 +1,4 @@
+import { fileURLToPath, URL } from 'node:url';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
@@ -15,6 +16,14 @@ export default defineConfig(({ mode }) => {
   const backendUrl = env.VITE_API_URL;
 
   return {
+    // Must stay in sync with the `paths` entry in tsconfig.app.json and the alias
+    // in vitest.config.ts — TypeScript resolves types, Vite resolves the build, and
+    // Vitest resolves the tests, so all three need to be told separately.
+    resolve: {
+      alias: {
+        '@': fileURLToPath(new URL('./src', import.meta.url)),
+      },
+    },
     plugins: [
       tailwindcss(),
       react(),
