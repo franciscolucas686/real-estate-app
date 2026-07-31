@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, useNavigate, useLocation } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { AnimatePresence, useIsPresent } from 'motion/react';
 import { motion } from 'motion/react';
 import {
   ChevronLeft,
+  ChevronRight,
   Pencil,
   CheckCircle,
   Bed,
@@ -19,6 +20,7 @@ import {
   Sun,
   Waves,
   Map as MapIcon,
+  MapPin,
   Triangle,
   Droplets,
   Trees,
@@ -27,14 +29,15 @@ import {
   Ruler,
 } from 'lucide-react';
 import { FaWhatsapp } from 'react-icons/fa';
-import { useProperty } from '../hooks/use-property';
-import { PropertyMediaCarousel } from '../components/media/property-media-carousel';
-import { PropertyMediaGallery } from '../components/media/property-media-gallery';
-import { PropertyMediaViewer } from '../components/media/property-media-viewer';
-import { PropertyDetailSkeleton } from '../components/ui/skeletons';
-import { PageContainer } from '../components/ui/page-container';
-import { SuccessSplash } from '../components/ui/success-splash';
-import { PropertyMap } from '../components/ui/property-map';
+import { useProperty } from '@/features/properties/hooks/use-property';
+import { PropertyMediaCarousel } from '@/features/properties/components/media/property-media-carousel';
+import { PropertyMediaGallery } from '@/features/properties/components/media/property-media-gallery';
+import { PropertyMediaViewer } from '@/features/properties/components/media/property-media-viewer';
+import { PropertyDetailSkeleton } from '@/features/properties/components/property-skeletons';
+import { PageContainer } from '@/layout/page-container';
+import { SuccessSplash } from '@/ui/success-splash';
+import { PropertyMap } from '@/features/properties/components/property-map';
+import { StatusBadge } from '@/features/properties/components/status-badge';
 import {
   formatPrice,
   formatArea,
@@ -47,7 +50,7 @@ import {
   formatZoning,
   TopographyLabel,
   WaterSourceLabel,
-} from '../utils/format';
+} from '@/shared/format';
 import {
   PropertyType,
   PropertyStatus,
@@ -60,11 +63,11 @@ import {
   type LandDetailsDto,
   type SmallFarmDetailsDto,
   type CountryHouseDetailsDto,
-} from '../types/api';
-import { useMe } from '../hooks/use-auth';
-import { useScrollLock } from '../hooks/use-scroll-lock';
-import { twMerge } from 'tailwind-merge';
-import { usePropertyMutationRefresh } from '../hooks/use-property-mutation-refresh';
+} from '@/shared/api/types';
+import { useMe } from '@/features/auth/use-auth';
+import { useScrollLock } from '@/shared/hooks/use-scroll-lock';
+import { cn } from '@/shared/cn';
+import { usePropertyMutationRefresh } from '@/features/properties/hooks/use-property-mutation-refresh';
 
 function flattenGallery(property: PropertyDetailDto): PropertyImageDto[] {
   const rooms = [...property.gallery.rooms].sort((a, b) => a.order - b.order);
@@ -165,11 +168,15 @@ export function PropertyDetails() {
   // Keep the skeleton up until the cover photo has actually loaded, so the
   // user never sees the page (incl. the WhatsApp CTA) before its first
   // visible image is ready.
-  if (isLoading || (allImages.length > 0 && !coverReady)) return <PropertyDetailSkeleton />;
+  if (isLoading || (allImages.length > 0 && !coverReady)) {
+    // One skeleton for both, because there is now one layout. The desktop variant existed
+    // only to mirror the second tree.
+    return <PropertyDetailSkeleton />;
+  }
 
   if (!property) {
     return (
-      <div className="flex min-h-dvh items-center justify-center p-4">
+      <div className="flex min-h-dvh items-center justify-center p-4 md:min-h-full">
         <p className="text-sm text-foreground-subtle">Imóvel não encontrado.</p>
       </div>
     );
@@ -177,7 +184,7 @@ export function PropertyDetails() {
 
   if (!isAuthenticated && property.status !== PropertyStatus.ACTIVE) {
     return (
-      <div className="flex min-h-dvh items-center justify-center p-4">
+      <div className="flex min-h-dvh items-center justify-center p-4 md:min-h-full">
         <p className="text-sm text-foreground-subtle">Imóvel não encontrado.</p>
       </div>
     );
@@ -188,201 +195,223 @@ export function PropertyDetails() {
     : null;
 
   return (
-    <div data-slot="page-property-details" className=" flex flex-col">
-      {/* Full-width carousel with back button overlaid */}
-      <div className="relative mx-0 w-full">
-        <PropertyMediaCarousel
-          images={allImages}
-          onOpenGallery={() => setGalleryOpen(true)}
-          showDots={false}
-        />
-        {isPostCreate ? (
-          <button
-            type="button"
-            onClick={() =>
-              navigate(`/properties/${id}/edit`, { state: { context: 'post-create' } })
-            }
-            aria-label="Editar imóvel"
-            className="absolute left-6 top-[calc(env(safe-area-inset-top,20px)+12px)] z-10 flex h-10 items-center gap-2 rounded-full bg-black/40 px-4 text-sm font-semibold text-white backdrop-blur-sm transition-transform active:scale-90"
-          >
-            <Pencil size={15} />
-            Editar imóvel
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            aria-label="Voltar"
-            className="absolute left-3 top-[calc(env(safe-area-inset-top,20px)+12px)] z-10 flex size-14 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-transform active:scale-90"
-          >
-            <ChevronLeft size={24} />
-          </button>
-        )}
-      </div>
-      {/* Main content */}
-      <PageContainer className="flex flex-col gap-4 py-6">
-        {/* Price */}
-        <div className="flex flex-col pt-6 gap-0.5">
-          <span className="text-xl font-bold text-foreground">
-            {formatMainPrice(property.businessType, property.price, property.rentPrice)}
-          </span>
-          {property.condoFee && (
-            <span className="text-sm text-foreground-subtle">
-              Condomínio: {formatPrice(property.condoFee)}/mês
-            </span>
-          )}
-        </div>
+    <article data-slot="page-property-details" className="flex flex-col">
+      {/*
+        One composition, not two.
 
-        <hr className="border-bs-gray-300 my-2" />
+        This page used to render the mobile layout and the desktop layout as separate JSX
+        trees, ~200 lines each, switched on `useIsDesktop()`. They contained the same
+        sections in a different order, which meant every product change had to be made
+        twice and the two drifted: the desktop tree showed a `StatusBadge` and a
+        breadcrumb the mobile one didn't, and the mobile one had a "Valores e Negócios"
+        block with a second copy of the price.
 
-        {/* Property details wrapper */}
-        <div className="flex flex-col gap-1.5">
-          {/* Property type — card style */}
-          <span className="text-sm text-muted-foreground tracking-wide">
-            {PropertyTypeLabel[property.type]}
-          </span>
+        The order difference is expressible in CSS. A two-row, two-column grid gives:
+        - mobile (single column): media → identity/price/CTA → specs and content
+        - desktop: media top-left, contact rail top-right and sticky, content below-left
 
-          {/* Location */}
-          <p className="font-bold text-sm text-foreground-subtle">
-            {property.neighborhood}, {property.city} – {property.state}
-          </p>
+        `md:row-span-2` on the rail is what lets it stay sticky while the content column
+        scrolls past — a sticky item can only travel within its own grid area.
+      */}
+      <PageContainer maxWidth="wide" className="flex flex-col gap-5 pb-10 md:py-8">
+        <DetailBreadcrumb type={property.type} />
 
-          {/* Quick specs row — area, bedrooms, bathrooms, parking only */}
-          <div className="flex flex-wrap items-center gap-3 text-sm text-foreground">
-            {(() => {
-              const items = [];
+        <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_340px] md:items-start md:gap-10 lg:grid-cols-[minmax(0,1fr)_380px]">
+          {/* ── Media ─────────────────────────────────────────────────────── */}
+          <div className="flex flex-col gap-3 md:col-start-1 md:row-start-1">
+            {/* Full-bleed on mobile, a rounded card from `md` up. This is the "two
+                layouts" difference reduced to two utility classes. */}
+            <div className="relative -mx-gutter overflow-hidden md:mx-0 md:rounded-2xl">
+              <PropertyMediaCarousel
+                images={allImages}
+                onOpenGallery={() => setGalleryOpen(true)}
+                showDots={false}
+              />
+              {isPostCreate ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate(`/properties/${id}/edit`, { state: { context: 'post-create' } })
+                  }
+                  className="absolute left-4 top-[calc(env(safe-area-inset-top,12px)+12px)] z-(--z-raised) flex h-10 items-center gap-2 rounded-full bg-black/40 px-4 text-sm font-semibold text-white backdrop-blur-sm transition-transform active:scale-90 md:top-4 md:hover:bg-black/55"
+                >
+                  <Pencil size={15} aria-hidden="true" />
+                  Editar imóvel
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  aria-label="Voltar"
+                  className="absolute left-3 top-[calc(env(safe-area-inset-top,12px)+12px)] z-(--z-raised) flex size-12 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-transform active:scale-90 md:top-3 md:size-11 md:hover:bg-black/55"
+                >
+                  <ChevronLeft size={22} aria-hidden="true" />
+                </button>
+              )}
+            </div>
 
-              if (property.totalArea) {
-                items.push(<span key="area">{formatArea(property.totalArea)}</span>);
-              }
-              if (property.bedrooms != null) {
-                items.push(
-                  <span key="bed">
-                    {property.bedrooms} {property.bedrooms === 1 ? 'quarto' : 'quartos'}
-                  </span>,
-                );
-              }
-              if (property.bathrooms != null) {
-                items.push(
-                  <span key="bath">
-                    {property.bathrooms} {property.bathrooms === 1 ? 'banheiro' : 'banheiros'}
-                  </span>,
-                );
-              }
-              if (property.parkingSpaces != null) {
-                items.push(
-                  <span key="parking">
-                    {property.parkingSpaces} {property.parkingSpaces === 1 ? 'vaga' : 'vagas'}
-                  </span>,
-                );
-              }
-
-              return items.flatMap((item, i) => [
-                item,
-                i < items.length - 1 && (
-                  <span key={`dot-${i}`} className="text-foreground-subtle">
-                    •
-                  </span>
-                ),
-              ]);
-            })()}
-          </div>
-        </div>
-
-        {/* WhatsApp CTA 1 — inline */}
-        {whatsUrl && (
-          <div ref={ctaRef}>
-            <a
-              href={whatsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-action text-base font-semibold text-white transition-transform active:scale-[0.98] my-4"
-            >
-              <FaWhatsapp size={22} />
-              Conversar conosco agora
-            </a>
-          </div>
-        )}
-
-        {/* Values and Deals wrapper */}
-        <div className="flex flex-col gap-5">
-          <h2 className="text-base font-semibold text-foreground">Valores e Negócios</h2>
-          <div className="flex flex-wrap gap-2">
-            <Badge color={property.businessType === BusinessType.SALE ? 'action' : 'accent'}>
-              {BusinessTypeLabel[property.businessType]}
-            </Badge>
-            {property.saleTypes.map((st) => (
-              <Badge key={st.id} color="border">
-                {SaleTypeLabel[st.type]}
-              </Badge>
-            ))}
-          </div>
-          <div className="flex flex-col gap-4">
-            <span className="text-2xl font-bold text-foreground">
-              {formatMainPrice(property.businessType, property.price, property.rentPrice)}
-            </span>
-            {property.condoFee && (
-              <span className="text-sm text-foreground-subtle">
-                Condomínio: {formatPrice(property.condoFee)}/mês
-              </span>
+            {/* Thumbnail strip: only useful where there's room for it to be tappable. */}
+            {allImages.length > 0 && (
+              <div className="hidden grid-cols-6 gap-2 md:grid">
+                {allImages.slice(0, 5).map((img, i) => (
+                  <button
+                    key={img.id}
+                    type="button"
+                    onClick={() => setViewerIndex(i)}
+                    aria-label={`Ver foto ${i + 1}`}
+                    className="aspect-square overflow-hidden rounded-lg"
+                  >
+                    <img
+                      src={img.url}
+                      alt={img.label ?? `Foto ${i + 1}`}
+                      loading="lazy"
+                      className="h-full w-full object-cover transition-opacity md:hover:opacity-80"
+                    />
+                  </button>
+                ))}
+                {allImages.length > 5 && (
+                  <button
+                    type="button"
+                    onClick={() => setGalleryOpen(true)}
+                    aria-label={`Ver todas as ${allImages.length} fotos`}
+                    className="relative aspect-square overflow-hidden rounded-lg"
+                  >
+                    <img
+                      src={allImages[5].url}
+                      alt=""
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                    />
+                    <span className="absolute inset-0 flex items-center justify-center bg-black/60 text-sm font-semibold text-white">
+                      +{allImages.length - 5} fotos
+                    </span>
+                  </button>
+                )}
+              </div>
             )}
           </div>
-        </div>
 
-        <hr className="border-bs-gray-300 my-6" />
-
-        {/* Spec grid — type-specific + basic specs */}
-        <PropertySpecGrid property={property} />
-
-        <hr className="border-bs-gray-300 my-6" />
-
-        {/* Description */}
-        {property.description && (
-          <div className="flex flex-col gap-2">
-            <h2 className="text-base font-semibold text-foreground">Descrição</h2>
-            <p className=" leading-relaxed text-foreground-subtle">{property.description}</p>
-          </div>
-        )}
-
-        <hr className="border-bs-gray-300 my-6" />
-
-        {/* Property code */}
-        <div>
-          <Badge color="border">Cód. Prop: {property.code}</Badge>
-        </div>
-
-        {/* Map section */}
-        {hasCoords(property.location) && (
-          <>
-            <hr className="border-bs-gray-300 my-6" />
-
-            <div className="flex flex-col gap-3">
-              <h2 className="text-base font-semibold text-foreground">Localização</h2>
-
-              {/* Inline map - read-only */}
-              {mapCenter && (
-                <div
-                  className={twMerge(
-                    'relative isolate h-96 w-full rounded-lg overflow-hidden cursor-pointer',
-                    mapFullscreen && 'invisible',
-                  )}
-                  onClick={() => setMapFullscreen(true)}
-                >
-                  <PropertyMap center={mapCenter} interactive={false} className="h-full w-full" />
-                </div>
-              )}
-
-              {/* Address text */}
-              <p className="text-sm text-foreground-subtle">
-                {property.location.neighborhood}, {property.location.city} —{' '}
-                {property.location.state}
-              </p>
-
-              {/* Fixed padding to prevent content from being covered by sticky CTA */}
-              <div className="h-24" aria-hidden="true" />
+          {/* ── Contact rail ──────────────────────────────────────────────── */}
+          <aside className="flex flex-col gap-4 md:col-start-2 md:row-span-2 md:row-start-1 md:sticky md:top-6 md:self-start md:rounded-2xl md:border md:border-border md:bg-surface-raised md:p-6 md:shadow-sm">
+            <div className="flex flex-wrap gap-2">
+              <Badge color={property.businessType === BusinessType.SALE ? 'action' : 'accent'}>
+                {BusinessTypeLabel[property.businessType]}
+              </Badge>
+              {property.saleTypes.map((st) => (
+                <Badge key={st.id} color="border">
+                  {SaleTypeLabel[st.type]}
+                </Badge>
+              ))}
+              {/* Only meaningful to someone who can change it. A visitor can only ever see
+                  ACTIVE properties, so the badge would be a constant. */}
+              {isAuthenticated && <StatusBadge status={property.status} />}
             </div>
-          </>
-        )}
+
+            <div className="flex flex-wrap items-baseline gap-x-2">
+              <h1 className="text-xl font-bold text-foreground md:text-2xl">
+                {PropertyTypeLabel[property.type]}
+              </h1>
+              <span className="font-mono text-sm text-muted-foreground">Cód. {property.code}</span>
+            </div>
+
+            <div className="flex flex-col gap-0.5">
+              <p className="text-2xl font-bold text-foreground">
+                {formatMainPrice(property.businessType, property.price, property.rentPrice)}
+              </p>
+              {property.condoFee && (
+                <p className="text-sm text-foreground-subtle">
+                  Condomínio: {formatPrice(property.condoFee)}/mês
+                </p>
+              )}
+            </div>
+
+            <p className="flex items-start gap-1.5 text-sm text-foreground-subtle">
+              <MapPin size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+              {property.neighborhood}, {property.city} — {property.state}
+            </p>
+
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-foreground">
+              <QuickSpecs property={property} />
+            </div>
+
+            {/* The inline CTA. `ctaRef` is watched so the fixed mobile bar only appears
+                once this one has scrolled out of view. */}
+            {whatsUrl && (
+              <div className="hidden md:block">
+                <a
+                  href={whatsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-whatsapp text-base font-semibold text-white transition-[transform,filter] active:scale-[0.98] md:hover:brightness-110"
+                >
+                  <FaWhatsapp size={22} aria-hidden="true" />
+                  Conversar conosco agora
+                </a>
+              </div>
+            )}
+          </aside>
+
+          {/* ── Content ───────────────────────────────────────────────────── */}
+          <div className="flex flex-col gap-6 md:col-start-1 md:row-start-2">
+            {whatsUrl && (
+              // Mobile keeps the CTA in the flow, right after the price, because there is
+              // no rail to pin it to.
+              // The sticky bottom bar is mobile-only, so this is the only CTA the scroll
+              // observer needs to watch.
+              <div ref={ctaRef} className="md:hidden">
+                <a
+                  href={whatsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-whatsapp text-base font-semibold text-white transition-transform active:scale-[0.98]"
+                >
+                  <FaWhatsapp size={22} aria-hidden="true" />
+                  Conversar conosco agora
+                </a>
+              </div>
+            )}
+
+            <PropertySpecGrid property={property} />
+
+            {property.description && (
+              <section className="flex flex-col gap-2">
+                <h2 className="text-base font-semibold text-foreground">Sobre o imóvel</h2>
+                {/* Capped for reading comfort: prose past ~70 characters per line is
+                    measurably harder to track back from. */}
+                <p className="max-w-prose leading-relaxed text-foreground-subtle">
+                  {property.description}
+                </p>
+              </section>
+            )}
+
+            {hasCoords(property.location) && (
+              <section className="flex flex-col gap-3 border-t border-border pt-6">
+                <h2 className="text-base font-semibold text-foreground">Localização</h2>
+                {mapCenter && (
+                  <button
+                    type="button"
+                    onClick={() => setMapFullscreen(true)}
+                    aria-label="Abrir mapa em tela cheia"
+                    className={cn(
+                      // A real <button>: this was a <div onClick>, unreachable by keyboard.
+                      'relative isolate h-72 w-full overflow-hidden rounded-lg md:h-80',
+                      mapFullscreen && 'invisible',
+                    )}
+                  >
+                    <PropertyMap center={mapCenter} interactive={false} className="h-full w-full" />
+                  </button>
+                )}
+                <p className="text-sm text-foreground-subtle">
+                  {property.location.neighborhood}, {property.location.city} —{' '}
+                  {property.location.state}
+                </p>
+              </section>
+            )}
+
+            {/* Clears the fixed mobile CTA bar. */}
+            <div className="h-20 md:hidden" aria-hidden="true" />
+          </div>
+        </div>
       </PageContainer>
       {/* Gallery overlay — portaled to escape the route-transition transform, which would
           otherwise become the containing block for this fixed overlay. */}
@@ -394,7 +423,7 @@ export function PropertyDetails() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 40, stiffness: 400 }}
-              className="fixed inset-0 z-50 flex flex-col bg-background overflow-y-auto"
+              className="fixed inset-0 z-(--z-fixed) flex flex-col bg-background overflow-y-auto"
             >
               <div className="sticky top-0 z-10 flex items-center gap-3 border-b border-border bg-background px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)]">
                 <button
@@ -500,13 +529,13 @@ export function PropertyDetails() {
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ type: 'spring', damping: 30, stiffness: 400 }}
-                className="fixed inset-x-0 bottom-0 z-40 px-4 pb-[calc(env(safe-area-inset-bottom,20px)+12px)] pt-3 bg-surface-raised border-t border-border shadow-lg"
+                className="fixed inset-x-0 bottom-0 z-(--z-nav) px-4 pb-[calc(env(safe-area-inset-bottom,20px)+12px)] pt-3 bg-surface-raised border-t border-border shadow-lg"
               >
                 <a
                   href={whatsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-action text-base font-semibold text-white transition-transform active:scale-[0.98]"
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-action text-base font-semibold text-white transition-[transform,background-color] active:scale-[0.98] md:mx-auto md:max-w-md md:hover:bg-action-hover"
                 >
                   <FaWhatsapp size={22} />
                   Conversar conosco agora
@@ -522,14 +551,14 @@ export function PropertyDetails() {
       {isPostCreate &&
         !mapFullscreen &&
         createPortal(
-          <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/90 px-4 pb-[calc(env(safe-area-inset-bottom,20px)+12px)] pt-3 backdrop-blur-sm">
+          <div className="fixed inset-x-0 bottom-0 z-(--z-nav) border-t border-border bg-background/90 px-4 pb-[calc(env(safe-area-inset-bottom,20px)+12px)] pt-3 backdrop-blur-sm">
             <button
               type="button"
               onClick={() => {
                 refreshPropertyQueries();
                 setFinalizeSplashVisible(true);
               }}
-              className="flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white transition-transform active:scale-[0.98]"
+              className="flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white transition-[transform,background-color] active:scale-[0.98] md:mx-auto md:max-w-md md:hover:bg-action-hover"
             >
               Finalizar imóvel
             </button>
@@ -566,7 +595,7 @@ export function PropertyDetails() {
               animate={{ y: 0 }}
               exit={{ y: '-100%' }}
               transition={{ type: 'spring', damping: 40, stiffness: 400 }}
-              className="fixed inset-x-0 top-0 z-40 flex items-center gap-3 border-b border-border bg-surface-raised px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)] shadow-sm"
+              className="fixed inset-x-0 top-0 z-(--z-nav) flex items-center gap-3 border-b border-border bg-surface-raised px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)] shadow-sm"
             >
               {isPostCreate ? (
                 <button
@@ -575,7 +604,7 @@ export function PropertyDetails() {
                     navigate(`/properties/${id}/edit`, { state: { context: 'post-create' } })
                   }
                   aria-label="Editar imóvel"
-                  className="flex h-10 items-center px-4 ml-2 gap-2 rounded-full text-sm font-medium bg-black/40 text-white transition-transform active:scale-90"
+                  className="flex h-10 items-center px-4 ml-2 gap-2 rounded-full text-sm font-medium bg-black/40 text-white transition-transform active:scale-90 md:hover:bg-black/55"
                 >
                   <Pencil size={16} />
                   Editar imóvel
@@ -585,7 +614,7 @@ export function PropertyDetails() {
                   type="button"
                   onClick={() => navigate(-1)}
                   aria-label="Voltar"
-                  className="flex size-10 items-center justify-center rounded-full bg-black/40 text-white transition-transform active:scale-90"
+                  className="flex size-10 items-center justify-center rounded-full bg-black/40 text-white transition-transform active:scale-90 md:hover:bg-black/55"
                 >
                   <ChevronLeft size={24} />
                 </button>
@@ -595,7 +624,73 @@ export function PropertyDetails() {
         </AnimatePresence>,
         document.body,
       )}
-    </div>
+    </article>
+  );
+}
+
+/* ──────────────────── Breadcrumb ──────────────────── */
+
+/**
+ * Hidden below `md`: on a phone the overlaid back button is the way out, and a trail
+ * competing with it just costs vertical space above the photo.
+ */
+function DetailBreadcrumb({ type }: { type: PropertyType }) {
+  return (
+    <nav
+      aria-label="Trilha"
+      className="hidden items-center gap-1.5 text-sm text-foreground-subtle md:flex"
+    >
+      <Link to="/" className="transition-colors md:hover:text-foreground">
+        Início
+      </Link>
+      <ChevronRight size={14} aria-hidden="true" />
+      <Link to="/imoveis" className="transition-colors md:hover:text-foreground">
+        Imóveis
+      </Link>
+      <ChevronRight size={14} aria-hidden="true" />
+      <span className="font-medium text-foreground">{PropertyTypeLabel[type]}</span>
+    </nav>
+  );
+}
+
+/* ──────────────────── QuickSpecs ──────────────────── */
+
+/**
+ * The at-a-glance line: area, bedrooms, bathrooms, parking, dot-separated.
+ *
+ * Built as a list of present values so the separators land between items rather than
+ * after every one — the previous version was an IIFE inside JSX doing the same thing with
+ * `flatMap`, which is why it needed a comment to be readable.
+ */
+function QuickSpecs({ property }: { property: PropertyDetailDto }) {
+  const items: string[] = [];
+
+  if (property.totalArea) items.push(formatArea(property.totalArea));
+  if (property.bedrooms != null) {
+    items.push(`${property.bedrooms} ${property.bedrooms === 1 ? 'quarto' : 'quartos'}`);
+  }
+  if (property.bathrooms != null) {
+    items.push(`${property.bathrooms} ${property.bathrooms === 1 ? 'banheiro' : 'banheiros'}`);
+  }
+  if (property.parkingSpaces != null) {
+    items.push(`${property.parkingSpaces} ${property.parkingSpaces === 1 ? 'vaga' : 'vagas'}`);
+  }
+
+  if (items.length === 0) return null;
+
+  return (
+    <>
+      {items.map((item, index) => (
+        <span key={item} className="flex items-center gap-3">
+          {index > 0 && (
+            <span className="text-foreground-subtle" aria-hidden="true">
+              •
+            </span>
+          )}
+          {item}
+        </span>
+      ))}
+    </>
   );
 }
 
@@ -609,7 +704,7 @@ function Badge({ color, children }: { color: string; children: React.ReactNode }
   };
   return (
     <span
-      className={twMerge(
+      className={cn(
         'rounded-full px-3 py-1.5 text-xs font-semibold',
         colorMap[color] ?? colorMap.border,
       )}
@@ -640,7 +735,13 @@ function SpecItem({
   );
 }
 
-function PropertySpecGrid({ property }: { property: PropertyDetailDto }) {
+function PropertySpecGrid({
+  property,
+  showHeading = true,
+}: {
+  property: PropertyDetailDto;
+  showHeading?: boolean;
+}) {
   const items: { icon: React.ReactNode; label: string; sublabel?: string }[] = [];
 
   // Area items — shown separately so both are visible when available
@@ -738,8 +839,11 @@ function PropertySpecGrid({ property }: { property: PropertyDetailDto }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <h2 className="text-base font-semibold text-foreground">Características</h2>
-      <div className="grid grid-cols-2 gap-4" style={{ gridAutoRows: '1fr' }}>
+      {showHeading && <h2 className="text-base font-semibold text-foreground">Características</h2>}
+      <div
+        className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
+        style={{ gridAutoRows: '1fr' }}
+      >
         {items.map((item, i) => (
           <SpecItem key={i} icon={item.icon} label={item.label} sublabel={item.sublabel} />
         ))}

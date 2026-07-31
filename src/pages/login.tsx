@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useLogin } from '../hooks/use-auth';
+import { useLogin } from '@/features/auth/use-auth';
 import { Eye, EyeOff, CheckCircle } from 'lucide-react';
-import { loginSchema, type LoginFormValues } from '../schemas/auth.schema';
-import { getErrorMessage } from '../utils/api-error';
-import { SuccessSplash } from '../components/ui/success-splash';
+import { loginSchema, type LoginFormValues } from '@/features/auth/auth.schema';
+import { getErrorMessage } from '@/shared/api/api-error';
+import { SuccessSplash } from '@/ui/success-splash';
+import { Input } from '@/ui/input';
 
 export function Login() {
   const navigate = useNavigate();
@@ -22,20 +23,27 @@ export function Login() {
     defaultValues: { email: '', password: '' },
   });
 
+  // The splash holds for 900ms before redirecting. Owning the timer in an effect
+  // (rather than starting it inside the submit handler) means unmounting early —
+  // back button, session expiry — cancels it, instead of navigating out from under
+  // whatever mounted next.
+  useEffect(() => {
+    if (!splashVisible) return;
+    const timer = setTimeout(() => navigate('/dashboard', { replace: true }), 900);
+    return () => clearTimeout(timer);
+  }, [splashVisible, navigate]);
+
   async function onSubmit(values: LoginFormValues) {
     try {
       await login.mutateAsync(values);
       setSplashVisible(true);
-      setTimeout(() => {
-        navigate('/dashboard', { replace: true });
-      }, 900);
     } catch {
       // error handled below via login.error
     }
   }
 
   return (
-    <div className="relative flex min-h-dvh max-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-4">
+    <div className="relative flex min-h-dvh max-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-4 md:min-h-full md:max-h-full">
       <div className="w-full max-w-sm mb-16">
         {/* Logo */}
         <div className="mb-10 flex justify-center">
@@ -51,12 +59,12 @@ export function Login() {
             <label htmlFor="email" className="text-md font-medium text-foreground">
               E-mail
             </label>
-            <input
+            <Input
               id="email"
               type="email"
               autoComplete="email"
               placeholder="seu@email.com"
-              className="h-16 rounded-xl border border-border bg-surface-raised px-4 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-action"
+              className="h-16"
               {...register('email')}
             />
             {errors.email && (
@@ -69,18 +77,18 @@ export function Login() {
               Senha
             </label>
             <div className="relative">
-              <input
+              <Input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
                 placeholder="••••••"
-                className="h-16 w-full rounded-xl border border-border bg-surface-raised px-4 pr-12 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-action"
+                className="h-16 w-full pr-12"
                 {...register('password')}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-4 p-2 ml-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                className="absolute right-4 p-2 ml-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors md:hover:text-foreground"
                 aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
               >
                 {showPassword ? <EyeOff size={28} /> : <Eye size={28} />}
@@ -92,7 +100,10 @@ export function Login() {
           </div>
 
           {login.isError && (
-            <p className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
+            <p
+              role="alert"
+              className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger"
+            >
               {getErrorMessage(login.error)}
             </p>
           )}
@@ -100,7 +111,7 @@ export function Login() {
           <button
             type="submit"
             disabled={login.isPending || splashVisible}
-            className="mt-2 flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white transition-colors active:bg-action-hover disabled:opacity-60"
+            className="mt-2 flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white transition-colors active:bg-action-hover disabled:opacity-60 md:hover:bg-action-hover"
           >
             {login.isPending ? 'Entrando...' : 'Entrar'}
           </button>
