@@ -1,6 +1,9 @@
 import { http, HttpResponse } from 'msw';
+import { BusinessType, PropertyStatus, PropertyType } from '@/shared/api/types';
 import type {
   ApiErrorResponse,
+  PropertyCardDto,
+  PropertyListResponseDto,
   LoginDto,
   SiteSettings,
   UpdateSiteSettingsDto,
@@ -8,7 +11,7 @@ import type {
   CreateWhatsappNumberDto,
   CreatePropertyDto,
   PropertyDetailDto,
-} from '../types/api';
+} from '@/shared/api/types';
 
 const VALID_LOGIN: LoginDto = { email: 'admin@example.com', password: 'secret123' };
 
@@ -38,8 +41,43 @@ export function setMockProperty(property: PropertyDetailDto | null) {
   mockProperty = property;
 }
 
+/**
+ * In-memory catalogue backing `GET /api/properties` and `/api/properties/status-counts`.
+ *
+ * Filtering, paging and the status tallies are implemented here rather than stubbed with
+ * a fixed payload, because the behaviour worth testing on the dashboard *is* the
+ * interaction between them — that a status filter narrows the list, that `code` is applied
+ * server-side, and that `total` drives the pagination.
+ */
+let mockProperties: PropertyCardDto[] = [];
+
+export function setMockProperties(properties: PropertyCardDto[]) {
+  mockProperties = properties;
+}
+
+export function makePropertyCard(overrides: Partial<PropertyCardDto> = {}): PropertyCardDto {
+  return {
+    id: 'prop-1',
+    code: '575301',
+    type: PropertyType.HOUSE,
+    businessType: BusinessType.SALE,
+    price: '450000.00',
+    rentPrice: null,
+    city: 'Sorocaba',
+    state: 'SP',
+    neighborhood: 'Campolim',
+    bedrooms: 3,
+    bathrooms: 2,
+    parkingSpaces: 2,
+    previewImages: [],
+    status: PropertyStatus.ACTIVE,
+    ...overrides,
+  };
+}
+
 export function resetMockData() {
   mockProperty = null;
+  mockProperties = [];
   siteSettings = {
     id: 'settings-1',
     whatsapp: '11999990000',
@@ -149,6 +187,42 @@ export const handlers = [
       updatedAt: new Date().toISOString(),
     };
     return HttpResponse.json(created, { status: 201 });
+  }),
+
+  // Declared before `/api/properties/:id` so `status-counts` isn't swallowed by the
+  // dynamic segment.
+  http.get('/api/properties/status-counts', () => {
+    const counts: Record<PropertyStatus, number> = {
+      [PropertyStatus.ACTIVE]: 0,
+      [PropertyStatus.PENDING]: 0,
+      [PropertyStatus.INACTIVE]: 0,
+    };
+    mockProperties.forEach((property) => {
+      counts[property.status] += 1;
+    });
+    return HttpResponse.json(counts);
+  }),
+
+  http.get('/api/properties', ({ request }) => {
+    const url = new URL(request.url);
+    const status = url.searchParams.get('status');
+    const code = url.searchParams.get('code');
+    const skip = Number(url.searchParams.get('skip') ?? 0);
+    const take = Number(url.searchParams.get('take') ?? 10);
+
+    const filtered = mockProperties.filter((property) => {
+      if (status && property.status !== status) return false;
+      if (code && !property.code.includes(code)) return false;
+      return true;
+    });
+
+    const body: PropertyListResponseDto = {
+      data: filtered.slice(skip, skip + take),
+      total: filtered.length,
+      skip,
+      take,
+    };
+    return HttpResponse.json(body);
   }),
 
   http.get('/api/properties/:id', ({ params }) => {

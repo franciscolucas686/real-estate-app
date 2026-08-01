@@ -16,6 +16,16 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* Absolute imports. Every intra-src import goes through `@/`, so moving a file
+       between layers is a `mv` plus a search-and-replace of its own path, instead of
+       rewriting `../../..` chains in every consumer. It also makes the layering rule
+       in eslint.config.mjs expressible: a restricted-import zone can match `@/ui/*`
+       reliably, which it cannot do against relative paths. */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,

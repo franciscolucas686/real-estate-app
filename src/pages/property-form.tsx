@@ -3,13 +3,17 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ChevronLeft, MapPin } from 'lucide-react';
+import { ChevronLeft, MapPin, ArrowRight } from 'lucide-react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import type { LatLngExpression } from 'leaflet';
-import { apiFetch } from '../services/api-client';
-import { twMerge } from 'tailwind-merge';
-import { formatPrice } from '../utils/format';
-import { PageContainer } from '../components/ui/page-container';
+import { apiFetch } from '@/shared/api/api-client';
+import { cn } from '@/shared/cn';
+import { formatPrice } from '@/shared/format';
+import { PageContainer } from '@/layout/page-container';
+import { Button } from '@/ui/button';
+import { Field as SharedField } from '@/ui/field';
+import { Input as SharedInput } from '@/ui/input';
+import { Select as SharedSelect } from '@/ui/select';
 import {
   PropertyTypeLabel,
   BusinessTypeLabel,
@@ -19,7 +23,7 @@ import {
   TopographyLabel,
   WaterSourceLabel,
   toPlaceCase,
-} from '../utils/format';
+} from '@/shared/format';
 import {
   PropertyType,
   BusinessType,
@@ -28,16 +32,21 @@ import {
   Zoning,
   Topography,
   WaterSource,
-} from '../types/api';
-import { createProperty, updateProperty, fetchPropertyById } from '../services/property-service';
-import { useDisablePullToRefresh } from '../hooks/use-disable-pull-to-refresh';
-import type { CreatePropertyDto, PropertyDetailDto } from '../types/api';
+} from '@/shared/api/types';
+import {
+  createProperty,
+  updateProperty,
+  fetchPropertyById,
+} from '@/features/properties/api/property-service';
+import { useDisablePullToRefresh } from '@/shared/hooks/use-disable-pull-to-refresh';
+import type { CreatePropertyDto, PropertyDetailDto } from '@/shared/api/types';
 import {
   propertyFormSchema,
   STEP_FIELDS,
   type PropertyFormValues,
-} from '../schemas/property.schema';
-import { getErrorMessage } from '../utils/api-error';
+} from '@/features/properties/property.schema';
+import { getErrorMessage } from '@/shared/api/api-error';
+import { propertyKeys } from '@/features/properties/query-keys';
 
 // ─── Form state ──────────────────────────────────────────────────────────────
 // Same shape react-hook-form validates via zodResolver(propertyFormSchema) —
@@ -178,13 +187,13 @@ function propertyToFormState(p: PropertyDetailDto): FormState {
 
   const d = p.details;
   if (p.type === PropertyType.HOUSE && d) {
-    const h = d as import('../types/api').HouseDetailsDto;
+    const h = d as import('@/shared/api/types').HouseDetailsDto;
     base.floors = h.floors != null ? String(h.floors) : '1';
     base.isInCondominium = h.isInCondominium;
     base.condominiumName = h.condominiumName ?? '';
     base.condominiumAmenities = h.condominiumAmenities ?? '';
   } else if (p.type === PropertyType.APARTMENT && d) {
-    const a = d as import('../types/api').ApartmentDetailsDto;
+    const a = d as import('@/shared/api/types').ApartmentDetailsDto;
     base.floor = String(a.floor);
     base.isGroundFloor = a.isGroundFloor ?? false;
     base.hasElevator = a.hasElevator;
@@ -192,18 +201,18 @@ function propertyToFormState(p: PropertyDetailDto): FormState {
     base.sunPosition = a.sunPosition;
     base.aptHasPool = a.hasPool ?? false;
   } else if (p.type === PropertyType.LAND && d) {
-    const l = d as import('../types/api').LandDetailsDto;
+    const l = d as import('@/shared/api/types').LandDetailsDto;
     base.zoning = l.zoning;
     base.topography = l.topography;
   } else if (p.type === PropertyType.SMALL_FARM && d) {
-    const sf = d as import('../types/api').SmallFarmDetailsDto;
+    const sf = d as import('@/shared/api/types').SmallFarmDetailsDto;
     base.waterSource = sf.waterSource;
     base.hasHouse = sf.hasHouse;
     base.sfHasPool = sf.hasPool;
     base.hasLake = sf.hasLake;
     base.hasFruitTrees = sf.hasFruitTrees;
   } else if (p.type === PropertyType.COUNTRY_HOUSE && d) {
-    const ch = d as import('../types/api').CountryHouseDetailsDto;
+    const ch = d as import('@/shared/api/types').CountryHouseDetailsDto;
     base.hasRiver = ch.hasRiver;
     base.hasSpring = ch.hasSpring;
   }
@@ -217,8 +226,17 @@ export function PropertyForm() {
   const { id } = useParams<{ id?: string }>();
   const isEdit = Boolean(id);
 
+  // Shares the cache entry with `useProperty` via the key factory rather than a raw
+  // `['property', id]` tuple — otherwise this is a second, parallel entry that the
+  // property mutations never invalidate, so editing right after a status change would
+  // hydrate the form from stale data.
+  //
+  // It stays a plain `useQuery` instead of calling `useProperty`, deliberately:
+  // `useProperty` seeds `placeholderData` from a list card, which would populate the
+  // form with a partial record (empty description, missing subtype details) and let the
+  // user submit it as if it were complete.
   const { data: existingProperty, isLoading: loadingProperty } = useQuery({
-    queryKey: ['property', id],
+    queryKey: propertyKeys.detail(id ?? ''),
     queryFn: () => fetchPropertyById(id!),
     enabled: isEdit && Boolean(id),
     staleTime: 5 * 60 * 1000,
@@ -226,7 +244,7 @@ export function PropertyForm() {
 
   if (isEdit && loadingProperty) {
     return (
-      <div className="flex min-h-dvh items-center justify-center">
+      <div className="flex min-h-dvh items-center justify-center md:min-h-full">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-border border-t-action" />
       </div>
     );
@@ -281,6 +299,17 @@ function PropertyFormInner({
     // the runtime behavior is exactly setValue(key, value), just needs the
     // escape hatch to type-check through the generic boundary.
     setValue(key, value as never);
+
+    // Terreno não tem quartos/banheiros/suítes/vagas/área construída — limpa
+    // valores herdados de uma seleção de tipo anterior para não serem
+    // enviados escondidos no payload (o backend rejeita esses campos para LAND).
+    if (key === 'type' && value === PropertyType.LAND) {
+      setValue('bedrooms', '');
+      setValue('bathrooms', '');
+      setValue('suites', '');
+      setValue('parkingSpaces', '');
+      setValue('builtArea', '');
+    }
   }
 
   function handleMapConfirm(
@@ -326,6 +355,15 @@ function PropertyFormInner({
     void submitStep3();
   }
 
+  function handleBack() {
+    if (step > 1) {
+      setError('');
+      setStep((s) => s - 1);
+    } else {
+      navigate(`/dashboard`);
+    }
+  }
+
   async function submitStep3() {
     await handleSubmit(
       async (values) => {
@@ -358,112 +396,211 @@ function PropertyFormInner({
     )();
   }
 
+  const stepLabels = ['Informações básicas', 'Localização', 'Características'];
+  const submitLabel = saving
+    ? 'Salvando...'
+    : step === 3
+      ? isEdit
+        ? 'Salvar alterações'
+        : 'Criar e ir para Galeria'
+      : 'Continuar';
+
+  const errorBanner = error && (
+    <p
+      ref={errorRef}
+      role="alert"
+      className="scroll-mb-28 rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger md:col-span-3"
+    >
+      {error}
+    </p>
+  );
+
+  const mapOverlay = mapOpen && (
+    <LocationPickerOverlay
+      onClose={() => {
+        setError('');
+        setMapOpen(false);
+      }}
+      onConfirm={handleMapConfirm}
+      initialCenter={
+        form.latitude !== null && form.longitude !== null
+          ? [form.latitude, form.longitude]
+          : undefined
+      }
+      initialAddress={{ city: form.city, state: form.state, neighborhood: form.neighborhood }}
+    />
+  );
+
   return (
-    <div data-slot="page-property-form" className="flex min-h-dvh flex-col bg-background">
-      {/* Header */}
-      <PageContainer className="sticky top-0 z-10 flex items-center gap-3 bg-background pt-[calc(env(safe-area-inset-top,16px)+12px)] pb-3">
-        <button
-          type="button"
-          onClick={() => {
-            if (step > 1) {
-              setError('');
-              setStep((s) => s - 1);
-            } else {
-              navigate(`/dashboard`);
-            }
-          }}
-          className="flex size-11 items-center justify-center rounded-full"
-          aria-label="Voltar"
+    /*
+      One composition.
+
+      This page rendered two full trees switched on `useIsDesktop()`: a centered card on
+      desktop, a sticky-header/fixed-footer stack on mobile. `Step1`/`Step2`/`Step3` were
+      already shared between them — only the *chrome* differed — so the fork was buying two
+      copies of a header, a field container and a footer, and nothing else. Every one of
+      those three differences is a breakpoint away.
+    */
+    <div
+      data-slot="page-property-form"
+      className="flex min-h-dvh flex-col bg-background md:min-h-full md:items-center md:justify-center md:p-8"
+    >
+      <div className="flex w-full flex-col md:max-w-4xl md:gap-6 md:rounded-3xl md:bg-surface md:p-8 md:shadow-xl">
+        {/* ── Header ────────────────────────────────────────────────────────── */}
+        <PageContainer
+          maxWidth="content"
+          className="sticky top-0 z-(--z-sticky) flex flex-col gap-3 bg-background pt-[calc(env(safe-area-inset-top,16px)+12px)] pb-3 md:static md:gap-6 md:bg-transparent md:p-0"
         >
-          <ChevronLeft size={24} />
-        </button>
-        <div className="flex-1 min-w-0">
-          <span className="text-base font-semibold text-foreground">
-            {isEdit ? 'Editar imóvel' : 'Novo imóvel'}
-          </span>
-          {isEdit && initialData && form.type ? (
-            <p className="mt-1 truncate text-xs text-foreground-subtle">
-              {PropertyTypeLabel[form.type]} · Cód. {initialData.code}
-            </p>
-          ) : (
-            !isEdit &&
-            step >= 2 &&
-            form.type &&
-            form.businessType && (
-              <p className="mt-1 truncate text-xs text-foreground-subtle">
-                {PropertyTypeLabel[form.type]} · {BusinessTypeLabel[form.businessType]}
-                {step === 3 && form.city ? ` · ${form.city}` : ''}
-              </p>
-            )
-          )}
-          <div className="flex items-center gap-1 mt-2">
-            {[1, 2, 3].map((s) => (
+          <div className="flex items-center gap-3">
+            {/* One back control, at every width. Keeping a labelled "Voltar" in the desktop
+                footer as well put two identically-named buttons in the DOM — ambiguous for a
+                screen reader, and it broke a spec that addresses the control by name. */}
+            <button
+              type="button"
+              onClick={handleBack}
+              className="flex size-11 shrink-0 items-center justify-center rounded-full transition-colors md:hover:bg-border/60"
+              aria-label="Voltar"
+            >
+              <ChevronLeft size={24} aria-hidden="true" />
+            </button>
+
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base font-semibold text-foreground md:text-2xl md:font-bold">
+                {isEdit ? 'Editar imóvel' : 'Novo imóvel'}
+              </h1>
+
+              {isEdit && initialData && form.type ? (
+                <p className="mt-1 truncate text-xs text-foreground-subtle">
+                  {PropertyTypeLabel[form.type]} · Cód. {initialData.code}
+                </p>
+              ) : (
+                !isEdit &&
+                step >= 2 &&
+                form.type &&
+                form.businessType && (
+                  <p className="mt-1 truncate text-xs text-foreground-subtle">
+                    {PropertyTypeLabel[form.type]} · {BusinessTypeLabel[form.businessType]}
+                    {step === 3 && form.city ? ` · ${form.city}` : ''}
+                  </p>
+                )
+              )}
+
+              {/* Progress: three bars in the cramped mobile header, the labelled indicator
+                where there is room for words. Same information, different density. */}
+              <div className="mt-2 flex items-center gap-1 md:hidden">
+                {[1, 2, 3].map((s) => (
+                  <div
+                    key={s}
+                    className={cn(
+                      'h-1 flex-1 rounded-full transition-colors',
+                      s <= step ? 'bg-action' : 'bg-border',
+                    )}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <span className="shrink-0 text-sm text-muted-foreground md:hidden">{step}/3</span>
+          </div>
+
+          {/* Labelled indicator where there is room for words; the three bars above carry
+              the same information in the cramped mobile header. */}
+          <div className="hidden justify-center md:flex">
+            <StepIndicator step={step} labels={stepLabels} />
+          </div>
+        </PageContainer>
+
+        {/* ── Fields ────────────────────────────────────────────────────────── */}
+        <PageContainer
+          maxWidth="content"
+          className="flex-1 pb-28 md:rounded-2xl md:bg-surface-raised md:p-8 md:pb-8"
+        >
+          <div
+            className={cn(
+              'flex flex-col gap-5 py-2 md:py-0',
+              // Steps 1 and 2 are short enough to read across three columns on a wide
+              // screen; step 3 is a long list of conditional specs and stays single-column
+              // so related fields don't end up in different columns.
+              step !== 3 && 'md:grid md:grid-cols-3 md:gap-x-6 md:gap-y-5',
+            )}
+          >
+            {step === 1 && <Step1 form={form} set={set} onSubmit={handleNext} />}
+            {step === 2 && (
+              <Step2
+                form={form}
+                set={set}
+                onOpenMap={() => setMapOpen(true)}
+                onSubmit={handleNext}
+              />
+            )}
+            {step === 3 && <Step3 form={form} set={set} />}
+            {errorBanner}
+          </div>
+        </PageContainer>
+
+        {/* ── Footer ────────────────────────────────────────────────────────── */}
+        <PageContainer
+          maxWidth="content"
+          className="fixed inset-x-0 bottom-0 z-(--z-nav) flex items-center justify-end gap-3 bg-background/90 pb-[calc(env(safe-area-inset-bottom,16px)+16px)] pt-3 backdrop-blur-sm md:static md:bg-transparent md:p-0 md:backdrop-blur-none"
+        >
+          <Button
+            size="lg"
+            shape="pill"
+            onClick={handleNext}
+            disabled={saving}
+            className="w-full md:h-12 md:w-auto md:rounded-xl md:text-sm"
+          >
+            {submitLabel}
+            {!saving && step !== 3 && <ArrowRight size={18} aria-hidden="true" />}
+          </Button>
+        </PageContainer>
+      </div>
+
+      {mapOverlay}
+    </div>
+  );
+}
+
+// ─── Step indicator (desktop) ─────────────────────────────────────────────────
+function StepIndicator({ step, labels }: { step: number; labels: string[] }) {
+  return (
+    <div className="flex items-start">
+      {labels.map((label, i) => {
+        const s = i + 1;
+        const active = s <= step;
+        return (
+          <div key={label} className="flex items-start">
+            <div className="flex w-24 flex-col items-center gap-2">
               <div
-                key={s}
-                className={twMerge(
-                  'h-1 flex-1 rounded-full transition-colors',
+                className={cn(
+                  'flex size-10 items-center justify-center rounded-full border-2 text-sm font-semibold transition-colors',
+                  active
+                    ? 'border-action bg-action text-white'
+                    : 'border-border text-foreground-subtle',
+                )}
+              >
+                {s}
+              </div>
+              <span
+                className={cn(
+                  'text-center text-xs font-medium',
+                  active ? 'text-action' : 'text-foreground-subtle',
+                )}
+              >
+                {label}
+              </span>
+            </div>
+            {s < labels.length && (
+              <div
+                className={cn(
+                  'mx-1 mt-5 h-0.5 w-10 shrink-0',
                   s <= step ? 'bg-action' : 'bg-border',
                 )}
               />
-            ))}
+            )}
           </div>
-        </div>
-        <span className="text-sm text-muted-foreground">{step}/3</span>
-      </PageContainer>
-
-      {/* Content */}
-      <PageContainer className="flex-1 overflow-y-auto pb-28">
-        <div className="flex flex-col gap-5 py-2">
-          {step === 1 && <Step1 form={form} set={set} onSubmit={handleNext} />}
-          {step === 2 && (
-            <Step2 form={form} set={set} onOpenMap={() => setMapOpen(true)} onSubmit={handleNext} />
-          )}
-          {step === 3 && <Step3 form={form} set={set} />}
-
-          {error && (
-            <p
-              ref={errorRef}
-              className="scroll-mb-28 rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger"
-            >
-              {error}
-            </p>
-          )}
-        </div>
-      </PageContainer>
-
-      {mapOpen && (
-        <LocationPickerOverlay
-          onClose={() => {
-            setError('');
-            setMapOpen(false);
-          }}
-          onConfirm={handleMapConfirm}
-          initialCenter={
-            form.latitude !== null && form.longitude !== null
-              ? [form.latitude, form.longitude]
-              : undefined
-          }
-          initialAddress={{ city: form.city, state: form.state, neighborhood: form.neighborhood }}
-        />
-      )}
-
-      {/* Footer */}
-      <PageContainer className="fixed inset-x-0 bottom-0 z-40 bg-background/90 pb-[calc(env(safe-area-inset-bottom,16px)+16px)] pt-3 backdrop-blur-sm">
-        <button
-          type="button"
-          onClick={handleNext}
-          disabled={saving}
-          className="flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white disabled:opacity-60"
-        >
-          {saving
-            ? 'Salvando...'
-            : step === 3
-              ? isEdit
-                ? 'Salvar alterações'
-                : 'Criar e ir para Galeria'
-              : 'Continuar'}
-        </button>
-      </PageContainer>
+        );
+      })}
     </div>
   );
 }
@@ -471,12 +608,24 @@ function PropertyFormInner({
 // ─── Steps ───────────────────────────────────────────────────────────────────
 type Setter = <K extends keyof FormState>(key: K, value: FormState[K]) => void;
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+// Thin wrappers around the shared Field/Input/Select primitives that keep
+// this file's existing controlled `value`/`onChange(v: string)` calling
+// convention untouched — every Step1/Step2/Step3 call site below keeps
+// working exactly as-is, only the rendered DOM/styling is now shared.
+function Field({
+  label,
+  children,
+  asGroup,
+}: {
+  label: string;
+  children: React.ReactNode;
+  /** See `ui/field.tsx` — required whenever the children are a group of controls. */
+  asGroup?: boolean;
+}) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-foreground">{label}</label>
+    <SharedField label={label} asGroup={asGroup}>
       {children}
-    </div>
+    </SharedField>
   );
 }
 
@@ -488,14 +637,7 @@ function Input({
   value: string;
   onChange: (v: string) => void;
 }) {
-  return (
-    <input
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className="h-12 rounded-xl border border-border bg-surface-raised px-4 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-action"
-      {...rest}
-    />
-  );
+  return <SharedInput value={value} onChange={(e) => onChange(e.target.value)} {...rest} />;
 }
 
 function Select<T extends string>({
@@ -510,18 +652,14 @@ function Select<T extends string>({
   options: { label: string; value: T }[];
 }) {
   return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value as T)}
-      className="h-12 rounded-xl border border-border bg-surface-raised px-4 text-sm text-foreground outline-none focus:border-action"
-    >
+    <SharedSelect value={value} onChange={(e) => onChange(e.target.value as T)}>
       {placeholder && <option value="">{placeholder}</option>}
       {options.map((o) => (
         <option key={o.value} value={o.value}>
           {o.label}
         </option>
       ))}
-    </select>
+    </SharedSelect>
   );
 }
 
@@ -538,17 +676,17 @@ function Toggle({
     <button
       type="button"
       onClick={() => onChange(!value)}
-      className="flex h-12 items-center justify-between rounded-xl border border-border bg-surface-raised px-4"
+      className="flex h-12 items-center justify-between rounded-xl border border-border bg-surface-raised px-4 transition-colors md:hover:border-foreground-subtle/40"
     >
       <span className="text-sm text-foreground">{label}</span>
       <div
-        className={twMerge(
+        className={cn(
           'relative h-6 w-11 rounded-full transition-colors',
           value ? 'bg-action' : 'bg-border',
         )}
       >
         <div
-          className={twMerge(
+          className={cn(
             'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
             value ? 'translate-x-5' : 'translate-x-0.5',
           )}
@@ -576,14 +714,14 @@ function Step1({ form, set, onSubmit }: { form: FormState; set: Setter; onSubmit
         />
       </Field>
 
-      <Field label="Tipo de negócio *">
+      <Field asGroup label="Tipo de negócio *">
         <div className="grid grid-cols-2 gap-2">
           {[BusinessType.SALE, BusinessType.RENT].map((bt) => (
             <button
               key={bt}
               type="button"
               onClick={() => set('businessType', bt)}
-              className={twMerge(
+              className={cn(
                 'h-12 rounded-xl border text-sm font-medium transition-colors',
                 form.businessType === bt
                   ? 'border-action bg-action/10 text-action'
@@ -597,7 +735,7 @@ function Step1({ form, set, onSubmit }: { form: FormState; set: Setter; onSubmit
       </Field>
 
       {form.businessType === BusinessType.SALE && (
-        <Field label="Modalidade de venda *">
+        <Field asGroup label="Modalidade de venda *">
           <div className="flex flex-wrap gap-2">
             {Object.values(SaleType).map((st) => {
               const sel = form.saleTypes.includes(st);
@@ -611,7 +749,7 @@ function Step1({ form, set, onSubmit }: { form: FormState; set: Setter; onSubmit
                       sel ? form.saleTypes.filter((s) => s !== st) : [...form.saleTypes, st],
                     )
                   }
-                  className={twMerge(
+                  className={cn(
                     'rounded-full border px-4 py-2 text-sm font-medium transition-colors',
                     sel
                       ? 'border-action bg-action/10 text-action'
@@ -664,7 +802,7 @@ function Step1({ form, set, onSubmit }: { form: FormState; set: Setter; onSubmit
         />
       </Field>
 
-      <span className="text-xs text-muted-foreground">
+      <span className="text-xs text-muted-foreground md:col-span-3">
         * Campos marcados com asterisco são obrigatórios.
       </span>
     </>
@@ -769,7 +907,7 @@ function LocationPickerOverlay({
 
   if (geocoding) {
     return (
-      <div className="fixed inset-0 z-50 flex flex-col bg-background">
+      <div className="fixed inset-0 z-(--z-fixed) flex flex-col bg-background">
         <div className="flex shrink-0 items-center gap-3 bg-background px-4 pt-[calc(env(safe-area-inset-top,16px)+12px)] pb-3">
           <button
             type="button"
@@ -792,7 +930,7 @@ function LocationPickerOverlay({
   const center: LatLngExpression = markerPos ?? effectiveCenter;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-background">
+    <div className="fixed inset-0 z-(--z-fixed) flex flex-col bg-background">
       {/* Header */}
       <div className="flex shrink-0 items-center gap-3 bg-background px-4 pt-[calc(env(safe-area-inset-top,16px)+12px)] pb-3">
         <button
@@ -832,7 +970,7 @@ function LocationPickerOverlay({
           {markerPos && <Marker position={markerPos} />}
         </MapContainer>
 
-        <div className="absolute inset-x-0 bottom-0 z-1000 flex justify-center pb-[calc(env(safe-area-inset-bottom,16px)+16px)]">
+        <div className="absolute inset-x-0 bottom-0 z-(--z-map-overlay) flex justify-center pb-[calc(env(safe-area-inset-bottom,16px)+16px)]">
           <button
             type="button"
             disabled={!markerPos || loading || !resolved?.neighborhood}
@@ -900,7 +1038,7 @@ function Step2({
       <button
         type="button"
         onClick={onOpenMap}
-        className="flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-surface-raised text-sm font-medium text-foreground active:bg-border"
+        className="flex h-12 items-center justify-center gap-2 rounded-xl border border-border bg-surface-raised text-sm font-medium text-foreground transition-colors active:bg-border md:col-span-3 md:hover:bg-border/60"
       >
         <MapPin size={18} className="text-action" />
         {form.latitude !== null ? 'Alterar localização no mapa' : 'Selecionar localização no mapa'}
@@ -912,51 +1050,56 @@ function Step2({
 // ─── Step 3: Characteristics ──────────────────────────────────────────────────
 function Step3({ form, set }: { form: FormState; set: Setter }) {
   const bathroomsNum = form.bathrooms ? Number(form.bathrooms) : undefined;
+  const isLand = form.type === PropertyType.LAND;
 
   return (
     <>
       {/* General specs */}
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Quartos">
-          <Input
-            type="number"
-            inputMode="numeric"
-            placeholder="0"
-            value={form.bedrooms}
-            onChange={(v) => set('bedrooms', v)}
-          />
-        </Field>
-        <Field label="Banheiros">
-          <Input
-            type="number"
-            inputMode="numeric"
-            placeholder="0"
-            value={form.bathrooms}
-            onChange={(v) => set('bathrooms', v)}
-          />
-        </Field>
-        <Field label={`Suítes${bathroomsNum ? ` (máx ${bathroomsNum})` : ''}`}>
-          <Input
-            type="number"
-            inputMode="numeric"
-            placeholder="0"
-            value={form.suites}
-            onChange={(v) => {
-              const n = Number(v);
-              set('suites', bathroomsNum && n > bathroomsNum ? String(bathroomsNum) : v);
-            }}
-          />
-        </Field>
-        <Field label="Vagas">
-          <Input
-            type="number"
-            inputMode="numeric"
-            placeholder="0"
-            value={form.parkingSpaces}
-            onChange={(v) => set('parkingSpaces', v)}
-          />
-        </Field>
-        <Field label="Área total (m²)">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+        {!isLand && (
+          <>
+            <Field label="Quartos">
+              <Input
+                type="number"
+                inputMode="numeric"
+                placeholder="0"
+                value={form.bedrooms}
+                onChange={(v) => set('bedrooms', v)}
+              />
+            </Field>
+            <Field label="Banheiros">
+              <Input
+                type="number"
+                inputMode="numeric"
+                placeholder="0"
+                value={form.bathrooms}
+                onChange={(v) => set('bathrooms', v)}
+              />
+            </Field>
+            <Field label={`Suítes${bathroomsNum ? ` (máx ${bathroomsNum})` : ''}`}>
+              <Input
+                type="number"
+                inputMode="numeric"
+                placeholder="0"
+                value={form.suites}
+                onChange={(v) => {
+                  const n = Number(v);
+                  set('suites', bathroomsNum && n > bathroomsNum ? String(bathroomsNum) : v);
+                }}
+              />
+            </Field>
+            <Field label="Vagas">
+              <Input
+                type="number"
+                inputMode="numeric"
+                placeholder="0"
+                value={form.parkingSpaces}
+                onChange={(v) => set('parkingSpaces', v)}
+              />
+            </Field>
+          </>
+        )}
+        <Field label={`Área total (m²)${isLand ? ' *' : ''}`}>
           <Input
             type="number"
             inputMode="numeric"
@@ -965,15 +1108,17 @@ function Step3({ form, set }: { form: FormState; set: Setter }) {
             onChange={(v) => set('totalArea', v)}
           />
         </Field>
-        <Field label="Área construída (m²)">
-          <Input
-            type="number"
-            inputMode="numeric"
-            placeholder="0"
-            value={form.builtArea}
-            onChange={(v) => set('builtArea', v)}
-          />
-        </Field>
+        {!isLand && (
+          <Field label="Área construída (m²)">
+            <Input
+              type="number"
+              inputMode="numeric"
+              placeholder="0"
+              value={form.builtArea}
+              onChange={(v) => set('builtArea', v)}
+            />
+          </Field>
+        )}
       </div>
 
       {/* Type-specific */}
@@ -989,7 +1134,7 @@ function Step3({ form, set }: { form: FormState; set: Setter }) {
           onChange={(e) => set('description', e.target.value)}
           rows={4}
           placeholder="Descreva o imóvel..."
-          className="rounded-xl border border-border bg-surface-raised px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-action resize-none"
+          className="rounded-xl border border-border bg-surface-raised px-4 py-3 text-base text-foreground placeholder:text-muted-foreground outline-none focus:border-action resize-none"
         />
       </Field>
     </>
@@ -1043,7 +1188,7 @@ function ApartmentFields({ form, set }: { form: FormState; set: Setter }) {
   }));
   return (
     <>
-      <Field label="Andar *">
+      <Field asGroup label="Andar *">
         <Toggle
           label="É térreo"
           value={form.isGroundFloor}

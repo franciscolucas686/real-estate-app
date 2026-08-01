@@ -31,6 +31,29 @@
   --color-foreground-subtle: #4a5568;
   --color-muted-foreground: #718096;
 
+  /* Status — property lifecycle. Semantic, and deliberately separate from
+     --color-action: these encode state, not interactivity. Before these existed
+     the palette lived as raw Tailwind classes (emerald-500 / amber-400) inside
+     utils/format.ts, outside the theme and invisible to any future dark mode.
+
+     The base values are dark enough to carry white text at 4.5:1 or better, which
+     the badges need: they render at 10px bold, and WCAG only relaxes to 3:1 at
+     18.66px bold. The stock Tailwind steps do not clear that bar — emerald-500 on
+     white is 2.54:1 and amber-600 is 3.19:1 — so these are one to two steps darker
+     on purpose. Measured: success 5.48:1, warning 5.02:1, neutral 7.58:1.
+
+     The `-subtle` variants are the inverse treatment (tinted background, dark text)
+     for status shown inline in text rather than as a solid pill. */
+  --color-success: #047857;
+  --color-success-subtle: #ecfdf5;
+  --color-success-foreground: #ffffff;
+  --color-warning: #b45309;
+  --color-warning-subtle: #fffbeb;
+  --color-warning-foreground: #ffffff;
+  --color-neutral: #475569;
+  --color-neutral-subtle: #f1f5f9;
+  --color-neutral-foreground: #ffffff;
+
   /* Brand */
   --color-whatsapp: #25d366;
 
@@ -39,7 +62,99 @@
   --color-ring: #1a7fd4;
 
   --font-sans: system-ui, -apple-system, sans-serif;
+
+  /* The page gutter, as a named token.
+     `PageContainer` is the only source of horizontal page padding, and full-bleed
+     children have to cancel exactly that amount. With the value written as a literal in
+     two places (`px-6` there, `-mx-6` here) they drift the moment one changes — and a
+     mismatch is invisible in review, showing up as a hairline of background beside a
+     photo. Naming it makes the pairing explicit and greppable. */
+  --spacing-gutter: 1.5rem;
+
+  /* Smallest step in the type scale. Exists so badges and nav labels stop
+     reaching for the arbitrary `text-[10px]`. */
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 1.2;
+
+  /* Modal enter/exit, driven by CSS rather than AnimatePresence.
+     Radix's Presence primitive keeps the element mounted while a CSS animation
+     runs against `data-state="closed"`, so the surface can animate out without a
+     JS animation library holding the unmount. That removes a class of bugs where
+     an interrupted exit left the panel mounted with the scroll lock still on. */
+  --animate-overlay-in: overlay-in 180ms ease-out;
+  --animate-overlay-out: overlay-out 140ms ease-in;
+  --animate-sheet-in: sheet-in 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-sheet-out: sheet-out 200ms ease-in;
+  --animate-panel-in: panel-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-panel-out: panel-out 140ms ease-in;
+
+  @keyframes overlay-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes overlay-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes sheet-in {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes sheet-out {
+    to {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
+  @keyframes panel-out {
+    to {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
 }
+
+/* ---------------------------------------------------------------------------
+   Z-INDEX LAYERS
+
+   Tailwind v4 has no `--z-*` theme namespace, so these are plain custom
+   properties consumed as `z-(--z-modal)`.
+
+   They exist because the app had accumulated eleven ad hoc values — z-9, z-10,
+   z-20, z-30, z-40, z-50, z-60, z-70, z-100, z-1000, z-9999 — where the large
+   ones were not decisions but escalations: each new overlay outbid the previous
+   one. Six named layers make the stacking order reviewable.
+
+   Rule: needing a new z value means introducing a new layer. That is a
+   discussion, not a literal.
+--------------------------------------------------------------------------- */
+:root {
+  --z-nav: 40; /* top nav and fixed action bars */
+  --z-fixed: 50; /* bottom nav and full-route overlays */
+  --z-overlay: 60; /* scrims behind modal surfaces */
+  --z-modal: 70; /* dialogs and bottom sheets */
+
+  /* Leaflet paints its own controls at z-index 1000 and its panes from 200–700.
+     Anything that must float over a live map has to clear that floor, which is
+     what the old `z-1000` in property-form's location picker was really doing —
+     it read as an arbitrary escalation but was load-bearing. */
+  --z-map-overlay: 1000;
+
+  --z-splash: 1100; /* boot and success splashes — above everything, maps included */
+}
+
+/* Values below 40 are intentionally absent. z-10/z-20/z-30 in this codebase are
+   local stacking inside a single component (carousel arrows, slider thumbs,
+   sticky sub-headers), not app-wide layers, and naming them would invent tokens
+   with no cross-component meaning. */
 
 body {
   margin: 0;
@@ -48,4 +163,44 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Desktop affordances — no-op on touch (cursor/:hover/:focus-visible don't
+   apply there), so this is safe baseline coverage for the many hand-rolled
+   `<button>`/`<a>` elements across pages that don't go through the shared
+   Button/Input/Select primitives. */
+button:not(:disabled),
+a,
+[role='button'],
+select {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* Honour the OS "reduce motion" setting app-wide.
+   The app animates a lot — page transitions, splash, bottom-sheet springs,
+   dialog scale, `active:scale-90`, skeleton pulses — and none of it consulted
+   this preference. Motion-library animations are handled separately by
+   <MotionConfig reducedMotion="user"> in App.tsx; this block covers everything
+   driven by plain CSS.
+
+   Durations are collapsed to 0.01ms rather than 0 so transitionend/animationend
+   listeners still fire and state machines waiting on them don't stall. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
