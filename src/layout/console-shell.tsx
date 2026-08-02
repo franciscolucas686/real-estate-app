@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Settings as SettingsIcon, Store } from 'lucide-react';
 import { cn } from '@/shared/cn';
 import { SkipLink } from '@/layout/skip-link';
+import { BottomNav, BottomNavItem } from '@/layout/app-nav';
 
 interface ConsoleNavItem {
   to: string;
@@ -98,28 +99,24 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
         {children}
       </div>
 
-      <nav
-        aria-label="Seções do painel"
-        className="fixed bottom-0 left-0 right-0 z-(--z-fixed) flex items-center justify-around bg-primary px-2 pt-2 pb-[calc(env(safe-area-inset-bottom,0px)+16px)] md:hidden"
-      >
-        {CONSOLE_NAV.map((item) => {
-          const active = isActive(item, pathname);
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              aria-current={active ? 'page' : undefined}
-              className={cn(
-                'flex min-h-11 flex-col items-center justify-center gap-1 px-4 py-2 text-primary-foreground/60 transition-all duration-300 ease-out active:scale-90',
-                active && 'text-primary-foreground',
-              )}
-            >
-              {item.icon}
-              <span className="text-2xs font-medium leading-none">{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
+      {/*
+        Same bar as the storefront's, from the same component. It used to be a byte-for-byte
+        copy of `BottomNav` + `BottomNavItem` living here, which meant the bar's height —
+        78px plus the safe-area inset — was encoded in two places and true in neither: the
+        dashboard reserved `pb-28` for it and clipped its own last row on a notched phone.
+        Only the active-state policy stays local, passed down as `active`.
+      */}
+      <BottomNav aria-label="Seções do painel">
+        {CONSOLE_NAV.map((item) => (
+          <BottomNavItem
+            key={item.to}
+            icon={item.icon}
+            label={item.label}
+            to={item.to}
+            active={isActive(item, pathname)}
+          />
+        ))}
+      </BottomNav>
     </div>
   );
 }

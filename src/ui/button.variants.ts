@@ -30,12 +30,22 @@ export const buttonVariants = tv({
       destructive:
         'bg-danger text-primary-foreground md:hover:bg-danger-hover active:bg-danger-hover',
     },
+    /**
+     * Heights shrink from `md` up. The mobile values are touch targets — WCAG 2.5.8
+     * asks 24×24 CSS px and 44 is the comfortable size for a thumb — but a pointer
+     * needs none of that, and a 56px button on a desktop reads as a phone screenshot
+     * pasted into a browser. Nothing here drops below 36px, and the mobile floors are
+     * untouched, so no tap target regresses.
+     *
+     * `icon-lg` is the dashboard's FAB, which is `md:hidden` — it never renders on a
+     * pointer device, so it has no desktop step.
+     */
     size: {
-      sm: 'h-10 px-4 text-sm [&_svg]:size-3.5',
-      md: 'h-12 px-5 text-base [&_svg]:size-4',
-      lg: 'h-14 px-6 text-lg [&_svg]:size-5',
-      'icon-sm': 'size-10 [&_svg]:size-4',
-      icon: 'size-12 [&_svg]:size-5',
+      sm: 'h-10 px-4 text-sm md:h-9 [&_svg]:size-3.5',
+      md: 'h-12 px-5 text-base md:h-10 [&_svg]:size-4',
+      lg: 'h-14 px-6 text-lg md:h-12 [&_svg]:size-5',
+      'icon-sm': 'size-10 md:size-9 [&_svg]:size-4',
+      icon: 'size-12 md:size-10 [&_svg]:size-5',
       'icon-lg': 'size-16 [&_svg]:size-7',
     },
     shape: {

@@ -73,7 +73,6 @@ function AppRoutes() {
   );
 
   if (route.shell === 'console') return <ConsoleShell>{pages}</ConsoleShell>;
-  if (route.shell === 'focused') return pages;
   return (
     <SiteShell items={siteNavItems} showMobileNav={!route.hideMobileNav}>
       {pages}

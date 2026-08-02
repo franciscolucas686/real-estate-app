@@ -16,9 +16,14 @@ export function useLogin() {
 
   return useMutation({
     mutationFn: (payload: LoginDto) => login(payload),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['me'] });
-    },
+    // The `return` is load-bearing: v5 keeps the mutation pending until a promise returned
+    // from `onSuccess` settles, so `await mutateAsync(...)` resolves only once `['me']` has
+    // actually refetched. Fire-and-forget instead resolved the caller while the session was
+    // still unknown, which is why `login.tsx` needed a 900ms guess to cover the gap — and a
+    // guess is either too short (the dashboard mounts and hangs on the guard's spinner) or
+    // too long (everyone waits for the slowest case). Awaiting the refetch replaces the
+    // guess with the actual answer. Pinned by `app/protected-route.spec.tsx`.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['me'] }),
   });
 }
 

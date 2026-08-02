@@ -99,8 +99,25 @@ export function BottomNav({ className, ...props }: ComponentProps<'nav'>) {
   );
 }
 
-export function BottomNavItem({ icon, label, to, className }: NavItem & { className?: string }) {
-  const active = useIsActive(to);
+/**
+ * `active` overrides the derived state instead of adding to it.
+ *
+ * `useIsActive` is a prefix match, which is the right default for the storefront but wrong
+ * for the console: there, `/dashboard` is labelled "Imóveis" and has to stay lit across
+ * `/properties/new` and `/properties/:id/gallery` — paths that share no prefix with it —
+ * while "Ver o site" (`/`) must never light up at all. That policy belongs to the console,
+ * not to the design system, so `ConsoleShell` computes it and passes it down. Deriving it
+ * here for both callers is what would force `owns` into this file.
+ */
+export function BottomNavItem({
+  icon,
+  label,
+  to,
+  active: activeOverride,
+  className,
+}: NavItem & { active?: boolean; className?: string }) {
+  const derived = useIsActive(to);
+  const active = activeOverride ?? derived;
 
   return (
     <Link
