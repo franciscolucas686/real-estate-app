@@ -68,13 +68,65 @@
      children have to cancel exactly that amount. With the value written as a literal in
      two places (`px-6` there, `-mx-6` here) they drift the moment one changes — and a
      mismatch is invisible in review, showing up as a hairline of background beside a
-     photo. Naming it makes the pairing explicit and greppable. */
-  --spacing-gutter: 1.5rem;
+     photo. Naming it makes the pairing explicit and greppable.
 
-  /* Smallest step in the type scale. Exists so badges and nav labels stop
-     reaching for the arbitrary `text-[10px]`. */
+     Fluid across the phone range only — `PageContainer`'s variants override it with
+     `md:px-10 lg:px-12` from `md` up, so the clamp tops out where that takes over.
+     `px-gutter` and `-mx-gutter` read the same token, so the full-bleed cancellation
+     stays exact at every width. */
+  --spacing-gutter: clamp(1.5rem, 1.36rem + 0.6vw, 1.75rem);
+
+  /* ── Type scale ───────────────────────────────────────────────────────────
+     Fluid between a 375px phone and a 1280px desktop, so `text-sm` on a laptop is
+     not the same 14px it is on a phone.
+
+     The scale is redefined here rather than by adding `md:text-*` at call sites,
+     because there are ~195 of those and only ~10 had a breakpoint: the sizes were
+     effectively viewport-fixed, and fixing that one class at a time is the drift
+     this file exists to prevent. Overriding the tokens makes every existing
+     `text-sm` responsive without touching a single component.
+
+     Why `clamp(rem, rem + vw, rem)` and not plain `vw`: a pure viewport unit
+     ignores the reader's default font size and does not survive zoom, which would
+     break WCAG 1.4.4 — the same requirement the zoomable viewport meta protects.
+     With rem at both ends and a rem base in the middle term, text still scales
+     when the root size does.
+
+     The `+ 0.0011 * (100vw - 375px)` style middle terms are just
+     (max - min) / (1280 - 375) expressed in rem per px of viewport.
+
+     Floors are the current mobile values — they were tuned against real devices,
+     so nothing gets *smaller* than it is today. In particular `--text-base` must
+     never floor below 1rem: inputs use it, and iOS auto-zooms any field under
+     16px on focus. */
+
+  /* Badges and nav labels. Deliberately NOT fluid: the status colours were measured
+     for 4.5:1 against 10px bold, and the pills are sized to that. */
   --text-2xs: 0.625rem;
   --text-2xs--line-height: 1.2;
+
+  --text-xs: clamp(0.75rem, 0.724rem + 0.111vw, 0.8125rem); /* 12 → 13 */
+  --text-xs--line-height: 1.4;
+  --text-sm: clamp(0.875rem, 0.849rem + 0.111vw, 0.9375rem); /* 14 → 15 */
+  --text-sm--line-height: 1.5;
+  --text-base: clamp(1rem, 0.974rem + 0.111vw, 1.0625rem); /* 16 → 17 */
+  --text-base--line-height: 1.6;
+  --text-lg: clamp(1.125rem, 1.073rem + 0.221vw, 1.25rem); /* 18 → 20 */
+  --text-lg--line-height: 1.5;
+  --text-xl: clamp(1.25rem, 1.146rem + 0.442vw, 1.5rem); /* 20 → 24 */
+  --text-xl--line-height: 1.4;
+  --text-2xl: clamp(1.5rem, 1.345rem + 0.663vw, 1.875rem); /* 24 → 30 */
+  --text-2xl--line-height: 1.3;
+  --text-3xl: clamp(1.875rem, 1.668rem + 0.884vw, 2.375rem); /* 30 → 38 */
+  --text-3xl--line-height: 1.2;
+
+  /* The home hero, and only the home hero (`md:text-5xl`). Keyed to 768 → 1536 rather
+     than the 375 → 1280 the rest of the scale uses, because it never renders below `md`:
+     it lands on exactly today's 48px where it first appears, then keeps growing on the
+     wide screens where a hero has the room. Left at Tailwind's fixed 3rem it would have
+     been the one step in the scale that stopped responding. */
+  --text-5xl: clamp(3rem, 2.25rem + 1.5625vw, 3.75rem); /* 48 → 60 */
+  --text-5xl--line-height: 1.1;
 
   /* Modal enter/exit, driven by CSS rather than AnimatePresence.
      Radix's Presence primitive keeps the element mounted while a CSS animation

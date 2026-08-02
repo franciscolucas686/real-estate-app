@@ -175,7 +175,9 @@ export function Settings() {
         >
           <ChevronLeft size={24} />
         </button>
-        <h1 className="text-lg font-bold text-foreground">Configurações</h1>
+        {/* Steps up from `md` like the dashboard and the gallery — the three console page
+            titles now share one treatment instead of three different sizes. */}
+        <h1 className="text-lg font-bold text-foreground md:text-2xl">Configurações</h1>
       </PageContainer>
 
       <PageContainer maxWidth="reading" className="flex flex-col gap-6 pt-4">

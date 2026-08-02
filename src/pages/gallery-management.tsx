@@ -369,7 +369,10 @@ export function GalleryManagement() {
           {mode === 'photo-select' ? <X size={24} /> : <ChevronLeft size={24} />}
         </button>
         <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-bold text-foreground truncate">
+          {/* Matches the property wizard's console header, which steps up to `2xl` from
+              `md`. Left at a flat `lg` this was the only console page whose title stayed
+              phone-sized on a desktop. */}
+          <h1 className="truncate text-lg font-bold text-foreground md:text-2xl">
             {mode === 'photo-select' ? 'Selecionar fotos' : 'Editar galeria'}
           </h1>
           <p className="truncate text-xs text-foreground-subtle">
@@ -513,7 +516,7 @@ export function GalleryManagement() {
               type="button"
               onClick={() => setConfirmDeletePhotosOpen(true)}
               disabled={selectedPhotoIds.length === 0}
-              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full border border-danger text-danger font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 active:bg-danger/10 md:hover:bg-danger/10"
+              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full border border-danger text-danger font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 active:bg-danger/10 md:h-12 md:hover:bg-danger/10"
             >
               <Trash2 size={24} />
               Excluir ({selectedPhotoIds.length})
@@ -522,7 +525,7 @@ export function GalleryManagement() {
               type="button"
               onClick={() => setShowMoveDialog(true)}
               disabled={selectedPhotoIds.length === 0}
-              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-action text-white font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 active:bg-action-hover md:hover:bg-action-hover"
+              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-action text-white font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 active:bg-action-hover md:h-12 md:hover:bg-action-hover"
             >
               <MoveRight size={24} />
               Mover
