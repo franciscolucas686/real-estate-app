@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { renderWithProviders } from '@/test/render';
 import { setMockProperty } from '@/mocks/handlers';
@@ -97,5 +97,49 @@ describe('PropertyDetails', () => {
       'href',
       '/imoveis',
     );
+  });
+
+  /**
+   * As duas barras fixas são afordâncias de telefone: no desktop a trilha (`hidden md:flex`)
+   * dá o caminho de volta e o rail lateral (`md:sticky`) mantém o CTA do WhatsApp sempre à
+   * vista, então elas seriam duplicatas sobrepostas ao conteúdo.
+   *
+   * O jsdom não avalia media query, então isto fixa a *regra* — a classe que expressa o
+   * corte — e não o resultado renderizado. Mesmo limite assumido em `layout/site-shell.spec.tsx`.
+   * O que o teste garante é que remover o `md:hidden` quebra a suíte em vez de devolver as
+   * barras ao desktop em silêncio.
+   */
+  it('as barras fixas são mobile-only', async () => {
+    // O rail e o header medem 0 no jsdom. Dar altura ao header é o que satisfaz a condição
+    // `ctaBottom < headerH` do CTA fixo — sem isso ele nunca monta e não há o que afirmar.
+    const rect = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function () {
+      return { ...rect.call(this), bottom: 0, height: 50 } as DOMRect;
+    };
+
+    try {
+      render();
+      await screen.findByRole('heading', { level: 1, name: 'Casa' });
+
+      // Dois scrolls, e o segundo só depois do primeiro ter montado o header: a condição
+      // do CTA lê `stickyHeaderRef`, que ainda é null enquanto o header não renderizou.
+      // Disparar os dois em sequência síncrona mede um ref vazio e o CTA nunca aparece.
+      Object.defineProperty(window, 'scrollY', { value: 300, configurable: true });
+
+      window.dispatchEvent(new Event('scroll'));
+      await waitFor(() =>
+        expect(document.querySelector('[data-slot="sticky-header"]')).not.toBeNull(),
+      );
+
+      window.dispatchEvent(new Event('scroll'));
+      await waitFor(() =>
+        expect(document.querySelector('[data-slot="sticky-cta"]')).not.toBeNull(),
+      );
+
+      expect(document.querySelector('[data-slot="sticky-header"]')).toHaveClass('md:hidden');
+      expect(document.querySelector('[data-slot="sticky-cta"]')).toHaveClass('md:hidden');
+    } finally {
+      Element.prototype.getBoundingClientRect = rect;
+    }
   });
 });

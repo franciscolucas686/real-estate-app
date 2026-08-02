@@ -342,7 +342,7 @@ export function PropertyDetails() {
                   href={whatsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-whatsapp text-base font-semibold text-white transition-[transform,filter] active:scale-[0.98] md:hover:brightness-110"
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-whatsapp text-base font-semibold text-white transition-[transform,filter] active:scale-[0.98] md:h-12 md:hover:brightness-110"
                 >
                   <FaWhatsapp size={22} aria-hidden="true" />
                   Conversar conosco agora
@@ -375,7 +375,10 @@ export function PropertyDetails() {
 
             {property.description && (
               <section className="flex flex-col gap-2">
-                <h2 className="text-base font-semibold text-foreground">Sobre o imóvel</h2>
+                {/* Section headings sit at `lg`, not `base`. At `base` they were one step
+                    above the body and rendered as 17px against 15px on a desktop — bold
+                    body text, not a heading. See the sibling headings below. */}
+                <h2 className="text-lg font-semibold text-foreground md:text-xl">Sobre o imóvel</h2>
                 {/* Capped for reading comfort: prose past ~70 characters per line is
                     measurably harder to track back from. */}
                 <p className="max-w-prose leading-relaxed text-foreground-subtle">
@@ -386,7 +389,7 @@ export function PropertyDetails() {
 
             {hasCoords(property.location) && (
               <section className="flex flex-col gap-3 border-t border-border pt-6">
-                <h2 className="text-base font-semibold text-foreground">Localização</h2>
+                <h2 className="text-lg font-semibold text-foreground md:text-xl">Localização</h2>
                 {mapCenter && (
                   <button
                     type="button"
@@ -515,7 +518,18 @@ export function PropertyDetails() {
       )}
       {/* WhatsApp CTA 2 — sticky, appears when CTA1 is covered by sticky header.
           Portaled to escape the route-transition transform, which would otherwise
-          become the containing block for this fixed overlay. */}
+          become the containing block for this fixed overlay.
+
+          `md:hidden` because the desktop rail (`md:sticky md:top-6`) already keeps the
+          WhatsApp CTA in view permanently — this bar exists to solve a problem the rail
+          does not have.
+
+          It also fixes a condition that was quietly always-true on desktop: the gate below
+          is `ctaBottom < headerH`, and `ctaRef` sits on a `md:hidden` div, so above `md`
+          `getBoundingClientRect()` returns an empty box and `ctaBottom` is 0. Once the
+          sticky header existed, `0 < headerH` held and 3px of scroll was enough to raise
+          this bar. With the header hidden too, `headerH` is 0 and the state stops
+          oscillating. */}
       {createPortal(
         <AnimatePresence>
           {isPresent &&
@@ -525,17 +539,21 @@ export function PropertyDetails() {
             !mapFullscreen &&
             !isPostCreate && (
               <motion.div
+                data-slot="sticky-cta"
                 initial={{ y: '100%' }}
                 animate={{ y: 0 }}
                 exit={{ y: '100%' }}
                 transition={{ type: 'spring', damping: 30, stiffness: 400 }}
-                className="fixed inset-x-0 bottom-0 z-(--z-nav) px-4 pb-[calc(env(safe-area-inset-bottom,20px)+12px)] pt-3 bg-surface-raised border-t border-border shadow-lg"
+                className="fixed inset-x-0 bottom-0 z-(--z-nav) px-4 pb-[calc(env(safe-area-inset-bottom,20px)+12px)] pt-3 bg-surface-raised border-t border-border shadow-lg md:hidden"
               >
+                {/* No `md:` styling here on purpose: the container above never renders at
+                    that width, so any desktop class would be dead and would suggest
+                    otherwise to whoever reads it next. */}
                 <a
                   href={whatsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-action text-base font-semibold text-white transition-[transform,background-color] active:scale-[0.98] md:mx-auto md:max-w-md md:hover:bg-action-hover"
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-action text-base font-semibold text-white transition-[transform,background-color] active:scale-[0.98]"
                 >
                   <FaWhatsapp size={22} />
                   Conversar conosco agora
@@ -558,7 +576,7 @@ export function PropertyDetails() {
                 refreshPropertyQueries();
                 setFinalizeSplashVisible(true);
               }}
-              className="flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white transition-[transform,background-color] active:scale-[0.98] md:mx-auto md:max-w-md md:hover:bg-action-hover"
+              className="flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white transition-[transform,background-color] active:scale-[0.98] md:mx-auto md:h-12 md:max-w-md md:hover:bg-action-hover"
             >
               Finalizar imóvel
             </button>
@@ -585,17 +603,24 @@ export function PropertyDetails() {
       </SuccessSplash>
       {/* Sticky back button header — appears when carousel scrolls out of view.
           Portaled to escape the route-transition transform, which would otherwise
-          become the containing block for this fixed overlay. */}
+          become the containing block for this fixed overlay.
+
+          `md:hidden` completes an intent `DetailBreadcrumb` already documents: the overlaid
+          back button is the phone's way out, the breadcrumb (`hidden md:flex`) is the
+          desktop's. This half never got the matching class, so both rendered on a desktop.
+          Nothing is stranded — the button overlaid on the carousel renders at every width
+          (it has its own `md:` sizing), and this bar is only its scrolled-state copy. */}
       {createPortal(
         <AnimatePresence>
           {isPresent && stickyHeaderVisible && !mapFullscreen && (
             <motion.div
               ref={stickyHeaderRef}
+              data-slot="sticky-header"
               initial={{ y: '-100%' }}
               animate={{ y: 0 }}
               exit={{ y: '-100%' }}
               transition={{ type: 'spring', damping: 40, stiffness: 400 }}
-              className="fixed inset-x-0 top-0 z-(--z-nav) flex items-center gap-3 border-b border-border bg-surface-raised px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)] shadow-sm"
+              className="fixed inset-x-0 top-0 z-(--z-nav) flex items-center gap-3 border-b border-border bg-surface-raised px-4 pb-3 pt-[calc(env(safe-area-inset-top,0px)+12px)] shadow-sm md:hidden"
             >
               {isPostCreate ? (
                 <button
@@ -839,7 +864,9 @@ function PropertySpecGrid({
 
   return (
     <div className="flex flex-col gap-6">
-      {showHeading && <h2 className="text-base font-semibold text-foreground">Características</h2>}
+      {showHeading && (
+        <h2 className="text-lg font-semibold text-foreground md:text-xl">Características</h2>
+      )}
       <div
         className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
         style={{ gridAutoRows: '1fr' }}
