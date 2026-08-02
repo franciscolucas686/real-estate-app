@@ -6,10 +6,29 @@ on:
   push:
     branches: [develop]
 
+# `branches` here filters the PR's *base*, not its source — any branch opening a PR
+# against main or develop runs this. A push to a feature branch on its own does not.
+
+# Superseded runs of the same ref are cancelled: on a PR only the latest commit's result
+# means anything, and review rounds otherwise leave stale runs burning minutes in parallel.
+# Deliberately not mirrored into cd.yml — there the point is that *every* commit landing on
+# main gets verified, so cancelling one because a newer one arrived defeats the purpose.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Nothing here writes: no PR comments, no releases, no artifacts. Default token permissions
+# come from the repo/org setting and are often read-write.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: test
     runs-on: ubuntu-latest
+    # The suite runs in ~45s. GitHub's default is 360 minutes, so a hung test would hold a
+    # runner for six hours before giving up.
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v5
