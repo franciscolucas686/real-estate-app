@@ -59,7 +59,11 @@ export function Home() {
 
         <form
           onSubmit={handleSubmit}
-          className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-raised p-4 shadow-sm md:flex-row md:items-end md:gap-2"
+          // The row turns on at `lg`, not `md`. Its rigid parts — two 176px selects, a
+          // ~127px button and the gaps — need 503px before the city field gets anything,
+          // and at 768 there is not that much: the button hung 25px off the right edge and
+          // the page scrolled sideways. 1024 leaves the city field ~409px.
+          className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-raised p-4 shadow-sm lg:flex-row lg:items-end lg:gap-2"
         >
           <label className="flex flex-1 flex-col gap-1.5">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -72,7 +76,7 @@ export function Home() {
             />
           </label>
 
-          <label className="flex flex-col gap-1.5 md:w-44">
+          <label className="flex flex-col gap-1.5 lg:w-44">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Negócio
             </span>
@@ -83,7 +87,7 @@ export function Home() {
             </Select>
           </label>
 
-          <label className="flex flex-col gap-1.5 md:w-44">
+          <label className="flex flex-col gap-1.5 lg:w-44">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Tipo
             </span>
@@ -97,7 +101,7 @@ export function Home() {
             </Select>
           </label>
 
-          <Button type="submit" size="md" className="md:w-auto">
+          <Button type="submit" size="md" className="lg:w-auto">
             <SearchIcon size={18} aria-hidden="true" />
             Buscar
           </Button>
