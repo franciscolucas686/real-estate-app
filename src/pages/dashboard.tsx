@@ -34,6 +34,23 @@ const PAGE_SIZE = 12;
 
 const SEARCH_DEBOUNCE_MS = 300;
 
+/**
+ * Space reserved at the bottom of the page for the things floating over it on mobile.
+ *
+ * Derived, not eyeballed. The console's bottom nav (`layout/console-shell.tsx`) measures
+ * 78px — `pt-2` + a 54px item + its own `pb-4` — *plus* `env(safe-area-inset-bottom)`, and
+ * this page's FAB sits 88px above that same inset at `size-16`, putting its top edge at
+ * 152px. Both are `position: fixed`, so neither takes part in layout and the page has to
+ * account for them itself.
+ *
+ * It was a flat `pb-28` (112px), which cleared the nav on a device with no inset and
+ * nothing else: on a notched phone the 34px inset pushed the nav to 112px exactly, hiding
+ * the last row of cards and all of `Pagination` behind it. From `md` up both the nav and
+ * the FAB are gone, so the reserve collapses to ordinary breathing room.
+ */
+const BOTTOM_RESERVE =
+  'flex min-h-dvh flex-col pb-[calc(env(safe-area-inset-bottom,0px)+152px)] md:min-h-full md:pb-10';
+
 const STATS = [
   {
     key: null,
@@ -193,10 +210,7 @@ export function Dashboard() {
   const hasFilter = Boolean(statusFilter) || Boolean(codeSearch.trim());
 
   return (
-    <div
-      data-slot="page-dashboard"
-      className="flex min-h-dvh flex-col pb-28 md:min-h-full md:pb-10"
-    >
+    <div data-slot="page-dashboard" className={BOTTOM_RESERVE}>
       <PageContainer
         withSafeAreaTop
         maxWidth="wide"
