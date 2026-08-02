@@ -22,8 +22,13 @@ describe('resolveRoute', () => {
     expect(resolveRoute('/properties/abc-123/gallery').shell).toBe('console');
   });
 
-  it('login não tem chrome nenhum', () => {
-    expect(resolveRoute('/login').shell).toBe('focused');
+  it('login renderiza na vitrine, com nav — não é mais uma tela sem chrome', () => {
+    // Era `shell: 'focused'`. O item "Entrar" da própria nav leva até aqui, então chegar e
+    // perder a navegação deixava o visitante sem caminho de volta que não o botão do
+    // navegador. `noScroll` continua: é o teclado virtual, não a ausência de chrome.
+    expect(resolveRoute('/login').shell).toBe('site');
+    expect(resolveRoute('/login').hideMobileNav).toBeUndefined();
+    expect(resolveRoute('/login').noScroll).toBe(true);
   });
 
   it('distingue o detalhe do imóvel das suas sub-rotas', () => {

@@ -19,9 +19,13 @@ import { NotFound } from '@/pages/not-found';
  *
  * - `site` — public storefront: top nav on desktop, bottom nav on mobile.
  * - `console` — authenticated operator surface: persistent sidebar.
- * - `focused` — no chrome at all; the screen *is* the task (login).
+ *
+ * There was a third, `focused` — no chrome at all — which existed for the login screen and
+ * nothing else. When login moved to `site` it had zero routes, and a shell kind that no
+ * screen uses is a branch nobody exercises and a paragraph of documentation that quietly
+ * stops being true. Reintroducing it is the two lines below plus one in `app.tsx`.
  */
-export type ShellKind = 'site' | 'console' | 'focused';
+export type ShellKind = 'site' | 'console';
 
 export interface AppRoute {
   path: string;
@@ -77,7 +81,10 @@ export const APP_ROUTES: AppRoute[] = [
   },
 
   // ── Authentication ─────────────────────────────────────────────────────────
-  { path: '/login', element: <Login />, shell: 'focused', noScroll: true },
+  // Storefront chrome, not a bare screen: signing in is reached *from* the nav — the third
+  // site item is literally "Entrar" → here — so removing the nav on arrival stranded the
+  // visitor with no way back to the listing except the browser's own back button.
+  { path: '/login', element: <Login />, shell: 'site', noScroll: true },
 
   // ── Console ────────────────────────────────────────────────────────────────
   { path: '/dashboard', element: <Dashboard />, shell: 'console', guarded: true },

@@ -23,10 +23,15 @@ export function Login() {
     defaultValues: { email: '', password: '' },
   });
 
-  // The splash holds for 900ms before redirecting. Owning the timer in an effect
-  // (rather than starting it inside the submit handler) means unmounting early —
-  // back button, session expiry — cancels it, instead of navigating out from under
-  // whatever mounted next.
+  // A reading beat for the confirmation, nothing more. It used to double as the wait for
+  // the session refetch — a guess that 900ms was enough for `/auth/me` to come back, which
+  // a desktop on a warm backend always won and a phone did not. The wait now lives in
+  // `useLogin`, which keeps the mutation pending until `['me']` has refetched, so by the
+  // time this timer starts the session is already known and the dashboard mounts with it.
+  //
+  // Owning the timer in an effect (rather than starting it inside the submit handler)
+  // means unmounting early — back button, session expiry — cancels it, instead of
+  // navigating out from under whatever mounted next.
   useEffect(() => {
     if (!splashVisible) return;
     const timer = setTimeout(() => navigate('/dashboard', { replace: true }), 900);
@@ -35,6 +40,7 @@ export function Login() {
 
   async function onSubmit(values: LoginFormValues) {
     try {
+      // Resolves only once the session query has settled — see `useLogin`.
       await login.mutateAsync(values);
       setSplashVisible(true);
     } catch {
@@ -43,8 +49,14 @@ export function Login() {
   }
 
   return (
-    <div className="relative flex min-h-dvh max-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-4 md:min-h-full md:max-h-full">
-      <div className="w-full max-w-sm mb-16">
+    // The bottom padding is the mobile nav's own height — 78px (pt-2 + a 54px item + pb-4)
+    // plus the safe-area inset — so `justify-center` centres inside what is actually
+    // visible. The screen is `overflow-hidden` with no scroll, so anything the fixed bar
+    // covers is unreachable, not merely hidden: the submit button would be untappable.
+    <div className="relative flex min-h-dvh max-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-4 pb-[calc(env(safe-area-inset-bottom,0px)+78px)] md:min-h-0 md:max-h-none md:flex-1 md:pb-0">
+      {/* Pulls the card off dead centre. Only above `md`, where there is no bottom bar to
+          balance it against — below, the nav already carries that visual weight. */}
+      <div className="w-full max-w-sm md:mb-16">
         {/* Logo */}
         <div className="mb-10 flex justify-center">
           <img src="/logo.png" alt="Logo" className="h-20 object-contain" />
@@ -56,7 +68,7 @@ export function Login() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="email" className="text-md font-medium text-foreground">
+            <label htmlFor="email" className="text-sm font-medium text-foreground md:text-base">
               E-mail
             </label>
             <Input
@@ -73,7 +85,7 @@ export function Login() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="password" className="text-md font-medium text-foreground">
+            <label htmlFor="password" className="text-sm font-medium text-foreground md:text-base">
               Senha
             </label>
             <div className="relative">

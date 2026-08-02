@@ -35,7 +35,11 @@ export function SiteShell({ children, items, showMobileNav = true }: SiteShellPr
         ))}
       </TopNav>
 
-      <div id="conteudo" className="md:min-h-0 md:flex-1">
+      {/* A flex column from `md` up so a page that asks to fill the slot actually can.
+          `md:h-full` on the page could not: a percentage height needs a definite parent
+          height, and this element's comes from `min-h-dvh` further up, which is a minimum,
+          not a size. Pages that don't opt in (no `md:flex-1`) keep their block behaviour. */}
+      <div id="conteudo" className="md:flex md:min-h-0 md:flex-1 md:flex-col">
         {children}
       </div>
 
