@@ -85,6 +85,16 @@ export function TopNavItem({ icon, label, to, className }: NavItem & { className
   );
 }
 
+/**
+ * Space `BottomNav` needs reserved below it on any page whose content could otherwise
+ * scroll behind it: `pt-2` (8px) + a 54px item + the nav's own `pb-4` (16px) = 78px, plus
+ * `env(safe-area-inset-bottom)` for the home-indicator/gesture-bar area on top of that.
+ * `position: fixed`, so the nav never takes part in page layout on its own — pages that
+ * can scroll their last item behind it (`settings.tsx`, `login.tsx`, and `dashboard.tsx`
+ * with its own extra reserve for a FAB) need to add this themselves.
+ */
+export const BOTTOM_NAV_CLEARANCE = 'pb-[calc(env(safe-area-inset-bottom,0px)+78px)]';
+
 export function BottomNav({ className, ...props }: ComponentProps<'nav'>) {
   return (
     <nav

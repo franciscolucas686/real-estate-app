@@ -9,6 +9,8 @@ import { useFilters } from '@/features/filters/use-filters';
 import { useFilterTextInput } from '@/features/filters/use-filter-text-input';
 import { countActiveFilters, type PropertyFilters } from '@/features/filters/filter-types';
 import { PageContainer } from '@/layout/page-container';
+import { BOTTOM_NAV_CLEARANCE } from '@/layout/app-nav';
+import { cn } from '@/shared/cn';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { Select } from '@/ui/select';
@@ -49,7 +51,10 @@ export function Properties() {
   }
 
   return (
-    <div data-slot="page-properties" className="flex flex-col bg-background">
+    <div
+      data-slot="page-properties"
+      className={cn('flex flex-col bg-background md:pb-0', BOTTOM_NAV_CLEARANCE)}
+    >
       <PageContainer withSafeAreaTop maxWidth="wide" className="flex flex-col gap-4 pt-4 md:pt-8">
         <div className="flex flex-col gap-1">
           <nav aria-label="Trilha" className="text-sm text-muted-foreground">
@@ -77,7 +82,7 @@ export function Properties() {
             value={codeInput.value}
             onChange={(e) => codeInput.onChange(e.target.value)}
             placeholder="Código do imóvel"
-            className="w-full sm:w-56"
+            className="hidden sm:block sm:w-56"
           />
 
           {/* Primary filters stay visible from `sm:` up; below that they'd wrap into a
@@ -91,10 +96,17 @@ export function Properties() {
             size="sm"
             shape="pill"
             onClick={() => setFiltersOpen(true)}
-            className="shrink-0"
+            className="w-full shrink-0 sm:w-auto"
           >
             <SlidersHorizontal size={16} aria-hidden="true" />
-            {activeCount > 0 ? `Filtros · ${activeCount}` : 'Mais filtros'}
+            {activeCount > 0 ? (
+              `Filtros · ${activeCount}`
+            ) : (
+              <>
+                <span className="sm:hidden">Filtros</span>
+                <span className="hidden sm:inline">Mais filtros</span>
+              </>
+            )}
           </Button>
         </div>
 
@@ -129,12 +141,7 @@ export function Properties() {
 
         <PropertyList take={PAGE_SIZE} skip={(page - 1) * PAGE_SIZE} onTotalChange={setTotal} />
 
-        <Pagination
-          page={page}
-          totalPages={totalPages}
-          onPageChange={goToPage}
-          className="pb-10 pt-2"
-        />
+        <Pagination page={page} totalPages={totalPages} onPageChange={goToPage} className="pt-2" />
       </PageContainer>
 
       {/*

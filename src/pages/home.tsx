@@ -6,6 +6,8 @@ import { PropertyCardSkeleton } from '@/features/properties/components/property-
 import { useProperties } from '@/features/properties/hooks/use-properties';
 import { usePropertyStatusCounts } from '@/features/properties/hooks/use-property-status-counts';
 import { PageContainer } from '@/layout/page-container';
+import { BOTTOM_NAV_CLEARANCE } from '@/layout/app-nav';
+import { cn } from '@/shared/cn';
 import { Button } from '@/ui/button';
 import { Input } from '@/ui/input';
 import { Select } from '@/ui/select';
@@ -41,7 +43,10 @@ export function Home() {
   }
 
   return (
-    <div data-slot="page-home" className="flex flex-col bg-background">
+    <div
+      data-slot="page-home"
+      className={cn('flex flex-col bg-background md:pb-0', BOTTOM_NAV_CLEARANCE)}
+    >
       <PageContainer
         withSafeAreaTop
         maxWidth="content"
@@ -76,7 +81,7 @@ export function Home() {
             />
           </label>
 
-          <label className="flex flex-col gap-1.5 lg:w-44">
+          <label className="flex flex-col gap-1.5 lg:w-48">
             <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Negócio
             </span>
