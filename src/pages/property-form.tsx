@@ -266,7 +266,12 @@ function PropertyFormInner({
 }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const fromContext = (location.state as { context?: string } | null)?.context;
+  const locationState = location.state as { context?: string; dashboardSearch?: string } | null;
+  const fromContext = locationState?.context;
+  // Carried from `PropertyAdminCard` when opened from a filtered dashboard (e.g.
+  // `?status=PENDING`), so "Voltar" and "Salvar" return to that same filtered view instead
+  // of resetting it. Empty when the wizard wasn't reached from the dashboard.
+  const dashboardSearch = locationState?.dashboardSearch ?? '';
   const [step, setStep] = useState(1);
   const methods = useForm<PropertyFormValues>({
     resolver: zodResolver(propertyFormSchema),
@@ -308,6 +313,12 @@ function PropertyFormInner({
       setValue('bathrooms', '');
       setValue('suites', '');
       setValue('parkingSpaces', '');
+      setValue('builtArea', '');
+    }
+
+    // Apartamento não tem área construída — mesmo motivo acima (o backend
+    // rejeita esse campo para APARTMENT).
+    if (key === 'type' && value === PropertyType.APARTMENT) {
       setValue('builtArea', '');
     }
   }
@@ -360,7 +371,7 @@ function PropertyFormInner({
       setError('');
       setStep((s) => s - 1);
     } else {
-      navigate(`/dashboard`);
+      navigate(`/dashboard${dashboardSearch}`);
     }
   }
 
@@ -376,7 +387,7 @@ function PropertyFormInner({
             if (fromContext === 'post-create') {
               navigate(`/properties/${id}/gallery`, { state: { context: 'post-create' } });
             } else {
-              navigate('/dashboard');
+              navigate(`/dashboard${dashboardSearch}`);
             }
           } else {
             const created = await createProperty(payload);
@@ -458,7 +469,7 @@ function PropertyFormInner({
             <button
               type="button"
               onClick={handleBack}
-              className="flex size-11 shrink-0 items-center justify-center rounded-full transition-colors md:hover:bg-border/60"
+              className="flex size-14 bg-border/60 shrink-0 items-center justify-center rounded-full transition-colors md:hover:bg-action md:hover:text-primary-foreground"
               aria-label="Voltar"
             >
               <ChevronLeft size={24} aria-hidden="true" />
@@ -518,10 +529,11 @@ function PropertyFormInner({
           <div
             className={cn(
               'flex flex-col gap-5 py-2 md:py-0',
-              // Steps 1 and 2 are short enough to read across three columns on a wide
-              // screen; step 3 is a long list of conditional specs and stays single-column
-              // so related fields don't end up in different columns.
-              step !== 3 && 'md:grid md:grid-cols-3 md:gap-x-6 md:gap-y-5',
+              // Only step 2 uses three columns. Step 1 stays single-column so each field
+              // (business type toggle, sale-type chips) gets the full row instead of being
+              // squeezed into a third of it; step 3 is a long list of conditional specs and
+              // stays single-column so related fields don't end up in different columns.
+              step === 2 && 'md:grid md:grid-cols-3 md:gap-x-6 md:gap-y-5',
             )}
           >
             {step === 1 && <Step1 form={form} set={set} onSubmit={handleNext} />}
@@ -616,14 +628,16 @@ function Field({
   label,
   children,
   asGroup,
+  className,
 }: {
   label: string;
   children: React.ReactNode;
   /** See `ui/field.tsx` — required whenever the children are a group of controls. */
   asGroup?: boolean;
+  className?: string;
 }) {
   return (
-    <SharedField label={label} asGroup={asGroup}>
+    <SharedField label={label} asGroup={asGroup} className={className}>
       {children}
     </SharedField>
   );
@@ -705,7 +719,10 @@ function Step1({ form, set, onSubmit }: { form: FormState; set: Setter; onSubmit
 
   return (
     <>
-      <Field label="Tipo de imóvel *">
+      {/* Mobile keeps the closed dropdown; desktop exposes the options as chips instead
+          (no more hiding a required field behind a click), toggled by CSS alone so the
+          two breakpoints don't fork into separate component trees. */}
+      <Field label="Tipo de imóvel *" className="md:hidden">
         <Select
           value={form.type}
           onChange={(v) => set('type', v)}
@@ -714,8 +731,31 @@ function Step1({ form, set, onSubmit }: { form: FormState; set: Setter; onSubmit
         />
       </Field>
 
+      <Field asGroup label="Tipo de imóvel *" className="hidden md:flex">
+        <div className="flex flex-wrap gap-2">
+          {typeOptions.map((opt) => {
+            const selected = form.type === opt.value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => set('type', opt.value)}
+                className={cn(
+                  'min-h-11 rounded-full border px-4 text-sm font-medium transition-colors',
+                  selected
+                    ? 'border-action bg-action/10 text-action'
+                    : 'border-border bg-surface-raised text-foreground',
+                )}
+              >
+                {opt.label}
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+
       <Field asGroup label="Tipo de negócio *">
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2 md:max-w-xs">
           {[BusinessType.SALE, BusinessType.RENT].map((bt) => (
             <button
               key={bt}
@@ -765,7 +805,7 @@ function Step1({ form, set, onSubmit }: { form: FormState; set: Setter; onSubmit
       )}
 
       {form.businessType !== BusinessType.RENT && (
-        <Field label="Preço *">
+        <Field label="Preço *" className="md:max-w-xs">
           <Input
             type="text"
             inputMode="numeric"
@@ -777,7 +817,7 @@ function Step1({ form, set, onSubmit }: { form: FormState; set: Setter; onSubmit
       )}
 
       {form.businessType === BusinessType.RENT && (
-        <Field label="Valor do aluguel *">
+        <Field label="Valor do aluguel *" className="md:max-w-xs">
           <Input
             type="text"
             inputMode="numeric"
@@ -788,7 +828,7 @@ function Step1({ form, set, onSubmit }: { form: FormState; set: Setter; onSubmit
         </Field>
       )}
 
-      <Field label="Condomínio — opcional">
+      <Field label="Condomínio — opcional" className="md:max-w-xs">
         <Input
           type="text"
           inputMode="numeric"
@@ -802,7 +842,7 @@ function Step1({ form, set, onSubmit }: { form: FormState; set: Setter; onSubmit
         />
       </Field>
 
-      <span className="text-xs text-muted-foreground md:col-span-3">
+      <span className="text-xs text-muted-foreground">
         * Campos marcados com asterisco são obrigatórios.
       </span>
     </>
@@ -984,7 +1024,7 @@ function LocationPickerOverlay({
                 resolved?.neighborhood ?? '',
               );
             }}
-            className="flex h-14 w-[90%] items-center justify-center rounded-full bg-action text-base font-semibold text-white shadow-lg disabled:opacity-60"
+            className="flex h-14 w-[90%] items-center justify-center rounded-xl bg-action text-base font-semibold text-white shadow-lg disabled:opacity-60"
           >
             Confirmar
           </button>
@@ -1051,6 +1091,7 @@ function Step2({
 function Step3({ form, set }: { form: FormState; set: Setter }) {
   const bathroomsNum = form.bathrooms ? Number(form.bathrooms) : undefined;
   const isLand = form.type === PropertyType.LAND;
+  const isApartment = form.type === PropertyType.APARTMENT;
 
   return (
     <>
@@ -1099,7 +1140,7 @@ function Step3({ form, set }: { form: FormState; set: Setter }) {
             </Field>
           </>
         )}
-        <Field label={`Área total (m²)${isLand ? ' *' : ''}`}>
+        <Field label={`Área total (m²)${isLand || isApartment ? ' *' : ''}`}>
           <Input
             type="number"
             inputMode="numeric"
@@ -1108,7 +1149,7 @@ function Step3({ form, set }: { form: FormState; set: Setter }) {
             onChange={(v) => set('totalArea', v)}
           />
         </Field>
-        {!isLand && (
+        {!isLand && !isApartment && (
           <Field label="Área construída (m²)">
             <Input
               type="number"

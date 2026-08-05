@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { cn } from '@/shared/cn';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Pencil, Images, MoreVertical, PowerOff, Power, Trash2 } from 'lucide-react';
 import type { PropertyCardDto } from '@/shared/api/types';
 import { BusinessType, PropertyStatus } from '@/shared/api/types';
@@ -32,6 +32,11 @@ export function PropertyAdminCard({
   className,
 }: PropertyAdminCardProps) {
   const navigate = useNavigate();
+  // This card only ever renders on the dashboard, so the current querystring *is* the
+  // dashboard's own filter/search state (e.g. `?status=PENDING`) — carried along so the
+  // property form/gallery's "Voltar" can return to the same filtered view instead of
+  // resetting to the unfiltered dashboard.
+  const location = useLocation();
   const [moreOpen, setMoreOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const firstImage = property.previewImages[0];
@@ -158,7 +163,11 @@ export function PropertyAdminCard({
           <div className="mt-1 flex justify-around border-t border-border pt-2">
             <button
               type="button"
-              onClick={() => navigate(`/properties/${property.id}/edit`)}
+              onClick={() =>
+                navigate(`/properties/${property.id}/edit`, {
+                  state: { from: 'dashboard', dashboardSearch: location.search },
+                })
+              }
               aria-label="Editar imóvel"
               className="flex size-10 items-center justify-center rounded-full bg-surface text-foreground-subtle transition-colors active:bg-border md:hover:bg-border"
             >
@@ -167,7 +176,9 @@ export function PropertyAdminCard({
             <button
               type="button"
               onClick={() =>
-                navigate(`/properties/${property.id}/gallery`, { state: { from: 'dashboard' } })
+                navigate(`/properties/${property.id}/gallery`, {
+                  state: { from: 'dashboard', dashboardSearch: location.search },
+                })
               }
               aria-label="Gerenciar galeria"
               className="flex size-10 items-center justify-center rounded-full bg-surface text-foreground-subtle transition-colors active:bg-border md:hover:bg-border"
