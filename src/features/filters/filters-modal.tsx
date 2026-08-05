@@ -76,11 +76,17 @@ export function FiltersModal({ open, onClose }: { open: boolean; onClose: () => 
   }
 
   return (
-    <Modal open={open} onClose={onClose} title="Filtros" panelClassName="md:max-w-2xl lg:max-w-3xl">
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="Filtros"
+      titleClassName="text-xl"
+      panelClassName="md:max-w-2xl lg:max-w-3xl"
+    >
       <div className="flex flex-col gap-6 px-6 pb-4 md:px-0 md:pb-0">
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           <Field asGroup label="Tipo de negócio">
-            <div className="inline-flex self-start rounded-full bg-surface p-1">
+            <div className="inline-flex mt-4 self-start rounded-full bg-surface p-1">
               {[BusinessType.SALE, BusinessType.RENT].map((value) => {
                 const selected = draft.businessType === value;
                 return (
@@ -90,7 +96,7 @@ export function FiltersModal({ open, onClose }: { open: boolean; onClose: () => 
                     aria-pressed={selected}
                     onClick={() => update('businessType', selected ? undefined : value)}
                     className={cn(
-                      'min-h-11 rounded-full px-6 text-sm font-medium transition-all',
+                      'min-h-11 rounded-full px-10 text-sm font-medium transition-all',
                       selected
                         ? 'bg-surface-raised text-foreground shadow-sm'
                         : 'text-foreground-subtle md:hover:text-foreground',
@@ -106,7 +112,7 @@ export function FiltersModal({ open, onClose }: { open: boolean; onClose: () => 
           <Field asGroup label="Tipo de imóvel">
             {/* Multi-select at every width. The desktop dropdown used to *replace* the
                 whole selection with a single value. */}
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mt-4">
               {Object.values(PropertyType).map((value) => {
                 const selected = draft.types.includes(value);
                 return (
@@ -125,9 +131,11 @@ export function FiltersModal({ open, onClose }: { open: boolean; onClose: () => 
           </Field>
         </div>
 
+        <div className="hidden border-t border-border md:block" />
+
         {draft.businessType === BusinessType.SALE && (
           <Field asGroup label="Modalidade de venda">
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 mt-4">
               {Object.values(SaleType).map((value) => {
                 const selected = draft.saleTypes.includes(value);
                 return (
@@ -148,6 +156,7 @@ export function FiltersModal({ open, onClose }: { open: boolean; onClose: () => 
 
         <Field asGroup label="Valor do imóvel">
           <RangeFilter
+            className="mt-4"
             min={0}
             max={MAX_PRICE}
             step={10_000}
@@ -155,19 +164,23 @@ export function FiltersModal({ open, onClose }: { open: boolean; onClose: () => 
               draft.minPrice ? Number(draft.minPrice) : 0,
               draft.maxPrice ? Number(draft.maxPrice) : MAX_PRICE,
             ]}
-            onChange={([min, max]) => {
+            onChange={([min, max], source) => {
               setDraft((prev) => ({
                 ...prev,
                 minPrice: min === 0 ? '' : String(min),
-                // At the ceiling this must clear maxPrice, not store it: dragging only the
-                // minimum thumb still reports max = MAX_PRICE, and storing that would drop
-                // every property above R$ 5.000.000 from the results.
-                maxPrice: max >= MAX_PRICE ? '' : String(max),
+                // At the slider's ceiling this must clear maxPrice, not store it: dragging
+                // only the minimum thumb still reports max = MAX_PRICE, and storing that
+                // would drop every property above R$ 5.000.000 from the results. Typing the
+                // same number is different — the user asked for that exact value, so only
+                // the slider gets the "no upper bound" treatment.
+                maxPrice: source === 'slider' && max >= MAX_PRICE ? '' : String(max),
               }));
             }}
             prefix="R$"
           />
         </Field>
+
+        <div className="hidden border-t border-border md:block" />
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <Field label="Bairro">
@@ -175,6 +188,7 @@ export function FiltersModal({ open, onClose }: { open: boolean; onClose: () => 
               value={draft.neighborhood}
               onChange={(e) => update('neighborhood', e.target.value)}
               placeholder="Ex: Campolim"
+              className="mt-4"
             />
           </Field>
           <Field label="Cidade">
@@ -182,6 +196,7 @@ export function FiltersModal({ open, onClose }: { open: boolean; onClose: () => 
               value={draft.city}
               onChange={(e) => update('city', e.target.value)}
               placeholder="Ex: Sorocaba"
+              className="mt-4"
             />
           </Field>
           <Field label="Estado">
@@ -190,13 +205,17 @@ export function FiltersModal({ open, onClose }: { open: boolean; onClose: () => 
               onChange={(e) => update('state', e.target.value.toUpperCase())}
               maxLength={2}
               placeholder="Ex: SP"
+              className="mt-4"
             />
           </Field>
         </div>
 
+        <div className="hidden border-t border-border md:block" />
+
         <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
           <Field asGroup label="Quartos (mínimo)">
             <ChipGroup
+              className="mt-4"
               options={COUNT_OPTIONS}
               value={draft.minBedrooms?.toString() ?? null}
               onChange={(v) => update('minBedrooms', v ? Number(v) : undefined)}
@@ -204,6 +223,7 @@ export function FiltersModal({ open, onClose }: { open: boolean; onClose: () => 
           </Field>
           <Field asGroup label="Banheiros (mínimo)">
             <ChipGroup
+              className="mt-4"
               options={COUNT_OPTIONS}
               value={draft.minBathrooms?.toString() ?? null}
               onChange={(v) => update('minBathrooms', v ? Number(v) : undefined)}
@@ -211,6 +231,7 @@ export function FiltersModal({ open, onClose }: { open: boolean; onClose: () => 
           </Field>
           <Field asGroup label="Vagas (mínimo)">
             <ChipGroup
+              className="mt-4"
               options={COUNT_OPTIONS}
               value={draft.minParkingSpaces?.toString() ?? null}
               onChange={(v) => update('minParkingSpaces', v ? Number(v) : undefined)}
@@ -218,24 +239,30 @@ export function FiltersModal({ open, onClose }: { open: boolean; onClose: () => 
           </Field>
         </div>
 
+        <div className="hidden border-t border-border md:block" />
+
         <Field asGroup label="Área total (m²)">
           <RangeFilter
+            className="mt-4"
             min={0}
             max={MAX_TOTAL_AREA}
             step={5}
             value={[draft.minTotalArea ?? 0, draft.maxTotalArea ?? MAX_TOTAL_AREA]}
-            onChange={([min, max]) => {
+            onChange={([min, max], source) => {
               setDraft((prev) => ({
                 ...prev,
                 minTotalArea: min === 0 ? undefined : min,
-                maxTotalArea: max >= MAX_TOTAL_AREA ? undefined : max,
+                maxTotalArea: source === 'slider' && max >= MAX_TOTAL_AREA ? undefined : max,
               }));
             }}
             suffix="m²"
           />
         </Field>
 
-        <div className="sticky bottom-0 flex gap-3 border-t border-border bg-background pt-4 md:static md:border-0 md:pt-2">
+        {/* z-40 beats the RangeFilter thumb's z-30 (range-filter.tsx) — without an explicit
+            z-index this sticky footer defaults to `auto`, which loses to any positioned
+            sibling with a numeric z-index, including a slider thumb mid-drag. */}
+        <div className="sticky bottom-0 z-40 flex gap-3 border-t border-border bg-background py-4 md:static md:border-0 md:pt-2">
           <Button
             variant="ghost"
             shape="pill"

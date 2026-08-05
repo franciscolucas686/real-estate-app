@@ -240,6 +240,38 @@ describe('propertyFormSchema — per-subtype required fields', () => {
     values.waterSource = '';
     expect(errorPaths(values)).toContain('waterSource');
   });
+
+  it('rejects APARTMENT with no totalArea', () => {
+    const values = base();
+    values.type = 'APARTMENT';
+    values.isGroundFloor = true;
+    values.floor = '';
+    values.sunPosition = 'MORNING';
+    values.totalArea = '';
+    expect(errorPaths(values)).toContain('totalArea');
+  });
+
+  it('rejects APARTMENT with builtArea set (mirrors PropertiesService.validateApartmentAreaFields)', () => {
+    const values = base();
+    values.type = 'APARTMENT';
+    values.isGroundFloor = true;
+    values.floor = '';
+    values.sunPosition = 'MORNING';
+    values.totalArea = '80';
+    values.builtArea = '70';
+    expect(errorPaths(values)).toContain('builtArea');
+  });
+
+  it('accepts APARTMENT with totalArea and no builtArea', () => {
+    const values = base();
+    values.type = 'APARTMENT';
+    values.isGroundFloor = true;
+    values.floor = '';
+    values.sunPosition = 'MORNING';
+    values.totalArea = '80';
+    values.builtArea = '';
+    expect(propertyFormSchema.safeParse(values).success).toBe(true);
+  });
 });
 
 describe('propertyFormSchema — field-level shape', () => {

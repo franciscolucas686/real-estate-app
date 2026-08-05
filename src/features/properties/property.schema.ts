@@ -184,6 +184,20 @@ export const propertyFormSchema = z
           message: 'Selecione a posição do sol.',
         });
       }
+      if (!f.totalArea) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['totalArea'],
+          message: 'Informe a área total do apartamento.',
+        });
+      }
+      if (f.builtArea !== '') {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['builtArea'],
+          message: 'Área construída não se aplica a apartamentos.',
+        });
+      }
     }
 
     if (f.type === PropertyType.LAND) {

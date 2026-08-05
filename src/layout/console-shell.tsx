@@ -52,7 +52,18 @@ function isActive(item: ConsoleNavItem, pathname: string): boolean {
  * dashboard's two-column grid cannot spare, so below `md` the same entries render as a
  * bottom bar instead. Same items, same active state, presentation chosen by width.
  */
-export function ConsoleShell({ children }: { children: ReactNode }) {
+export function ConsoleShell({
+  children,
+  showMobileNav = true,
+}: {
+  children: ReactNode;
+  /** Suppress the mobile bottom nav — mirrors `SiteShell`'s prop of the same name, for a
+   *  single-task console screen that already has its own fixed action bar at the bottom
+   *  (the property wizard's "Continuar"). Both are `fixed bottom-0`; without this, the
+   *  console's bar sits at a higher z-index and paints over the page's own, leaving its
+   *  button in the DOM but invisible and untouchable. */
+  showMobileNav?: boolean;
+}) {
   const { pathname } = useLocation();
 
   return (
@@ -106,17 +117,19 @@ export function ConsoleShell({ children }: { children: ReactNode }) {
         dashboard reserved `pb-28` for it and clipped its own last row on a notched phone.
         Only the active-state policy stays local, passed down as `active`.
       */}
-      <BottomNav aria-label="Seções do painel">
-        {CONSOLE_NAV.map((item) => (
-          <BottomNavItem
-            key={item.to}
-            icon={item.icon}
-            label={item.label}
-            to={item.to}
-            active={isActive(item, pathname)}
-          />
-        ))}
-      </BottomNav>
+      {showMobileNav && (
+        <BottomNav aria-label="Seções do painel">
+          {CONSOLE_NAV.map((item) => (
+            <BottomNavItem
+              key={item.to}
+              icon={item.icon}
+              label={item.label}
+              to={item.to}
+              active={isActive(item, pathname)}
+            />
+          ))}
+        </BottomNav>
+      )}
     </div>
   );
 }

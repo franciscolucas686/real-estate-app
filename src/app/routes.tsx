@@ -33,7 +33,7 @@ export interface AppRoute {
   shell: ShellKind;
   /** Wrap in `ProtectedRoute`. */
   guarded?: boolean;
-  /** Suppress the mobile bottom nav on a single-task public screen. */
+  /** Suppress the mobile bottom nav on a single-task screen, in either shell. */
   hideMobileNav?: boolean;
   /** Page transition, forwarded to `PageWrapper`. */
   motion?: HTMLMotionProps<'main'>;
@@ -89,8 +89,22 @@ export const APP_ROUTES: AppRoute[] = [
   // ── Console ────────────────────────────────────────────────────────────────
   { path: '/dashboard', element: <Dashboard />, shell: 'console', guarded: true },
   { path: '/settings', element: <Settings />, shell: 'console', guarded: true },
-  { path: '/properties/new', element: <PropertyForm />, shell: 'console', guarded: true },
-  { path: '/properties/:id/edit', element: <PropertyForm />, shell: 'console', guarded: true },
+  {
+    path: '/properties/new',
+    element: <PropertyForm />,
+    shell: 'console',
+    guarded: true,
+    // The wizard has its own fixed "Continuar" bar at the bottom — same position as the
+    // console's mobile nav, and without this the nav's higher z-index paints over it.
+    hideMobileNav: true,
+  },
+  {
+    path: '/properties/:id/edit',
+    element: <PropertyForm />,
+    shell: 'console',
+    guarded: true,
+    hideMobileNav: true,
+  },
   {
     path: '/properties/:id/gallery',
     element: <GalleryManagement />,

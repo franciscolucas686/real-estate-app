@@ -5,6 +5,8 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useLogout } from '@/features/auth/use-auth';
 import { PageContainer } from '@/layout/page-container';
+import { BOTTOM_NAV_CLEARANCE } from '@/layout/app-nav';
+import { cn } from '@/shared/cn';
 import { Input } from '@/ui/input';
 import {
   fetchWhatsappNumbers,
@@ -162,7 +164,12 @@ export function Settings() {
   if (isLoading || loadingSettings) return <SettingsSkeleton />;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background pb-10 md:min-h-full">
+    <div
+      className={cn(
+        'flex min-h-dvh flex-col bg-background md:min-h-full md:pb-10',
+        BOTTOM_NAV_CLEARANCE,
+      )}
+    >
       <PageContainer
         maxWidth="reading"
         className="sticky top-0 z-10 flex items-center gap-3 bg-background pt-[calc(env(safe-area-inset-top,16px)+12px)] pb-3"
@@ -372,7 +379,7 @@ export function Settings() {
                 type="submit"
                 disabled={savingContact}
                 aria-busy={savingContact || undefined}
-                className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-action text-sm font-semibold text-white transition-colors active:bg-action-hover disabled:opacity-60 md:hover:bg-action-hover"
+                className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-action text-sm font-semibold text-white transition-colors active:bg-action-hover disabled:opacity-60 md:hover:bg-action-hover"
               >
                 {savingContact ? (
                   <Loader2 size={24} className="animate-spin" />
@@ -389,12 +396,12 @@ export function Settings() {
         </section>
 
         {/* Logout */}
-        <section>
+        <section className="mb-6">
           <button
             type="button"
             onClick={handleLogout}
             disabled={logout.isPending || logoutSplashVisible}
-            className="flex h-14 w-full items-center justify-center rounded-full border border-danger text-sm font-semibold text-danger transition-colors active:bg-danger/10 disabled:opacity-60 md:hover:bg-danger/10"
+            className="flex h-14 w-full items-center justify-center rounded-xl border border-danger text-sm font-semibold text-danger transition-colors active:bg-danger/10 disabled:opacity-60 md:hover:bg-danger/10"
           >
             {logout.isPending ? 'Saindo...' : 'Sair da conta'}
           </button>

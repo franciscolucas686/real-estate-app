@@ -23,7 +23,7 @@ export function ConfirmModalContent({
   onClose,
 }: ConfirmContentProps) {
   return (
-    <div className="flex flex-col gap-4 px-6 md:px-0">
+    <div className="flex flex-col gap-4 px-6 mb-4 md:px-0">
       <p className="text-sm text-foreground-subtle">{message}</p>
       <button
         type="button"
