@@ -72,7 +72,9 @@ function AppRoutes() {
     </AnimatePresence>
   );
 
-  if (route.shell === 'console') return <ConsoleShell>{pages}</ConsoleShell>;
+  if (route.shell === 'console') {
+    return <ConsoleShell showMobileNav={!route.hideMobileNav}>{pages}</ConsoleShell>;
+  }
   return (
     <SiteShell items={siteNavItems} showMobileNav={!route.hideMobileNav}>
       {pages}
