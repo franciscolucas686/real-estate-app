@@ -109,11 +109,10 @@ export function useSwipeToSelect({
       }
     },
     onPointerUp() {
-      // Gesture ended without ever resolving into a drag (select or scroll)
-      // — that's a tap, so toggle the item the same way a click would.
-      if (intent.current === 'unknown' && startId.current) {
-        onToggle(startId.current);
-      }
+      // A gesture that never resolved into a drag is a tap, and the item's own
+      // `onClick` already handles that — for mouse, touch, and keyboard activation
+      // alike. Toggling here too double-fired on every plain click (this handler,
+      // then the native `click` event right after), which canceled itself out.
       reset();
     },
     onPointerCancel() {
