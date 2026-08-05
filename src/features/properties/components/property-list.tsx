@@ -83,7 +83,7 @@ export function PropertyList({
     <section
       data-slot="property-list"
       className={cn(
-        'flex flex-col gap-4 md:grid md:grid-cols-2 md:gap-6 lg:grid-cols-3 xl:grid-cols-4',
+        'flex flex-col gap-4 mb-8 md:grid md:grid-cols-2 md:gap-6 lg:grid-cols-3 xl:grid-cols-4',
         className,
       )}
       {...props}

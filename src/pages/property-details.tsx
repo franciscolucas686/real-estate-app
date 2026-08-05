@@ -294,6 +294,9 @@ export function PropertyDetails() {
           {/* ── Contact rail ──────────────────────────────────────────────── */}
           <aside className="flex flex-col gap-4 md:col-start-2 md:row-span-2 md:row-start-1 md:sticky md:top-6 md:self-start md:rounded-2xl md:border md:border-border md:bg-surface-raised md:p-6 md:shadow-sm">
             <div className="flex flex-wrap gap-2">
+              {/* Only meaningful to someone who can change it. A visitor can only ever see
+                  ACTIVE properties, so the badge would be a constant. */}
+              {isAuthenticated && <StatusBadge status={property.status} />}
               <Badge color={property.businessType === BusinessType.SALE ? 'action' : 'accent'}>
                 {BusinessTypeLabel[property.businessType]}
               </Badge>
@@ -302,9 +305,6 @@ export function PropertyDetails() {
                   {SaleTypeLabel[st.type]}
                 </Badge>
               ))}
-              {/* Only meaningful to someone who can change it. A visitor can only ever see
-                  ACTIVE properties, so the badge would be a constant. */}
-              {isAuthenticated && <StatusBadge status={property.status} />}
             </div>
 
             <div className="flex flex-wrap items-baseline gap-x-2">
@@ -342,7 +342,7 @@ export function PropertyDetails() {
                   href={whatsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-whatsapp text-base font-semibold text-white transition-[transform,filter] active:scale-[0.98] md:h-12 md:hover:brightness-110"
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-action text-base font-semibold text-white transition-[transform,filter] active:scale-[0.98] md:h-12 md:hover:brightness-110"
                 >
                   <FaWhatsapp size={22} aria-hidden="true" />
                   Conversar conosco agora
@@ -363,7 +363,7 @@ export function PropertyDetails() {
                   href={whatsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-whatsapp text-base font-semibold text-white transition-transform active:scale-[0.98]"
+                  className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-action text-base font-semibold text-white transition-transform active:scale-[0.98]"
                 >
                   <FaWhatsapp size={22} aria-hidden="true" />
                   Conversar conosco agora
