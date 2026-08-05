@@ -71,22 +71,27 @@ export function PropertyCard({ property, className }: PropertyCardProps) {
 
         {/* Specs */}
         {(property.bedrooms || property.bathrooms || property.parkingSpaces) && (
-          <div className="flex items-center gap-5 font-bold text-sm text-foreground-subtle">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-bold text-sm text-foreground-subtle">
+            {/* Icon + number + name always show together — tight gaps (both between specs
+                and inside each one) buy back the room the icons need. `flex-wrap` is the
+                backstop: if a spec still doesn't fit (long numbers, a user font-size
+                override), it drops to its own line instead of being clipped by the card's
+                `overflow-hidden`. */}
             {property.bedrooms != null && (
               <span className="flex items-center gap-1">
-                <Bed size={18} className="block lg:hidden 2xl:block" />
+                <Bed size={18} />
                 {property.bedrooms} {property.bedrooms === 1 ? 'quarto' : 'quartos'}
               </span>
             )}
             {property.bathrooms != null && (
               <span className="flex items-center gap-1">
-                <Bath size={18} className="block lg:hidden 2xl:block" />
+                <Bath size={18} />
                 {property.bathrooms} {property.bathrooms === 1 ? 'banheiro' : 'banheiros'}
               </span>
             )}
             {property.parkingSpaces != null && (
               <span className="flex items-center gap-1">
-                <Car size={18} className="block lg:hidden 2xl:block " />
+                <Car size={18} />
                 {property.parkingSpaces} {property.parkingSpaces === 1 ? 'Vaga' : 'Vagas'}
               </span>
             )}
