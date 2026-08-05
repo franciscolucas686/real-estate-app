@@ -27,6 +27,9 @@ export interface ModalProps {
   title?: string;
   /** Renders `title` for assistive tech only. Use when the content carries its own heading. */
   hideTitle?: boolean;
+  /** Overrides the title's default `text-base font-semibold` — e.g. a larger size for a
+   *  surface where the title should read as more prominent than the rest of the modals. */
+  titleClassName?: string;
   presentation?: ModalPresentation;
   /** Width override for the dialog presentation (default `max-w-md md:max-w-lg`). */
   panelClassName?: string;
@@ -40,8 +43,7 @@ const PRESENTATION_CLASSES: Record<ModalPresentation, string> = {
   // back to a centered panel. Written sheet-first to match the app's mobile-first
   // baseline and to keep the `md:` overrides in one readable block.
   responsive: [
-    'fixed inset-x-0 bottom-0 flex max-h-[85dvh] flex-col rounded-t-2xl',
-    'pb-[calc(env(safe-area-inset-bottom,0px)+16px)]',
+    'fixed inset-x-0 bottom-0  flex max-h-[85dvh] flex-col rounded-t-2xl',
     'data-[state=open]:animate-sheet-in data-[state=closed]:animate-sheet-out',
     'md:inset-x-auto md:bottom-auto md:left-1/2 md:top-1/2 md:w-full md:max-w-md',
     'md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-2xl md:p-6 md:pb-6 md:shadow-xl',
@@ -50,7 +52,6 @@ const PRESENTATION_CLASSES: Record<ModalPresentation, string> = {
   ].join(' '),
   sheet: [
     'fixed inset-x-0 bottom-0 flex max-h-[85dvh] flex-col rounded-t-2xl',
-    'pb-[calc(env(safe-area-inset-bottom,0px)+16px)]',
     'data-[state=open]:animate-sheet-in data-[state=closed]:animate-sheet-out',
   ].join(' '),
   dialog: [
@@ -76,6 +77,7 @@ export function Modal({
   onClose,
   title,
   hideTitle = false,
+  titleClassName,
   presentation = 'responsive',
   panelClassName,
   showCloseButton = presentation !== 'sheet',
@@ -146,7 +148,9 @@ export function Modal({
                 <span className="sr-only">{title ?? 'Janela de diálogo'}</span>
               </RadixDialog.Title>
             ) : (
-              <RadixDialog.Title className="text-base font-semibold text-foreground">
+              <RadixDialog.Title
+                className={cn('text-base font-semibold text-foreground', titleClassName)}
+              >
                 {title}
               </RadixDialog.Title>
             )}
@@ -159,7 +163,7 @@ export function Modal({
                   (hideTitle || !title) && 'absolute right-4 top-4 md:right-6 md:top-6',
                 )}
               >
-                <X size={18} />
+                <X size={25} />
               </RadixDialog.Close>
             )}
           </div>

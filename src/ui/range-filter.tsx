@@ -6,7 +6,14 @@ interface RangeFilterProps {
   max: number;
   step?: number;
   value: [number, number];
-  onChange: (value: [number, number]) => void;
+  /**
+   * `source` tells the caller whether the change came from dragging/keying the slider
+   * (always bounded to `min`/`max`) or from typing in a text field (unbounded — see the
+   * text `onChange` handlers below). Callers that clear a field once the slider reaches
+   * its ceiling ("dragged to the end" = "no upper bound") must only do that for
+   * `'slider'`, or a literally typed ceiling value gets silently discarded too.
+   */
+  onChange: (value: [number, number], source: 'slider' | 'text') => void;
   prefix?: string;
   suffix?: string;
   className?: string;
@@ -35,8 +42,10 @@ export function RangeFilter({
   const [dragging, setDragging] = useState<'min' | 'max' | null>(null);
 
   const range = max - min || 1;
-  const minPercent = ((minVal - min) / range) * 100;
-  const maxPercent = ((maxVal - min) / range) * 100;
+  // Clamped for rendering only — a typed value past the slider's ceiling/floor is kept
+  // in full for the actual filter, but the thumb has nowhere to go past the track ends.
+  const minPercent = Math.min(100, Math.max(0, ((minVal - min) / range) * 100));
+  const maxPercent = Math.min(100, Math.max(0, ((maxVal - min) / range) * 100));
 
   const getValueFromPosition = useCallback(
     (clientX: number) => {
@@ -58,9 +67,9 @@ export function RangeFilter({
     if (!dragging) return;
     const val = getValueFromPosition(e.clientX);
     if (dragging === 'min') {
-      onChange([Math.min(val, maxVal - step), maxVal]);
+      onChange([Math.min(val, maxVal - step), maxVal], 'slider');
     } else {
-      onChange([minVal, Math.max(val, minVal + step)]);
+      onChange([minVal, Math.max(val, minVal + step)], 'slider');
     }
   };
 
@@ -78,7 +87,13 @@ export function RangeFilter({
             value={formatBR(minVal)}
             onChange={(e) => {
               const num = parseBR(e.target.value);
-              if (!isNaN(num)) onChange([Math.max(min, Math.min(num, maxVal)), maxVal]);
+              if (isNaN(num)) return;
+              // Only floored at 0, never capped at `max`: the slider ceiling exists so
+              // dragging has an endpoint, not to cap what someone can type. If the typed
+              // minimum overtakes the current maximum, the maximum rises with it instead
+              // of silently discarding the keystroke.
+              const newMin = Math.max(0, num);
+              onChange([newMin, Math.max(newMin, maxVal)], 'text');
             }}
             className="w-full min-w-0 bg-transparent text-base font-medium text-foreground outline-none"
           />
@@ -92,7 +107,9 @@ export function RangeFilter({
             value={formatBR(maxVal)}
             onChange={(e) => {
               const num = parseBR(e.target.value);
-              if (!isNaN(num)) onChange([minVal, Math.min(max, Math.max(num, minVal))]);
+              if (isNaN(num)) return;
+              const newMax = Math.max(0, num);
+              onChange([Math.min(minVal, newMax), newMax], 'text');
             }}
             className="w-full min-w-0 bg-transparent text-base font-medium text-foreground outline-none"
           />
@@ -132,9 +149,9 @@ export function RangeFilter({
             onPointerDown={handlePointerDown('min')}
             onKeyDown={(e) => {
               if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
-                onChange([Math.min(minVal + step, maxVal - step), maxVal]);
+                onChange([Math.min(minVal + step, maxVal - step), maxVal], 'slider');
               } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
-                onChange([Math.max(minVal - step, min), maxVal]);
+                onChange([Math.max(minVal - step, min), maxVal], 'slider');
               }
             }}
           >
@@ -159,9 +176,9 @@ export function RangeFilter({
             onPointerDown={handlePointerDown('max')}
             onKeyDown={(e) => {
               if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
-                onChange([minVal, Math.min(maxVal + step, max)]);
+                onChange([minVal, Math.min(maxVal + step, max)], 'slider');
               } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
-                onChange([minVal, Math.max(maxVal - step, minVal + step)]);
+                onChange([minVal, Math.max(maxVal - step, minVal + step)], 'slider');
               }
             }}
           >

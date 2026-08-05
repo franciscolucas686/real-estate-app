@@ -43,16 +43,18 @@ export function QuickFilters() {
   const maxPriceNum = priceToNum(filters.maxPrice) || MAX_PRICE;
   const hasPriceFilter = Boolean(filters.minPrice || filters.maxPrice);
 
-  function handlePriceRange([min, max]: [number, number]) {
-    // Both bounds in one write, and the ceiling clears `maxPrice` instead of storing it:
-    // dragging only the minimum thumb still reports max = MAX_PRICE, and storing that
-    // would silently drop every property above R$ 5.000.000. This was the same defect
-    // fixed on the (now retired) filters page — it lived here too, unnoticed, because the
-    // two surfaces duplicated the logic instead of sharing it.
+  function handlePriceRange([min, max]: [number, number], source: 'slider' | 'text') {
+    // Both bounds in one write, and reaching the slider's ceiling clears `maxPrice`
+    // instead of storing it: dragging only the minimum thumb still reports
+    // max = MAX_PRICE, and storing that would silently drop every property above
+    // R$ 5.000.000. This was the same defect fixed on the (now retired) filters page — it
+    // lived here too, unnoticed, because the two surfaces duplicated the logic instead of
+    // sharing it. Typing that same number is a literal request for that value, not a
+    // "no bound" gesture, so only the slider gets the clearing treatment.
     setFilters({
       ...filters,
       minPrice: min === 0 ? '' : String(min),
-      maxPrice: max >= MAX_PRICE ? '' : String(max),
+      maxPrice: source === 'slider' && max >= MAX_PRICE ? '' : String(max),
     });
   }
 
@@ -60,11 +62,11 @@ export function QuickFilters() {
   const maxAreaNum = filters.maxTotalArea ?? MAX_TOTAL_AREA;
   const hasAreaFilter = filters.minTotalArea != null || filters.maxTotalArea != null;
 
-  function handleAreaRange([min, max]: [number, number]) {
+  function handleAreaRange([min, max]: [number, number], source: 'slider' | 'text') {
     setFilters({
       ...filters,
       minTotalArea: min === 0 ? undefined : min,
-      maxTotalArea: max >= MAX_TOTAL_AREA ? undefined : max,
+      maxTotalArea: source === 'slider' && max >= MAX_TOTAL_AREA ? undefined : max,
     });
   }
 
