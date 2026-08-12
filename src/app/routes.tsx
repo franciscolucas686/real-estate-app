@@ -110,6 +110,12 @@ export const APP_ROUTES: AppRoute[] = [
     element: <GalleryManagement />,
     shell: 'console',
     guarded: true,
+    // Same reason as the wizard: this page owns the bottom of a phone's viewport — its own
+    // "Concluir" bar, and the room manager's selection bar. The gallery's bar is `fixed
+    // bottom-0` and the console's nav is too, at `z-(--z-fixed)` and rendered *after*
+    // `{children}` — so the nav painted over it and the button was in the DOM but invisible
+    // and untouchable on mobile.
+    hideMobileNav: true,
     // The gallery is a workspace, not a document: reopening it mid-scroll from a
     // previous session is disorienting.
     resetScroll: true,

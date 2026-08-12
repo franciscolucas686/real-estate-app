@@ -44,6 +44,14 @@ describe('resolveRoute', () => {
     expect(resolveRoute('/properties/abc/qualquer-coisa')).toBe(NOT_FOUND_ROUTE);
   });
 
+  it('a galeria esconde a barra inferior, como o wizard', () => {
+    // A página é dona do rodapé no celular: a barra "Concluir" e a barra de seleção do
+    // gerenciador de ambiente são `fixed bottom-0`, e a nav do console — mesmo z-index,
+    // renderizada depois de `{children}` — pintava por cima. O botão existia no DOM e não
+    // aparecia no telefone.
+    expect(resolveRoute('/properties/abc-123/gallery').hideMobileNav).toBe(true);
+  });
+
   it('só a galeria descarta a posição de scroll', () => {
     const resetting = APP_ROUTES.filter((route) => route.resetScroll).map((route) => route.path);
     expect(resetting).toEqual(['/properties/:id/gallery']);
