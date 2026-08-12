@@ -7,6 +7,7 @@ import { useLogout } from '@/features/auth/use-auth';
 import { PageContainer } from '@/layout/page-container';
 import { BOTTOM_NAV_CLEARANCE } from '@/layout/app-nav';
 import { cn } from '@/shared/cn';
+import { onlyDigits } from '@/shared/digits';
 import { Input } from '@/ui/input';
 import {
   fetchWhatsappNumbers,
@@ -96,8 +97,8 @@ export function Settings() {
     if (siteSettings && !initialized) {
       resetContact({
         email: siteSettings.email,
-        phone: siteSettings.phone.replace(/\D/g, '').slice(0, 11),
-        whatsapp: siteSettings.whatsapp.replace(/\D/g, '').slice(0, 11),
+        phone: onlyDigits(siteSettings.phone).slice(0, 11),
+        whatsapp: onlyDigits(siteSettings.whatsapp).slice(0, 11),
         hours: siteSettings.hours,
       });
       setInitialized(true);
@@ -128,7 +129,7 @@ export function Settings() {
         isActive: true,
       });
       if (numbers.length === 0) {
-        const num = created.number.replace(/\D/g, '').slice(0, 11);
+        const num = onlyDigits(created.number).slice(0, 11);
         setContactValue('whatsapp', num);
         await updateSiteSettings({ whatsapp: created.number });
         await queryClient.invalidateQueries({ queryKey: ['site-settings'] });
@@ -177,7 +178,7 @@ export function Settings() {
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="flex size-11 items-center justify-center rounded-full transition-colors md:hover:bg-border/60"
+          className="flex size-12 items-center justify-center rounded-full transition-colors md:hover:bg-action hover:text-white"
           aria-label="Voltar"
         >
           <ChevronLeft size={24} />
@@ -233,9 +234,7 @@ export function Settings() {
                       inputMode="numeric"
                       placeholder="(11) 99999-9999"
                       value={formatPhone(field.value)}
-                      onChange={(e) =>
-                        field.onChange(e.target.value.replace(/\D/g, '').slice(0, 11))
-                      }
+                      onChange={(e) => field.onChange(onlyDigits(e.target.value).slice(0, 11))}
                       disabled={addingNumber}
                       className="h-11 flex-1 px-3"
                     />
@@ -285,7 +284,7 @@ export function Settings() {
                   <Input
                     inputMode="numeric"
                     value={formatPhone(field.value)}
-                    onChange={(e) => field.onChange(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    onChange={(e) => field.onChange(onlyDigits(e.target.value).slice(0, 11))}
                     placeholder="(11) 99999-9999"
                     className="h-11 w-full px-3"
                   />
@@ -323,9 +322,7 @@ export function Settings() {
                     <Input
                       inputMode="numeric"
                       value={formatPhoneAdaptive(field.value)}
-                      onChange={(e) =>
-                        field.onChange(e.target.value.replace(/\D/g, '').slice(0, 11))
-                      }
+                      onChange={(e) => field.onChange(onlyDigits(e.target.value).slice(0, 11))}
                       placeholder="(11) 99999-9999"
                       className="h-11 w-full px-3"
                     />

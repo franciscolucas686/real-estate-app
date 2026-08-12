@@ -9,6 +9,7 @@ import {
   WaterSource,
   Zoning,
 } from '@/shared/api/types';
+import { onlyDigits } from '@/shared/digits';
 
 export const PropertyTypeLabel: Record<PropertyType, string> = {
   HOUSE: 'Casa',
@@ -95,7 +96,7 @@ export function formatMainPrice(
 }
 
 export function formatPhone(raw: string): string {
-  const d = raw.replace(/\D/g, '').slice(0, 11);
+  const d = onlyDigits(raw).slice(0, 11);
   if (d.length === 0) return '';
   if (d.length <= 2) return `(${d}`;
   if (d.length <= 7) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
@@ -104,7 +105,7 @@ export function formatPhone(raw: string): string {
 
 // Adapts to landline (10 digits → 4-4) or mobile (11 digits → 5-4)
 export function formatPhoneAdaptive(raw: string): string {
-  const d = raw.replace(/\D/g, '').slice(0, 11);
+  const d = onlyDigits(raw).slice(0, 11);
   if (d.length === 0) return '';
   if (d.length <= 2) return `(${d}`;
   if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
@@ -113,7 +114,7 @@ export function formatPhoneAdaptive(raw: string): string {
 }
 
 export function buildWhatsAppUrl(contact: string, propertyCode?: string): string {
-  const number = `55${contact.replace(/\D/g, '')}`;
+  const number = `55${onlyDigits(contact)}`;
   const message = propertyCode
     ? `Olá! Tenho interesse no imóvel de código ${propertyCode}.`
     : 'Olá! Tenho interesse em um imóvel.';
