@@ -211,6 +211,87 @@
   --z-splash: 1100; /* boot and success splashes — above everything, maps included */
 }
 
+/* ---------------------------------------------------------------------------
+   SITE NAV HEIGHT
+
+   `TopNav` is `md:sticky md:top-0`, so it owns the top band of the viewport on
+   every storefront page. Anything else that sticks has to start below it — and
+   `position: sticky` measures from the viewport, not from the end of the nav, so
+   the offset has to be stated. The contact rail on a property detail was
+   `md:top-6` and spent its life pinned *behind* the nav.
+
+   It is a token rather than a literal because the height is not a round number
+   anyone could guess, and it is not even constant:
+     - below `lg` the nav has no in-flow content at all — the logo is
+       `hidden lg:flex`, the nav items are `absolute`, and `site-shell.tsx` passes
+       no `rightSlot` — so it is exactly the block's own box: 80px.
+     - from `lg` the logo appears at `text-lg`, which is a clamp in the fluid type
+       scale above, so the nav grows with the viewport: ~109.2px at 1024px,
+       reaching 110px at 1280px.
+
+   6.875rem is the *top* of that fluid range, not a rounding of it. Trimming it to
+   6.75rem re-opens the overlap on wide screens, which is the failure this exists
+   to close. `TopNav` consumes this as its height so the value cannot drift from
+   the thing it describes.
+--------------------------------------------------------------------------- */
+:root {
+  --site-nav-height: 5rem;
+}
+
+/* ---------------------------------------------------------------------------
+   PROPERTY DETAIL — MAIN PHOTO CEILING
+
+   The main photo's height is decided by its proportion — `md:aspect-16/9`,
+   `lg:aspect-21/9` — in every realistic window. This is the net underneath
+   that: a window shorter than the ones those ratios were measured against
+   (1280×720, a browser carrying several toolbars, a high zoom level) would push
+   the thumbnail strip off screen again. Under this ceiling the photo flattens
+   instead, which the reader can still act on.
+
+   It takes two values because what sits under the photo changes at `lg`. Stated
+   term by term, so nobody "rounds" either total later:
+
+                                                        md–lg      lg and up
+     - `PageContainer`'s `md:py-8`, top half             2rem          2rem
+     - the breadcrumb line (`text-sm`, line-height 1.5) ~1.4rem       ~1.4rem
+     - `gap-5`, breadcrumb → grid                        1.25rem       1.25rem
+     - `gap-3`, photo → thumbnail strip                    —           0.75rem
+     - the thumbnail strip, `h-20`                         —              5rem
+     - breathing room                                     1rem          1rem
+                                                        ────────      ────────
+                                                         5.65rem      11.4rem
+
+   Breathing room is not padding for the arithmetic's sake — the terms above it
+   are exact. Without it the strip lands 1–2px from the bottom edge on a 1366×650
+   or 1280×560 window, which reads as cut off whether or not it technically is.
+   It costs photo height only where the ceiling already bites.
+
+   Three couplings are live here.
+
+   The nav's band is read as `var(--site-nav-height)` rather than copied, so the
+   ceiling follows that token across `lg` (80px → 110px) on its own — which is
+   why this is redefined in the same media query rather than a second one.
+
+   The last two terms exist only above `lg`, because that is where
+   `property-details.tsx` renders the strip (`hidden lg:grid`). Bring the strip
+   back below `lg` and this band's total is wrong by 5.75rem.
+
+   And the strip's tiles are a fixed `h-20` rather than `aspect-square` precisely
+   so its term can be stated: a square tile's height is the media column's width
+   over six (120–147px across the widths where it renders), so it could only ever
+   have been a worst-case guess. Change one and the other has to move.
+--------------------------------------------------------------------------- */
+:root {
+  --property-photo-max-height: calc(100dvh - var(--site-nav-height) - 5.75rem);
+}
+
+@media (width >= theme(--breakpoint-lg)) {
+  :root {
+    --site-nav-height: 6.875rem;
+    --property-photo-max-height: calc(100dvh - var(--site-nav-height) - 11.5rem);
+  }
+}
+
 /* Values below 40 are intentionally absent. z-10/z-20/z-30 in this codebase are
    local stacking inside a single component (carousel arrows, slider thumbs,
    sticky sub-headers), not app-wide layers, and naming them would invent tokens
