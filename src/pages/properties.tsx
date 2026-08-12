@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { SlidersHorizontal } from 'lucide-react';
 import { PropertyList } from '@/features/properties/components/property-list';
@@ -12,7 +12,7 @@ import { PageContainer } from '@/layout/page-container';
 import { BOTTOM_NAV_CLEARANCE } from '@/layout/app-nav';
 import { cn } from '@/shared/cn';
 import { Button } from '@/ui/button';
-import { Input } from '@/ui/input';
+import { NumericInput } from '@/ui/numeric-input';
 import { Select } from '@/ui/select';
 import { Pagination } from '@/ui/pagination';
 
@@ -41,14 +41,36 @@ export function Properties() {
 
   const totalPages = Math.max(1, Math.ceil((total ?? 0) / PAGE_SIZE));
 
-  function goToPage(next: number) {
-    setSearchParams((current) => {
-      const params = new URLSearchParams(current);
-      if (next <= 1) params.delete('page');
-      else params.set('page', String(next));
-      return params;
-    });
-  }
+  const goToPage = useCallback(
+    (next: number, options?: { replace?: boolean }) => {
+      setSearchParams(
+        (current) => {
+          const params = new URLSearchParams(current);
+          if (next <= 1) params.delete('page');
+          else params.set('page', String(next));
+          return params;
+        },
+        { replace: options?.replace ?? false },
+      );
+    },
+    [setSearchParams],
+  );
+
+  /**
+   * `page` travels in the URL, so it can arrive already out of range — a link shared when
+   * the listing had five pages, opened after the inventory shrank to one. No filter changed,
+   * so dropping `page` on a filter write doesn't help here, and nothing on screen recovers
+   * from it: the grid is empty while the header announces a non-zero count, and `Pagination`
+   * renders nothing at `totalPages <= 1`, so there is no control left to click.
+   *
+   * Gated on `total !== null` — the query has to have answered before "out of range" means
+   * anything, and `total` is deliberately `null` rather than `0` until then. `replace`
+   * because a broken offset is not a place the back button should return to.
+   */
+  useEffect(() => {
+    if (total === null || page <= totalPages) return;
+    goToPage(totalPages, { replace: true });
+  }, [total, page, totalPages, goToPage]);
 
   return (
     <div
@@ -76,7 +98,7 @@ export function Properties() {
           and single-select on desktop, and `saleTypes` had no desktop UI at all.
         */}
         <div className="flex flex-wrap items-center gap-2">
-          <Input
+          <NumericInput
             type="search"
             aria-label="Buscar por código"
             value={codeInput.value}
@@ -91,12 +113,15 @@ export function Properties() {
             <QuickFilters />
           </div>
 
+          {/* No `shape` here on purpose — the default `control` (`rounded-xl`) is the point.
+              This button sits in a row with the `Dropdown` triggers, and the sort `Select`
+              below matches it, so a `pill` would be the odd one out. Everywhere else in the
+              app the button is `shape="pill"`; do not "restore" it here for symmetry. */}
           <Button
             variant={activeCount > 0 ? 'primary' : 'secondary'}
             size="sm"
-            shape="pill"
             onClick={() => setFiltersOpen(true)}
-            className="w-full shrink-0 sm:w-auto"
+            className="w-full shrink-0 sm:w-auto min-h-10"
           >
             <SlidersHorizontal size={16} aria-hidden="true" />
             {activeCount > 0 ? (
@@ -126,8 +151,12 @@ export function Properties() {
             )}
           </p>
 
+          {/* `sr-only` rather than no text at all: dropping the visible "Ordenar" left the
+              `<label>` empty, and an empty label associates nothing — the select announced
+              itself as a bare combo box with no indication of what it sorts. The options
+              read "Mais recentes"/"Mais antigos", which say nothing on their own either. */}
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            Ordenar
+            <span className="sr-only">Ordenar</span>
             <Select
               value={filters.sort}
               onChange={(e) => updateFilter('sort', e.target.value as PropertyFilters['sort'])}

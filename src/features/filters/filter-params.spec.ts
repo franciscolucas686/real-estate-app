@@ -39,13 +39,24 @@ describe('parseFilters', () => {
   it('ignora valores inválidos em vez de quebrar a página', () => {
     // Um link editado à mão não pode derrubar a busca nem gerar um request que a API
     // rejeitaria com 400 (o backend usa forbidNonWhitelisted).
-    const result = parse('minBedrooms=abc&businessType=BANANA&sort=random&maxPrice=-5&state=SPXX');
+    const result = parse(
+      'minBedrooms=abc&businessType=BANANA&sort=random&maxPrice=-5&state=SPXX&code=57a5',
+    );
 
     expect(result.minBedrooms).toBeUndefined();
     expect(result.businessType).toBeUndefined();
     expect(result.sort).toBe('newest');
     expect(result.maxPrice).toBe('');
     expect(result.state).toBe('');
+    // Ignorado, não limpo para `575`: o campo aceita só dígitos, e transformar o valor
+    // fabricaria uma busca que ninguém pediu.
+    expect(result.code).toBe('');
+  });
+
+  it('aceita um código todo numérico — o regex não pode ser zeloso demais', () => {
+    // Zeros à esquerda são códigos reais e precisam sobreviver.
+    expect(parse('code=575301').code).toBe('575301');
+    expect(parse('code=0001').code).toBe('0001');
   });
 
   it('descarta apenas os itens desconhecidos de uma lista', () => {

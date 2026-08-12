@@ -2,10 +2,9 @@ import { useFilters } from '@/features/filters/use-filters';
 import { cn } from '@/shared/cn';
 import { Dropdown } from '@/ui/dropdown';
 import { ChipGroup } from '@/ui/chip-group';
-import { RangeFilter } from '@/ui/range-filter';
+import { RangeFilterDropdown } from '@/features/filters/range-filter-dropdown';
 import { PropertyTypeLabel, BusinessTypeLabel } from '@/shared/format';
 import { PropertyType, BusinessType } from '@/shared/api/types';
-import { countActiveFilters } from '@/features/filters/filter-types';
 
 const PROPERTY_TYPE_OPTIONS = Object.values(PropertyType).map((v) => ({
   label: PropertyTypeLabel[v],
@@ -16,6 +15,14 @@ const BUSINESS_TYPE_OPTIONS = [BusinessType.RENT, BusinessType.SALE].map((v) => 
   label: BusinessTypeLabel[v],
   value: v,
 }));
+
+/**
+ * Overrides `Dropdown`'s own `rounded-sm` so the triggers read as one row with the
+ * "Mais filtros" button beside them. Scoped to `sm:` because that is exactly where
+ * `properties.tsx` reveals this component — below it the toolbar is the modal's job and
+ * these never render, so the override is inert on mobile.
+ */
+const TRIGGER_SHAPE = 'sm:rounded-xl';
 
 /** Slider ceilings. At the ceiling the filter means "no upper bound", not "at most N". */
 const MAX_PRICE = 5_000_000;
@@ -37,7 +44,6 @@ function priceToNum(v: string): number {
  */
 export function QuickFilters() {
   const { filters, updateFilter, setFilters } = useFilters();
-  const activeCount = countActiveFilters(filters);
 
   const minPriceNum = priceToNum(filters.minPrice);
   const maxPriceNum = priceToNum(filters.maxPrice) || MAX_PRICE;
@@ -80,8 +86,8 @@ export function QuickFilters() {
   }
 
   return (
-    <div className="flex flex-wrap items-center gap-4">
-      <Dropdown label="Tipo" active={filters.types.length > 0}>
+    <div className="flex flex-wrap items-center gap-2">
+      <Dropdown label="Tipo" active={filters.types.length > 0} triggerClassName={TRIGGER_SHAPE}>
         {() => (
           // Multi-select, and the panel stays open between picks. It used to be a
           // ChipGroup bound to `types[0]`, so choosing a type *replaced* the whole
@@ -97,7 +103,7 @@ export function QuickFilters() {
                   aria-pressed={selected}
                   onClick={() => toggleType(option.value)}
                   className={cn(
-                    'min-h-11 rounded-full border px-4 text-sm font-medium transition-colors',
+                    'min-h-11 border rounded-xl px-4 text-sm font-medium transition-colors',
                     selected
                       ? 'border-action bg-action/10 text-action'
                       : 'border-border bg-surface-raised text-foreground md:hover:border-foreground-subtle/40',
@@ -111,7 +117,11 @@ export function QuickFilters() {
         )}
       </Dropdown>
 
-      <Dropdown label="Negócio" active={Boolean(filters.businessType)}>
+      <Dropdown
+        label="Negócio"
+        active={Boolean(filters.businessType)}
+        triggerClassName={TRIGGER_SHAPE}
+      >
         {(close) => (
           <ChipGroup
             options={BUSINESS_TYPE_OPTIONS}
@@ -124,37 +134,33 @@ export function QuickFilters() {
         )}
       </Dropdown>
 
-      <Dropdown label="Valor" active={hasPriceFilter} panelClassName="w-80">
-        {() => (
-          <RangeFilter
-            min={0}
-            max={MAX_PRICE}
-            step={10_000}
-            value={[minPriceNum, maxPriceNum]}
-            onChange={handlePriceRange}
-            prefix="R$"
-          />
-        )}
-      </Dropdown>
+      {/* The two ranges commit on "Aplicar filtro" rather than on every change — see
+          `RangeFilterDropdown` for why the slider is the exception to this toolbar's
+          write-straight-through rule. The handlers below are unchanged; only *when* they
+          run is. */}
+      <RangeFilterDropdown
+        label="Valor"
+        active={hasPriceFilter}
+        triggerClassName={TRIGGER_SHAPE}
+        min={0}
+        max={MAX_PRICE}
+        step={10_000}
+        value={[minPriceNum, maxPriceNum]}
+        onApply={handlePriceRange}
+        prefix="R$"
+      />
 
-      <Dropdown label="Área total" active={hasAreaFilter} panelClassName="w-80">
-        {() => (
-          <RangeFilter
-            min={0}
-            max={MAX_TOTAL_AREA}
-            step={5}
-            value={[minAreaNum, maxAreaNum]}
-            onChange={handleAreaRange}
-            suffix="m²"
-          />
-        )}
-      </Dropdown>
-
-      {activeCount > 0 && (
-        <span className="text-sm font-medium text-action">
-          {activeCount} filtro{activeCount !== 1 ? 's' : ''} ativo{activeCount !== 1 ? 's' : ''}
-        </span>
-      )}
+      <RangeFilterDropdown
+        label="Área total"
+        active={hasAreaFilter}
+        triggerClassName={TRIGGER_SHAPE}
+        min={0}
+        max={MAX_TOTAL_AREA}
+        step={5}
+        value={[minAreaNum, maxAreaNum]}
+        onApply={handleAreaRange}
+        suffix="m²"
+      />
     </div>
   );
 }

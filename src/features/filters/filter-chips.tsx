@@ -135,7 +135,7 @@ export function FilterChips({ className }: { className?: string }) {
             <button
               type="button"
               onClick={() => setFilters(DEFAULT_FILTERS)}
-              className="min-h-8 px-2 text-sm font-medium text-muted-foreground underline-offset-2 transition-colors md:hover:text-foreground md:hover:underline"
+              className="min-h-8 px-2 text-sm font-medium text-muted-foreground underline-offset-2 transition-colors md:hover:text-foreground"
             >
               Limpar tudo
             </button>

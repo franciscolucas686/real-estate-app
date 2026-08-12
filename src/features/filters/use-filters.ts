@@ -40,10 +40,21 @@ export function useFilters(): UseFiltersResult {
       setSearchParams(
         (current) => {
           const params = serializeFilters(next);
-          // Carry over params this module doesn't own (e.g. `page`). `serializeFilters`
-          // returns only filter keys, so without this a filter change would drop
-          // `?page=3` on the floor.
+          // Carry over params this module doesn't own — `serializeFilters` returns only
+          // filter keys, so without this loop an unrelated `?utm_source=` or `?ref=`
+          // would be dropped on the floor by any filter change.
           current.forEach((value, key) => {
+            // `page` is the one exception, and not arbitrarily: it is an offset *into a
+            // result set the filters define*. Changing a filter redefines that set, so the
+            // old offset means nothing — carrying it over lands the visitor on an empty
+            // page whose pager has vanished (`ui/pagination.tsx` renders nothing at
+            // `totalPages <= 1`), with the header still announcing a non-zero count. The
+            // dashboard already encodes the same rule as `setParam`'s `resetPage`; this is
+            // where the storefront gets it, because the six call sites that write filters
+            // (`quick-filters`, `filters-modal`, `filter-chips`, `use-filter-text-input`
+            // and the sort `Select`) all go through here and none of them knows `page`
+            // exists.
+            if (key === 'page') return;
             if (!FILTER_PARAM_KEYS.has(key) && !params.has(key)) params.set(key, value);
           });
           return params;
