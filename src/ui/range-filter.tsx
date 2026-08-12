@@ -142,7 +142,7 @@ export function RangeFilter({
             aria-valuemax={maxVal}
             aria-valuenow={minVal}
             className={cn(
-              'absolute top-1/2 flex size-11 -translate-x-1/2 -translate-y-1/2 cursor-grab items-center justify-center rounded-full bg-[#e5e7eb] shadow-md active:cursor-grabbing',
+              'absolute top-1/2 flex size-11 -translate-x-1/2 -translate-y-1/2 cursor-grab items-center justify-center rounded-full bg-border shadow-md active:cursor-grabbing',
               dragging === 'min' ? 'z-30' : 'z-9',
             )}
             style={{ left: `${minPercent}%` }}
@@ -156,8 +156,8 @@ export function RangeFilter({
             }}
           >
             <div className="flex gap-1">
-              <div className="h-3 w-0.5 rounded-full bg-gray-400" />
-              <div className="h-3 w-0.5 rounded-full bg-gray-400" />
+              <div className="h-3 w-0.5 rounded-full bg-muted-foreground" />
+              <div className="h-3 w-0.5 rounded-full bg-muted-foreground" />
             </div>
           </div>
           {/* Max thumb */}
@@ -169,7 +169,7 @@ export function RangeFilter({
             aria-valuemax={max}
             aria-valuenow={maxVal}
             className={cn(
-              'absolute top-1/2 flex size-11 -translate-x-1/2 -translate-y-1/2 cursor-grab items-center justify-center rounded-full bg-[#e5e7eb] shadow-md active:cursor-grabbing',
+              'absolute top-1/2 flex size-11 -translate-x-1/2 -translate-y-1/2 cursor-grab items-center justify-center rounded-full bg-border shadow-md active:cursor-grabbing',
               dragging === 'max' ? 'z-30' : 'z-9',
             )}
             style={{ left: `${maxPercent}%` }}
@@ -183,8 +183,8 @@ export function RangeFilter({
             }}
           >
             <div className="flex gap-1">
-              <div className="h-3 w-0.5 rounded-full bg-gray-400" />
-              <div className="h-3 w-0.5 rounded-full bg-gray-400" />
+              <div className="h-3 w-0.5 rounded-full bg-muted-foreground" />
+              <div className="h-3 w-0.5 rounded-full bg-muted-foreground" />
             </div>
           </div>
         </div>

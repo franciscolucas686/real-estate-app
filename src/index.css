@@ -54,8 +54,16 @@
   --color-neutral-subtle: #f1f5f9;
   --color-neutral-foreground: #ffffff;
 
-  /* Brand */
-  --color-whatsapp: #25d366;
+  /* Brand — WhatsApp, darkened from the official #25d366.
+     The brand hex is a light green: 2.0:1 against white, and 1.8:1 against the 10% tint it
+     is actually drawn on in `contact.tsx`, which is the adjacent colour WCAG 1.4.11 measures.
+     This value keeps the hue recognisably WhatsApp while clearing 3:1 on both (3.49:1 and
+     ~3.13:1). The icon is decorative — the word "WhatsApp" sits beside it — so the rule does
+     not strictly bite; a brand token nobody could put on text is a token half-built.
+
+     It was declared here with zero consumers while the one place that draws the mark used a
+     raw `emerald-500`, which is not even the brand hue. */
+  --color-whatsapp: #1a9e4d;
 
   /* Border / ring */
   --color-border: #e2e8f0;
