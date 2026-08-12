@@ -59,4 +59,30 @@ describe('SiteShell', () => {
     expect(bottomBar()).toBeNull();
     expect(topBar()).not.toBeNull();
   });
+
+  /**
+   * A nav rola embora com a página em toda rota — não fixa em nenhuma.
+   *
+   * Vale afirmar a negativa porque `md:sticky` é a mudança de uma palavra, e o estrago não
+   * aparece aqui: quando a nav fixa, ela ocupa a faixa do topo, e todo sticky de página
+   * passa a precisar reservar `--site-nav-height` acima de si. `position: sticky` mede a
+   * partir do viewport, nunca do fim da nav. O rail do property-details (`md:top-6`) é
+   * quem paga — foi exatamente o bug que ele já teve.
+   */
+  it('a nav não fixa no topo', () => {
+    renderAt('/login');
+
+    expect(topBar()).not.toHaveClass('md:sticky');
+  });
+
+  /**
+   * A altura segue declarada, mesmo sem ninguém precisando escapar dela: derivá-la de
+   * `py-10` mais o filho mais alto dá 80px abaixo de `lg` e ~110px fluidos acima, porque o
+   * logo entra em `text-lg`. O token é o que torna isso um número, e não um resultado.
+   */
+  it('a nav declara a própria altura', () => {
+    renderAt('/login');
+
+    expect(topBar()).toHaveClass('md:h-(--site-nav-height)');
+  });
 });

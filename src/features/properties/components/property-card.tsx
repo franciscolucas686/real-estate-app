@@ -28,7 +28,9 @@ export function PropertyCard({ property, className }: PropertyCardProps) {
       {/* Image carousel — full width, no padding */}
       <div className="relative">
         {hasImages ? (
-          <Carousel>
+          // No arrows: the card's photo is a preview, and the whole card is a click target
+          // leading to the property. Swiping, the dots and the arrow keys still page it.
+          <Carousel showArrows={false}>
             {property.previewImages.map((img, i) => (
               <img
                 key={img.id}

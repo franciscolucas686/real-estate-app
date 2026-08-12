@@ -73,7 +73,14 @@ function AppRoutes() {
   );
 
   if (route.shell === 'console') {
-    return <ConsoleShell showMobileNav={!route.hideMobileNav}>{pages}</ConsoleShell>;
+    // Same `siteNavItems` the storefront gets: the bottom bar is the same bar with the same
+    // entries in both shells, so signing in doesn't rearrange it. Free to compute — the hook
+    // already ran above, unconditionally.
+    return (
+      <ConsoleShell items={siteNavItems} showMobileNav={!route.hideMobileNav}>
+        {pages}
+      </ConsoleShell>
+    );
   }
   return (
     <SiteShell items={siteNavItems} showMobileNav={!route.hideMobileNav}>

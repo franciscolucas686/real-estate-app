@@ -16,7 +16,7 @@ import {
 import { PageContainer } from '@/layout/page-container';
 import { Modal } from '@/ui/modal';
 import { Button } from '@/ui/button';
-import { Input } from '@/ui/input';
+import { NumericInput } from '@/ui/numeric-input';
 import { Pagination } from '@/ui/pagination';
 import { PropertyStatus } from '@/shared/api/types';
 import { cn } from '@/shared/cn';
@@ -131,11 +131,14 @@ export function Dashboard() {
    */
   const [searchParams, setSearchParams] = useSearchParams();
   const statusFilter = parseStatus(searchParams.get('status'));
-  const codeSearch = searchParams.get('code') ?? '';
+  const codeSearch = parseCode(searchParams.get('code'));
   const page = Math.max(1, Number(searchParams.get('page')) || 1);
 
   const setParam = useCallback(
-    (updates: Record<string, string | null>, options?: { resetPage?: boolean }) => {
+    (
+      updates: Record<string, string | null>,
+      options?: { resetPage?: boolean; replace?: boolean },
+    ) => {
       setSearchParams(
         (current) => {
           const next = new URLSearchParams(current);
@@ -147,7 +150,9 @@ export function Dashboard() {
           return next;
         },
         // Changing a filter replaces; paging pushes, so Back returns to the previous page.
-        { replace: options?.resetPage ?? false },
+        // `replace` is separate so the out-of-range correction below can replace without
+        // also being a page reset.
+        { replace: options?.replace ?? options?.resetPage ?? false },
       );
     },
     [setSearchParams],
@@ -164,7 +169,7 @@ export function Dashboard() {
   useEffect(() => {
     if (codeDraft === codeSearch) return;
     const timer = setTimeout(
-      () => setParam({ code: codeDraft.trim() }, { resetPage: true }),
+      () => setParam({ code: codeDraft }, { resetPage: true }),
       SEARCH_DEBOUNCE_MS,
     );
     return () => clearTimeout(timer);
@@ -182,12 +187,29 @@ export function Dashboard() {
     // Always server-side. It used to be server-side on desktop and a client-side
     // `includes()` over the batch of 100 on mobile — the same control behaving
     // differently depending on the device.
-    ...(codeSearch.trim() ? { code: codeSearch.trim() } : {}),
+    ...(codeSearch ? { code: codeSearch } : {}),
   });
 
   const properties = data?.data ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  /**
+   * `page` lives in the URL, so a bookmark can arrive already out of range — "pending
+   * properties, page 9", opened after the queue was worked down. No filter changed, so
+   * `resetPage` never fires, and nothing on screen recovers: the grid is empty while the
+   * heading still counts the real total, and `Pagination` renders nothing at
+   * `totalPages <= 1`, leaving no control to click.
+   *
+   * Gated on `data` rather than on `total`, because `total` falls back to `0` while a query
+   * is in flight — reading it too early would compute `totalPages === 1` and "correct" a
+   * perfectly valid page mid-load. `replace` because a broken offset is not a place the back
+   * button should return to.
+   */
+  useEffect(() => {
+    if (!data || page <= totalPages) return;
+    setParam({ page: totalPages === 1 ? null : String(totalPages) }, { replace: true });
+  }, [data, page, totalPages, setParam]);
 
   const deleteProperty = useSoftDeleteProperty();
   const changeStatus = useUpdatePropertyStatus();
@@ -300,7 +322,7 @@ export function Dashboard() {
         maxWidth="wide"
         className="flex flex-wrap items-center justify-between gap-3 pb-3"
       >
-        <h2 className="text-lg font-bold text-foreground">
+        <h2 className="text-xl font-bold text-foreground">
           Meus imóveis{' '}
           {!isLoading && !isError && (
             <span className="text-sm font-medium text-muted-foreground">
@@ -315,9 +337,8 @@ export function Dashboard() {
             aria-hidden="true"
             className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
           />
-          <Input
+          <NumericInput
             type="search"
-            inputMode="numeric"
             aria-label="Buscar por código"
             placeholder="Buscar por código (ex: 575301)"
             value={codeDraft}
@@ -357,7 +378,7 @@ export function Dashboard() {
                 shape="pill"
                 onClick={() => setParam({ status: null, code: null }, { resetPage: true })}
               >
-                Limpar filtros
+                Limpar filtro
               </Button>
             ) : (
               <Button asChild shape="pill">
@@ -405,12 +426,25 @@ export function Dashboard() {
   );
 
   function emptyMessage() {
-    if (codeSearch.trim()) return 'Nenhum imóvel com esse código';
+    if (codeSearch) return 'Nenhum imóvel com esse código';
     if (statusFilter === PropertyStatus.ACTIVE) return 'Nenhum imóvel ativo';
     if (statusFilter === PropertyStatus.PENDING) return 'Nenhum imóvel pendente';
     if (statusFilter === PropertyStatus.INACTIVE) return 'Nenhum imóvel inativo';
     return 'Nenhum imóvel cadastrado';
   }
+}
+
+/**
+ * Só dígitos chegam à busca: `NumericInput` não deixa digitar outra coisa, e um `?code=`
+ * editado à mão não pode afirmar o contrário — o valor é adotado no campo durante o
+ * render, então ele exibiria algo que o próprio campo não consegue produzir. Um valor
+ * inválido é ignorado, não limpo para os dígitos: buscar por `575` porque alguém mandou
+ * `57a5` fabrica uma consulta que ninguém pediu. Mesma regra do `code` em
+ * `features/filters/filter-params.ts`.
+ */
+function parseCode(value: string | null): string {
+  const trimmed = value?.trim() ?? '';
+  return /^\d*$/.test(trimmed) ? trimmed : '';
 }
 
 /** Narrows an arbitrary query-string value to a status, or null. */

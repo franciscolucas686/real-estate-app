@@ -60,15 +60,31 @@ describe('useFilters', () => {
     expect(result.current.filters).toEqual(DEFAULT_FILTERS);
   });
 
-  it('preserva params que não são filtros, como page', () => {
-    // Sem isso, mexer num filtro descartaria a paginação — serializeFilters só devolve
-    // chaves de filtro.
+  it('preserva params que não são filtros', () => {
+    // `serializeFilters` só devolve chaves de filtro, então sem o carry-over qualquer param
+    // alheio — a origem de uma campanha, um `ref` — sumiria ao mexer num filtro.
+    const { result } = setup('/?utm_source=whatsapp&city=Sorocaba');
+
+    act(() => result.current.updateFilter('minBedrooms', 2));
+
+    expect(result.current.search).toContain('utm_source=whatsapp');
+    expect(result.current.search).toContain('minBedrooms=2');
+  });
+
+  it('descarta o page ao mexer num filtro — o offset antigo não vale no conjunto novo', () => {
+    // Este caso já existiu com a asserção invertida, preservando o `page` junto com os
+    // demais params. `page` é a exceção: filtrar para 5 resultados estando em `page=3`
+    // pedia `skip=24`, a API devolvia lista vazia, e o `Pagination` não renderiza nada em
+    // `totalPages <= 1` — o visitante ficava numa página vazia sem controle para voltar,
+    // com o cabeçalho ainda anunciando "5 imóveis encontrados".
     const { result } = setup('/?page=3&city=Sorocaba');
 
     act(() => result.current.updateFilter('minBedrooms', 2));
 
-    expect(result.current.search).toContain('page=3');
+    expect(result.current.search).not.toContain('page');
     expect(result.current.search).toContain('minBedrooms=2');
+    // O filtro que já estava lá sobrevive — o reset é do offset, não da busca.
+    expect(result.current.search).toContain('city=Sorocaba');
   });
 
   it('setFilters aplica em lote e o resultado é reversível pelo histórico', () => {

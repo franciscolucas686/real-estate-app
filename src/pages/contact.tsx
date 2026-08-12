@@ -56,7 +56,7 @@ export function Contact() {
           rel="noopener noreferrer"
           className="flex items-center gap-4 rounded-2xl border border-border bg-surface-raised px-5 py-4 transition-colors active:bg-border md:hover:border-foreground-subtle/30 md:hover:bg-border/20"
         >
-          <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
+          <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-whatsapp/10 text-whatsapp">
             <FaWhatsapp size={22} />
           </div>
           <div className="flex-1">

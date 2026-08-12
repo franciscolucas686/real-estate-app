@@ -64,6 +64,16 @@ describe('Dashboard', () => {
     await waitFor(() => expect(screen.getAllByRole('article').length).toBe(4));
   });
 
+  it('um page fora de alcance é corrigido em vez de mostrar a grade vazia', async () => {
+    // Um favorito de "pendentes, página 9" aberto depois que a fila foi resolvida. Nenhum
+    // filtro mudou, então o `resetPage` não dispara — e sem a correção sobrava uma grade
+    // vazia com o cabeçalho contando 16, sem pager (`Pagination` não renderiza em
+    // `totalPages <= 1`) e portanto sem controle para voltar.
+    render('/dashboard?page=9');
+
+    await waitFor(() => expect(screen.getAllByRole('article').length).toBe(4));
+  });
+
   it('filtrar por status a partir do card de contagem', async () => {
     const user = userEvent.setup();
     render();
@@ -92,6 +102,27 @@ describe('Dashboard', () => {
     // Antes: server-side no desktop e `includes()` no cliente sobre um lote de 100 no
     // mobile — o mesmo controle com semântica diferente por dispositivo.
     await waitFor(() => expect(requestedCode).toBe('575305'));
+  });
+
+  it('a busca por código recusa o que não é dígito', async () => {
+    const user = userEvent.setup();
+    let requestedCode: string | null = null;
+
+    server.use(
+      http.get('/api/properties', ({ request }) => {
+        requestedCode = new URL(request.url).searchParams.get('code');
+        return HttpResponse.json({ data: [], total: 0, skip: 0, take: 12 });
+      }),
+    );
+
+    render();
+    const input = screen.getByRole('searchbox', { name: 'Buscar por código' });
+    await user.type(input, '57a5-301');
+
+    // Nem na tela nem no request: o campo é um `NumericInput`, então uma letra não tem por
+    // onde entrar — e o `?code=` que chega da URL passa por `parseCode`.
+    expect(input).toHaveValue('575301');
+    await waitFor(() => expect(requestedCode).toBe('575301'));
   });
 
   it('mostra erro com retry quando a listagem falha — a página ignorava isError', async () => {
@@ -124,7 +155,7 @@ describe('Dashboard', () => {
     render('/dashboard?status=INACTIVE');
 
     expect(await screen.findByText('Nenhum imóvel inativo')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Limpar filtros' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Limpar filtro' })).toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: 'Cadastrar meu primeiro imóvel' }),
     ).not.toBeInTheDocument();

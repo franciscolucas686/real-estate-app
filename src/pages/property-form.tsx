@@ -8,6 +8,7 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import type { LatLngExpression } from 'leaflet';
 import { apiFetch } from '@/shared/api/api-client';
 import { cn } from '@/shared/cn';
+import { onlyDigits } from '@/shared/digits';
 import { formatPrice } from '@/shared/format';
 import { PageContainer } from '@/layout/page-container';
 import { Button } from '@/ui/button';
@@ -469,7 +470,7 @@ function PropertyFormInner({
             <button
               type="button"
               onClick={handleBack}
-              className="flex size-14 bg-border/60 shrink-0 items-center justify-center rounded-full transition-colors md:hover:bg-action md:hover:text-primary-foreground"
+              className="flex size-14 shrink-0 items-center justify-center rounded-full transition-colors bg-border md:hover:bg-action md:hover:text-primary-foreground"
               aria-label="Voltar"
             >
               <ChevronLeft size={24} aria-hidden="true" />
@@ -701,7 +702,7 @@ function Toggle({
       >
         <div
           className={cn(
-            'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform',
+            'absolute top-0.5 h-5 w-5 rounded-full bg-surface-raised shadow transition-transform',
             value ? 'translate-x-5' : 'translate-x-0.5',
           )}
         />
@@ -741,7 +742,7 @@ function Step1({ form, set, onSubmit }: { form: FormState; set: Setter; onSubmit
                 type="button"
                 onClick={() => set('type', opt.value)}
                 className={cn(
-                  'min-h-11 rounded-full border px-4 text-sm font-medium transition-colors',
+                  'min-h-11 rounded-xl border px-4 text-sm font-medium transition-colors',
                   selected
                     ? 'border-action bg-action/10 text-action'
                     : 'border-border bg-surface-raised text-foreground',
@@ -790,7 +791,7 @@ function Step1({ form, set, onSubmit }: { form: FormState; set: Setter; onSubmit
                     )
                   }
                   className={cn(
-                    'rounded-full border px-4 py-2 text-sm font-medium transition-colors',
+                    'rounded-xl border px-4 py-2 text-sm font-medium transition-colors',
                     sel
                       ? 'border-action bg-action/10 text-action'
                       : 'border-border bg-surface-raised text-foreground',
@@ -811,7 +812,7 @@ function Step1({ form, set, onSubmit }: { form: FormState; set: Setter; onSubmit
             inputMode="numeric"
             placeholder="Ex: R$ 450.000"
             value={formatPrice(form.price)}
-            onChange={(v) => set('price', v.replace(/\D/g, ''))}
+            onChange={(v) => set('price', onlyDigits(v))}
           />
         </Field>
       )}
@@ -823,7 +824,7 @@ function Step1({ form, set, onSubmit }: { form: FormState; set: Setter; onSubmit
             inputMode="numeric"
             placeholder="Ex: R$ 2.500"
             value={formatPrice(form.rentPrice)}
-            onChange={(v) => set('rentPrice', v.replace(/\D/g, ''))}
+            onChange={(v) => set('rentPrice', onlyDigits(v))}
           />
         </Field>
       )}
@@ -834,7 +835,7 @@ function Step1({ form, set, onSubmit }: { form: FormState; set: Setter; onSubmit
           inputMode="numeric"
           placeholder="Ex: R$ 800"
           value={formatPrice(form.condoFee)}
-          onChange={(v) => set('condoFee', v.replace(/\D/g, ''))}
+          onChange={(v) => set('condoFee', onlyDigits(v))}
           onKeyDown={(e) => {
             if (e.key === 'Enter') onSubmit();
           }}

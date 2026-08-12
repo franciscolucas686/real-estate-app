@@ -23,10 +23,10 @@ export function ChipGroup({ options, value, onChange, className }: ChipGroupProp
             type="button"
             onClick={() => onChange(selected ? null : opt.value)}
             className={cn(
-              'min-h-11 rounded-full px-5 py-2.5 text-sm font-medium transition-colors',
+              'min-h-11 border rounded-xl px-5 py-2.5 text-sm font-medium transition-colors',
               selected
-                ? 'border border-secondary/40 bg-secondary/10 text-primary'
-                : 'bg-surface text-foreground',
+                ? 'border-action bg-action/10 text-action'
+                : 'border-border bg-surface-raised text-foreground md:hover:border-foreground-subtle/40',
             )}
           >
             {opt.label}

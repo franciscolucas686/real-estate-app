@@ -21,6 +21,7 @@ export function Button({
   className,
   variant,
   size,
+  shape,
   disabled,
   asChild = false,
   type,
@@ -39,7 +40,11 @@ export function Button({
       {...(asChild ? {} : { type: type ?? 'button', disabled })}
       data-slot="button"
       data-disabled={disabled ? '' : undefined}
-      className={cn(buttonVariants({ variant, size }), className)}
+      // `shape` has to be destructured and forwarded like `variant`/`size`. It was neither:
+      // `VariantProps` accepted it, so all 11 `shape="pill"` call sites typechecked, but the
+      // prop fell through to `...props` and onto the DOM while the button silently rendered
+      // the `control` default. That is how the circular FAB became a rounded square.
+      className={cn(buttonVariants({ variant, size, shape }), className)}
       {...props}
     >
       {children}

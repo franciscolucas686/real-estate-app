@@ -46,7 +46,11 @@ const filterParamsSchema = z.object({
   businessType: z.enum(BusinessType).optional().catch(undefined),
   types: csv(Object.values(PropertyType)),
   saleTypes: csv(Object.values(SaleType)),
-  code: z.string().trim().max(32).catch(''),
+  // Só dígitos, como `ui/numeric-input.tsx` deixa digitar. Sem isso um `?code=abc` é
+  // adotado durante o render por `useFilterTextInput` e mostra no campo um valor que o
+  // próprio campo não consegue produzir. Ignorado em vez de limpo para os dígitos: `57a5`
+  // virar uma busca por `575` fabrica uma consulta que ninguém pediu.
+  code: z.string().trim().max(32).regex(/^\d*$/).catch(''),
   city: z.string().trim().max(80).catch(''),
   state: z.string().trim().max(2).catch(''),
   neighborhood: z.string().trim().max(80).catch(''),

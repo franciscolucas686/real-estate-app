@@ -44,7 +44,17 @@ export function TopNav({
       data-slot="top-nav"
       aria-label="Navegação principal"
       className={cn(
-        'relative z-(--z-nav) hidden shrink-0 items-center gap-6 bg-primary px-10 py-10 md:sticky md:top-0 md:flex lg:px-12',
+        // Not sticky: the nav scrolls away with the page and comes back when the reader
+        // returns to the top. It used to pin, which meant every sticky element on a page had
+        // to reserve `--site-nav-height` above itself or spend the whole scroll behind the
+        // bar — the property detail's contact rail did exactly that. Pinning it again means
+        // reintroducing that clearance everywhere, not just flipping this class.
+        //
+        // The height stays declared rather than derived from `py-10` plus the tallest
+        // in-flow child, which is *nothing* below `lg` and a fluid `text-lg` logo above it.
+        // `--site-nav-height` is defined in `index.css`; applied here so the token and the
+        // element it measures cannot disagree.
+        'relative z-(--z-nav) hidden shrink-0 items-center gap-6 bg-primary px-10 md:flex md:h-(--site-nav-height) lg:px-12',
         className,
       )}
       {...props}
@@ -109,25 +119,8 @@ export function BottomNav({ className, ...props }: ComponentProps<'nav'>) {
   );
 }
 
-/**
- * `active` overrides the derived state instead of adding to it.
- *
- * `useIsActive` is a prefix match, which is the right default for the storefront but wrong
- * for the console: there, `/dashboard` is labelled "Imóveis" and has to stay lit across
- * `/properties/new` and `/properties/:id/gallery` — paths that share no prefix with it —
- * while "Ver o site" (`/`) must never light up at all. That policy belongs to the console,
- * not to the design system, so `ConsoleShell` computes it and passes it down. Deriving it
- * here for both callers is what would force `owns` into this file.
- */
-export function BottomNavItem({
-  icon,
-  label,
-  to,
-  active: activeOverride,
-  className,
-}: NavItem & { active?: boolean; className?: string }) {
-  const derived = useIsActive(to);
-  const active = activeOverride ?? derived;
+export function BottomNavItem({ icon, label, to, className }: NavItem & { className?: string }) {
+  const active = useIsActive(to);
 
   return (
     <Link
