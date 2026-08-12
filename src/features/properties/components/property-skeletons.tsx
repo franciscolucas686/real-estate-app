@@ -45,10 +45,13 @@ export function PropertyDetailSkeleton() {
     >
       <div className="grid gap-6 md:grid-cols-[minmax(0,1fr)_340px] md:items-start md:gap-10 lg:grid-cols-[minmax(0,1fr)_380px]">
         <div className="flex flex-col gap-3 md:col-start-1 md:row-start-1">
-          <Skeleton className="-mx-gutter aspect-16/10 w-auto rounded-none md:mx-0 md:rounded-2xl" />
-          <div className="hidden grid-cols-6 gap-2 md:grid">
+          {/* The desktop half tracks the real media exactly — same `16/9` then `21/9`, same
+              ceiling, same `h-20` strip appearing only at `lg` — so the photo landing
+              doesn't shove the page down. */}
+          <Skeleton className="-mx-gutter aspect-16/10 w-auto rounded-none md:mx-0 md:aspect-16/9 md:max-h-(--property-photo-max-height) md:rounded-2xl lg:aspect-21/9" />
+          <div className="hidden grid-cols-6 gap-2 lg:grid">
             {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="aspect-square w-full rounded-lg" />
+              <Skeleton key={i} className="h-20 w-full rounded-lg" />
             ))}
           </div>
         </div>

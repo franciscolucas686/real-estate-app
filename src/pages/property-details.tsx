@@ -225,6 +225,7 @@ export function PropertyDetails() {
               <PropertyMediaCarousel
                 images={allImages}
                 onOpenGallery={() => setGalleryOpen(true)}
+                onOpenViewer={(i) => setViewerIndex(i)}
                 showDots={false}
               />
               {isPostCreate ? (
@@ -239,27 +240,51 @@ export function PropertyDetails() {
                   Editar imóvel
                 </button>
               ) : (
+                /* `md:hidden`, and no `md:` styling left on it for the same reason the
+                   sticky CTA carries none: the element does not render at that width, so
+                   any desktop class would be dead and would tell the next reader
+                   otherwise. `DetailBreadcrumb` is the way out from `md` up — its docblock
+                   states the other half of this, and the two are now genuinely exclusive
+                   rather than merely different in size. */
                 <button
                   type="button"
                   onClick={() => navigate(-1)}
                   aria-label="Voltar"
-                  className="absolute left-3 top-[calc(env(safe-area-inset-top,12px)+12px)] z-(--z-raised) flex size-12 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-transform active:scale-90 md:top-3 md:size-11 md:hover:bg-black/55"
+                  className="absolute left-3 top-[calc(env(safe-area-inset-top,12px)+12px)] z-(--z-raised) flex size-12 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-transform active:scale-90 md:hidden"
                 >
                   <ChevronLeft size={22} aria-hidden="true" />
                 </button>
               )}
             </div>
 
-            {/* Thumbnail strip: only useful where there's room for it to be tappable. */}
+            {/* Thumbnail strip: only useful where there's room for it to be tappable, which
+                is why it starts at `lg` and not `md`. Between the two the media column is
+                308–563px wide, so six tiles plus five gaps left each one too small to aim
+                at. Being `hidden lg:grid`, the tiles below need no breakpoint gating of
+                their own to send the viewer everything from `lg` up.
+
+                Three things move with this boundary and have to keep moving together: the
+                photo's proportion (`lg:aspect-21/9`, which exists to fit *beside* this
+                strip), the "Ver todas" pill (`lg:hidden`, the affordance that covers the
+                band where this one is absent), and the strip term in
+                `--property-photo-max-height`.
+
+                The tiles are a fixed `h-20` rather than `aspect-square`, and that is the
+                other half of a decision made in `index.css`. A square tile's height is
+                whatever the media column's width divided by six happens to be — 120px to
+                147px across the widths where it now renders — so the strip could only
+                enter that token's accounting as a worst-case guess, and the photo would
+                pay ~60px for it at every size. Raise this height without raising that term
+                and the strip starts falling off the viewport again. */}
             {allImages.length > 0 && (
-              <div className="hidden grid-cols-6 gap-2 md:grid">
+              <div className="hidden grid-cols-6 gap-2 lg:grid">
                 {allImages.slice(0, 5).map((img, i) => (
                   <button
                     key={img.id}
                     type="button"
                     onClick={() => setViewerIndex(i)}
                     aria-label={`Ver foto ${i + 1}`}
-                    className="aspect-square overflow-hidden rounded-lg"
+                    className="h-20 overflow-hidden rounded-lg"
                   >
                     <img
                       src={img.url}
@@ -270,11 +295,15 @@ export function PropertyDetails() {
                   </button>
                 ))}
                 {allImages.length > 5 && (
+                  /* Opens the viewer on the photo it shows (`allImages[5]`), the same rule
+                     the five tiles before it follow. The label still says "todas" because
+                     the destination really is the whole set — the viewer browses every
+                     photo; only the door changed, from the mosaic to the viewer. */
                   <button
                     type="button"
-                    onClick={() => setGalleryOpen(true)}
+                    onClick={() => setViewerIndex(5)}
                     aria-label={`Ver todas as ${allImages.length} fotos`}
-                    className="relative aspect-square overflow-hidden rounded-lg"
+                    className="relative h-20 overflow-hidden rounded-lg"
                   >
                     <img
                       src={allImages[5].url}
@@ -292,6 +321,14 @@ export function PropertyDetails() {
           </div>
 
           {/* ── Contact rail ──────────────────────────────────────────────── */}
+          {/* 24px from the viewport, which is correct only because `TopNav` no longer pins —
+              it scrolls away with the page instead of holding the top band. While it is
+              still leaving, it paints over the rail (it carries `z-(--z-nav)`, the rail
+              carries none), which reads fine for something on its way out.
+
+              Pin the nav again and this offset has to clear `--site-nav-height`, or the rail
+              spends every scroll behind the bar, badges and title included — the bug it
+              used to have. The two are one decision made in two files. */}
           <aside className="flex flex-col gap-4 md:col-start-2 md:row-span-2 md:row-start-1 md:sticky md:top-6 md:self-start md:rounded-2xl md:border md:border-border md:bg-surface-raised md:p-6 md:shadow-sm">
             <div className="flex flex-wrap gap-2">
               {/* Only meaningful to someone who can change it. A visitor can only ever see
@@ -520,9 +557,9 @@ export function PropertyDetails() {
           Portaled to escape the route-transition transform, which would otherwise
           become the containing block for this fixed overlay.
 
-          `md:hidden` because the desktop rail (`md:sticky md:top-6`) already keeps the
-          WhatsApp CTA in view permanently — this bar exists to solve a problem the rail
-          does not have.
+          `md:hidden` because the desktop rail (sticky below the nav, see its offset above)
+          already keeps the WhatsApp CTA in view permanently — this bar exists to solve a
+          problem the rail does not have.
 
           It also fixes a condition that was quietly always-true on desktop: the gate below
           is `ctaBottom < headerH`, and `ctaRef` sits on a `md:hidden` div, so above `md`
@@ -608,8 +645,9 @@ export function PropertyDetails() {
           `md:hidden` completes an intent `DetailBreadcrumb` already documents: the overlaid
           back button is the phone's way out, the breadcrumb (`hidden md:flex`) is the
           desktop's. This half never got the matching class, so both rendered on a desktop.
-          Nothing is stranded — the button overlaid on the carousel renders at every width
-          (it has its own `md:` sizing), and this bar is only its scrolled-state copy. */}
+          Nothing is stranded — this bar is only the scrolled-state copy of the button
+          overlaid on the carousel, which is `md:hidden` too, so the pair is mobile-only at
+          both ends and the desktop has the trail. */}
       {createPortal(
         <AnimatePresence>
           {isPresent && stickyHeaderVisible && !mapFullscreen && (
@@ -823,7 +861,7 @@ function PropertySpecGrid({
       label: h.floors === 1 ? 'Térrea' : `${h.floors} andares`,
     });
     if (h.isInCondominium && h.condominiumName) {
-      items.push({ icon: <Building2 size={20} />, label: `Cond.: ${h.condominiumName}` });
+      items.push({ icon: <Building2 size={20} />, label: `Cond. ${h.condominiumName}` });
     }
   }
 
@@ -868,7 +906,7 @@ function PropertySpecGrid({
         <h2 className="text-lg font-semibold text-foreground md:text-xl">Características</h2>
       )}
       <div
-        className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4"
+        className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4"
         style={{ gridAutoRows: '1fr' }}
       >
         {items.map((item, i) => (

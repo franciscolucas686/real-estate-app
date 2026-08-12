@@ -20,6 +20,25 @@ window.HTMLElement.prototype.scrollIntoView = () => {};
 URL.createObjectURL = URL.createObjectURL ?? (() => 'blob:mock');
 URL.revokeObjectURL = URL.revokeObjectURL ?? (() => {});
 
+// jsdom doesn't implement ResizeObserver, and `useCarouselSwipe` constructs one on mount to
+// track the slide width. It went unnoticed until a spec first rendered a property *with*
+// photos: the throw happens in a passive effect, which React treats as fatal, so the whole
+// tree unmounted and the page under test rendered as an empty `<div />` — the failure read
+// as "element not found", pointing nowhere near the cause.
+//
+// A no-op is the honest stub rather than a fake observer: jsdom reports every element as
+// zero-sized, so a callback would only ever report a width of 0, which is what `offsetWidth`
+// already returns on the initial `updateWidth()` call. Nothing in a spec depends on the
+// carousel measuring itself — the swipe threshold that width feeds is deliberately not what
+// the drag-suppression logic uses, precisely so it stays observable here.
+window.ResizeObserver =
+  window.ResizeObserver ??
+  class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+
 // `useSwipeToSelect` calls this on every pointerdown, and jsdom has no layout to answer it
 // with. Without the stub the gallery spec's `user.click` — which dispatches the whole
 // pointer sequence, not just a click — threw a TypeError inside a React event handler.
@@ -34,10 +53,12 @@ URL.revokeObjectURL = URL.revokeObjectURL ?? (() => {});
 // keyboard on the checkbox — is untouched.
 document.elementFromPoint = document.elementFromPoint ?? (() => null);
 
-// jsdom doesn't implement matchMedia. Nothing in the app forks its component tree on
-// viewport width any more — `useIsDesktop` is gone and layout is CSS — but Radix and the
-// motion library both query it, so the polyfill stays. Reports "no match", which is also
-// what jsdom's zero-width viewport would imply.
+// jsdom doesn't implement matchMedia. Nothing in the app reads viewport width in JS at all
+// any more — `useIsDesktop` is gone, layout is CSS, and the gallery's one click-time
+// exception went with "Ver mais". The only remaining caller in `src/` asks about
+// `display-mode: standalone` (app.tsx), which is not a width. Radix and the motion library
+// query it too, so the polyfill stays. Reports "no match", which is also what jsdom's
+// zero-width viewport would imply.
 window.matchMedia =
   window.matchMedia ??
   ((query: string) => ({
