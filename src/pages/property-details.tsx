@@ -1,33 +1,9 @@
 import { useState, useRef, useEffect, useLayoutEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, useIsPresent } from 'motion/react';
 import { motion } from 'motion/react';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Pencil,
-  CheckCircle,
-  Bed,
-  Bath,
-  Car,
-  Maximize,
-  Home as HomeIcon,
-  Layers,
-  Building2,
-  ArrowUp,
-  Wind,
-  Sun,
-  Waves,
-  Map as MapIcon,
-  MapPin,
-  Triangle,
-  Droplets,
-  Trees,
-  Fish,
-  Workflow,
-  Ruler,
-} from 'lucide-react';
+import { ChevronLeft, Pencil, CheckCircle, MapPin } from 'lucide-react';
 import { FaWhatsapp } from 'react-icons/fa';
 import { useProperty } from '@/features/properties/hooks/use-property';
 import { PropertyMediaCarousel } from '@/features/properties/components/media/property-media-carousel';
@@ -40,30 +16,24 @@ import { PropertyMap } from '@/features/properties/components/property-map';
 import { StatusBadge } from '@/features/properties/components/status-badge';
 import {
   formatPrice,
-  formatArea,
   formatMainPrice,
   buildWhatsAppUrl,
   PropertyTypeLabel,
   BusinessTypeLabel,
   SaleTypeLabel,
-  SunPositionLabel,
-  formatZoning,
-  TopographyLabel,
-  WaterSourceLabel,
 } from '@/shared/format';
 import {
-  PropertyType,
   PropertyStatus,
   BusinessType,
   type PropertyDetailDto,
   type PropertyImageDto,
   type PropertyLocationDto,
-  type HouseDetailsDto,
-  type ApartmentDetailsDto,
-  type LandDetailsDto,
-  type SmallFarmDetailsDto,
-  type CountryHouseDetailsDto,
 } from '@/shared/api/types';
+import { Badge } from '@/features/properties/components/badge';
+import { DetailBreadcrumb } from '@/features/properties/components/detail-breadcrumb';
+import { PropertySpecGrid } from '@/features/properties/components/property-spec-grid';
+import { QuickSpecs } from '@/features/properties/components/quick-specs';
+import { SplashIdentity } from '@/features/properties/components/splash-identity';
 import { useMe } from '@/features/auth/use-auth';
 import { useScrollLock } from '@/shared/hooks/use-scroll-lock';
 import { cn } from '@/shared/cn';
@@ -627,16 +597,20 @@ export function PropertyDetails() {
           <p className="text-xl font-bold text-foreground">Imóvel criado!</p>
           <p className="text-sm text-muted-foreground">Revise o imóvel e finalize o cadastro.</p>
         </div>
+        <SplashIdentity property={property} />
       </SuccessSplash>
       {/* post-create: finalize success splash */}
       <SuccessSplash visible={finalizeSplashVisible}>
         <CheckCircle size={64} className="text-action" />
         <div className="flex flex-col items-center gap-1 text-center">
-          <p className="text-xl font-bold text-foreground">
-            Imóvel {property.code} <br />
-            finalizado com sucesso!
-          </p>
+          {/* The title states the outcome and nothing else. It used to read
+              "Imóvel 575301 / finalizado com sucesso!" with a hard `<br />` splitting the
+              sentence around the code — a line break placed for one string length, on a
+              screen whose width varies. The code moved into `SplashIdentity` below, where
+              it sits with the rest of what identifies the property. */}
+          <p className="text-xl font-bold text-foreground">Imóvel finalizado com sucesso!</p>
         </div>
+        <SplashIdentity property={property} />
       </SuccessSplash>
       {/* Sticky back button header — appears when carousel scrolls out of view.
           Portaled to escape the route-transition transform, which would otherwise
@@ -688,231 +662,5 @@ export function PropertyDetails() {
         document.body,
       )}
     </article>
-  );
-}
-
-/* ──────────────────── Breadcrumb ──────────────────── */
-
-/**
- * Hidden below `md`: on a phone the overlaid back button is the way out, and a trail
- * competing with it just costs vertical space above the photo.
- */
-function DetailBreadcrumb({ type }: { type: PropertyType }) {
-  return (
-    <nav
-      aria-label="Trilha"
-      className="hidden items-center gap-1.5 text-sm text-foreground-subtle md:flex"
-    >
-      <Link to="/" className="transition-colors md:hover:text-foreground">
-        Início
-      </Link>
-      <ChevronRight size={14} aria-hidden="true" />
-      <Link to="/imoveis" className="transition-colors md:hover:text-foreground">
-        Imóveis
-      </Link>
-      <ChevronRight size={14} aria-hidden="true" />
-      <span className="font-medium text-foreground">{PropertyTypeLabel[type]}</span>
-    </nav>
-  );
-}
-
-/* ──────────────────── QuickSpecs ──────────────────── */
-
-/**
- * The at-a-glance line: area, bedrooms, bathrooms, parking, dot-separated.
- *
- * Built as a list of present values so the separators land between items rather than
- * after every one — the previous version was an IIFE inside JSX doing the same thing with
- * `flatMap`, which is why it needed a comment to be readable.
- */
-function QuickSpecs({ property }: { property: PropertyDetailDto }) {
-  const items: string[] = [];
-
-  if (property.totalArea) items.push(formatArea(property.totalArea));
-  if (property.bedrooms != null) {
-    items.push(`${property.bedrooms} ${property.bedrooms === 1 ? 'quarto' : 'quartos'}`);
-  }
-  if (property.bathrooms != null) {
-    items.push(`${property.bathrooms} ${property.bathrooms === 1 ? 'banheiro' : 'banheiros'}`);
-  }
-  if (property.parkingSpaces != null) {
-    items.push(`${property.parkingSpaces} ${property.parkingSpaces === 1 ? 'vaga' : 'vagas'}`);
-  }
-
-  if (items.length === 0) return null;
-
-  return (
-    <>
-      {items.map((item, index) => (
-        <span key={item} className="flex items-center gap-3">
-          {index > 0 && (
-            <span className="text-foreground-subtle" aria-hidden="true">
-              •
-            </span>
-          )}
-          {item}
-        </span>
-      ))}
-    </>
-  );
-}
-
-/* ──────────────────── Badge ──────────────────── */
-function Badge({ color, children }: { color: string; children: React.ReactNode }) {
-  const colorMap: Record<string, string> = {
-    primary: 'bg-primary/10 text-primary',
-    action: 'bg-action/10 text-action',
-    accent: 'bg-accent/10 text-accent',
-    border: 'bg-border text-foreground-subtle',
-  };
-  return (
-    <span
-      className={cn(
-        'rounded-full px-3 py-1.5 text-xs font-semibold',
-        colorMap[color] ?? colorMap.border,
-      )}
-    >
-      {children}
-    </span>
-  );
-}
-
-/* ──────────────────── Spec grid ──────────────────── */
-function SpecItem({
-  icon,
-  label,
-  sublabel,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  sublabel?: string;
-}) {
-  return (
-    <div className="flex h-full items-center gap-2 rounded-xl border border-border bg-surface-raised px-3 py-3">
-      <span className="text-foreground-subtle">{icon}</span>
-      <div className="flex flex-col">
-        <span className="text-sm text-foreground">{label}</span>
-        {sublabel && <span className="text-xs text-foreground-subtle">{sublabel}</span>}
-      </div>
-    </div>
-  );
-}
-
-function PropertySpecGrid({
-  property,
-  showHeading = true,
-}: {
-  property: PropertyDetailDto;
-  showHeading?: boolean;
-}) {
-  const items: { icon: React.ReactNode; label: string; sublabel?: string }[] = [];
-
-  // Area items — shown separately so both are visible when available
-  if (property.builtArea != null) {
-    items.push({
-      icon: <Ruler size={20} />,
-      label: formatArea(property.builtArea),
-      sublabel: 'Área construída',
-    });
-  }
-  if (property.totalArea != null) {
-    items.push({
-      icon: <Maximize size={20} />,
-      label: formatArea(property.totalArea),
-      sublabel: 'Área total',
-    });
-  }
-
-  // Bedrooms + suites in a single card
-  if (property.bedrooms != null) {
-    const bedroomLabel = `${property.bedrooms} ${property.bedrooms === 1 ? 'quarto' : 'quartos'}`;
-    const suiteLabel =
-      property.suites != null
-        ? `(${property.suites} ${property.suites === 1 ? 'suíte' : 'suítes'})`
-        : undefined;
-
-    items.push({
-      icon: <Bed size={20} />,
-      label: bedroomLabel,
-      sublabel: suiteLabel,
-    });
-  }
-
-  if (property.bathrooms != null) {
-    items.push({
-      icon: <Bath size={20} />,
-      label: `${property.bathrooms} ${property.bathrooms === 1 ? 'banheiro' : 'banheiros'}`,
-    });
-  }
-  if (property.parkingSpaces != null) {
-    items.push({
-      icon: <Car size={20} />,
-      label: `${property.parkingSpaces} ${property.parkingSpaces === 1 ? 'vaga' : 'vagas'}`,
-    });
-  }
-
-  // Type-specific details
-  const d = property.details;
-
-  if (property.type === PropertyType.HOUSE && d) {
-    const h = d as HouseDetailsDto;
-    items.push({
-      icon: <Layers size={20} />,
-      label: h.floors === 1 ? 'Térrea' : `${h.floors} andares`,
-    });
-    if (h.isInCondominium && h.condominiumName) {
-      items.push({ icon: <Building2 size={20} />, label: `Cond. ${h.condominiumName}` });
-    }
-  }
-
-  if (property.type === PropertyType.APARTMENT && d) {
-    const a = d as ApartmentDetailsDto;
-    items.push({
-      icon: <Building2 size={20} />,
-      label: a.isGroundFloor ? 'Térreo' : `${a.floor}º andar`,
-    });
-    if (a.hasElevator) items.push({ icon: <ArrowUp size={20} />, label: 'Elevador' });
-    if (a.hasBalcony) items.push({ icon: <Wind size={20} />, label: 'Varanda' });
-    if (a.hasPool) items.push({ icon: <Waves size={20} />, label: 'Piscina' });
-    items.push({ icon: <Sun size={20} />, label: SunPositionLabel[a.sunPosition] });
-  }
-
-  if (property.type === PropertyType.LAND && d) {
-    const l = d as LandDetailsDto;
-    items.push({ icon: <MapIcon size={20} />, label: formatZoning(l.zoning) });
-    items.push({ icon: <Triangle size={20} />, label: TopographyLabel[l.topography] });
-  }
-
-  if (property.type === PropertyType.SMALL_FARM && d) {
-    const sf = d as SmallFarmDetailsDto;
-    items.push({ icon: <Droplets size={20} />, label: WaterSourceLabel[sf.waterSource] });
-    if (sf.hasHouse) items.push({ icon: <HomeIcon size={20} />, label: 'Casa sede' });
-    if (sf.hasPool) items.push({ icon: <Waves size={20} />, label: 'Piscina' });
-    if (sf.hasLake) items.push({ icon: <Fish size={20} />, label: 'Lago' });
-    if (sf.hasFruitTrees) items.push({ icon: <Trees size={20} />, label: 'Pomar' });
-  }
-
-  if (property.type === PropertyType.COUNTRY_HOUSE && d) {
-    const ch = d as CountryHouseDetailsDto;
-    if (ch.hasRiver) items.push({ icon: <Workflow size={20} />, label: 'Rio' });
-    if (ch.hasSpring) items.push({ icon: <Droplets size={20} />, label: 'Nascente' });
-  }
-
-  if (items.length === 0) return null;
-
-  return (
-    <div className="flex flex-col gap-6">
-      {showHeading && (
-        <h2 className="text-lg font-semibold text-foreground md:text-xl">Características</h2>
-      )}
-      <div
-        className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-4"
-        style={{ gridAutoRows: '1fr' }}
-      >
-        {items.map((item, i) => (
-          <SpecItem key={i} icon={item.icon} label={item.label} sublabel={item.sublabel} />
-        ))}
-      </div>
-    </div>
   );
 }
