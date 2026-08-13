@@ -277,23 +277,19 @@ describe('PropertyDetails', () => {
 
       const surface = screen.getByRole('button', { name: 'Ampliar foto 1' });
 
-      // O jsdom não implementa captura de ponteiro, e `onPointerDown` a chama.
-      const capture = Element.prototype.setPointerCapture;
-      Element.prototype.setPointerCapture = () => {};
+      // A captura de ponteiro que o `onPointerDown` chama está stubada em `test/setup.ts`,
+      // junto dos outros buracos do jsdom — este teste tinha uma cópia local disso, e duas
+      // soluções para o mesmo buraco fazem quem lê supor que a global não cobre o caso.
 
-      try {
-        // Um arrasto de verdade termina em `click` — mousedown e mouseup caem na mesma
-        // imagem. Sem a supressão no `use-carousel-swipe`, cada arrasto abriria o viewer.
-        fireEvent.pointerDown(surface, { pointerType: 'mouse', clientX: 200, pointerId: 1 });
-        fireEvent.pointerMove(surface, { pointerType: 'mouse', clientX: 120, pointerId: 1 });
-        fireEvent.pointerUp(surface, { pointerType: 'mouse', clientX: 120, pointerId: 1 });
-        fireEvent.click(surface);
+      // Um arrasto de verdade termina em `click` — mousedown e mouseup caem na mesma
+      // imagem. Sem a supressão no `use-carousel-swipe`, cada arrasto abriria o viewer.
+      fireEvent.pointerDown(surface, { pointerType: 'mouse', clientX: 200, pointerId: 1 });
+      fireEvent.pointerMove(surface, { pointerType: 'mouse', clientX: 120, pointerId: 1 });
+      fireEvent.pointerUp(surface, { pointerType: 'mouse', clientX: 120, pointerId: 1 });
+      fireEvent.click(surface);
 
-        expect(viewer()).toBeNull();
-        expect(mosaic()).toBeNull();
-      } finally {
-        Element.prototype.setPointerCapture = capture;
-      }
+      expect(viewer()).toBeNull();
+      expect(mosaic()).toBeNull();
     });
 
     /**
