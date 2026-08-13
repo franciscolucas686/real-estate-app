@@ -53,6 +53,24 @@ window.ResizeObserver =
 // keyboard on the checkbox — is untouched.
 document.elementFromPoint = document.elementFromPoint ?? (() => null);
 
+// jsdom implements no pointer capture at all, and three drag surfaces call it on every
+// `pointerdown`: `useCarouselSwipe`, `useSwipeToSelect` and `ui/range-filter`. It keeps
+// `pointermove` flowing when the pointer leaves the element mid-drag, so it is genuinely
+// needed at runtime — guarding the call with `?.` would bend production code around a test
+// environment, in three places instead of one.
+//
+// Same failure shape as `elementFromPoint` above, and it bit the same way: `user.click`
+// dispatches the whole pointer sequence, the TypeError landed inside a React event handler
+// where nothing catches it, and the run reported 25 files and 214 tests passing while
+// exiting 1. `grep`ping vitest's output for "FAIL" shows green on a run like that — the
+// honest check is the exit code.
+//
+// All three at once because stubbing one is choosing which test breaks next.
+// `hasPointerCapture` answers `false`, which is what "never captured" means.
+Element.prototype.setPointerCapture = Element.prototype.setPointerCapture ?? (() => {});
+Element.prototype.releasePointerCapture = Element.prototype.releasePointerCapture ?? (() => {});
+Element.prototype.hasPointerCapture = Element.prototype.hasPointerCapture ?? (() => false);
+
 // jsdom doesn't implement matchMedia. Nothing in the app reads viewport width in JS at all
 // any more — `useIsDesktop` is gone, layout is CSS, and the gallery's one click-time
 // exception went with "Ver mais". The only remaining caller in `src/` asks about
