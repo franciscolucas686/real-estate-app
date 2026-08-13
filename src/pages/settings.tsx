@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Plus, Trash2, Check, CheckCircle, Loader2 } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
@@ -9,12 +9,14 @@ import { BOTTOM_NAV_CLEARANCE } from '@/layout/app-nav';
 import { cn } from '@/shared/cn';
 import { onlyDigits } from '@/shared/digits';
 import { Input } from '@/ui/input';
+import { fetchWhatsappNumbers } from '@/features/settings/whatsapp-service';
+import { fetchSiteSettings } from '@/features/settings/site-settings-service';
+import { settingsKeys } from '@/features/settings/query-keys';
 import {
-  fetchWhatsappNumbers,
-  createWhatsappNumber,
-  deleteWhatsappNumber,
-} from '@/features/settings/whatsapp-service';
-import { fetchSiteSettings, updateSiteSettings } from '@/features/settings/site-settings-service';
+  useCreateWhatsappNumber,
+  useDeleteWhatsappNumber,
+  useUpdateSiteSettings,
+} from '@/features/settings/use-settings-mutations';
 import { formatPhone, formatPhoneAdaptive } from '@/shared/format';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { SettingsSkeleton } from '@/features/settings/settings-skeleton';
@@ -33,16 +35,28 @@ export function Settings() {
   const queryClient = useQueryClient();
 
   const [saved, setSaved] = useState(false);
-  const [initialized, setInitialized] = useState(false);
+  // A ref, not state: this only guards a one-time `reset()` and is never read during render,
+  // so setting it in the effect bought a second render pass for nothing. The lint rule that
+  // flags it was previously silent here — the compiler-based analysis bailed on the
+  // component while the three writes were hand-rolled try/catch/finally blocks.
+  const initialized = useRef(false);
   const [splashVisible, setSplashVisible] = useState(false);
   const [logoutSplashVisible, setLogoutSplashVisible] = useState(false);
-  const [savingContact, setSavingContact] = useState(false);
-  const [contactError, setContactError] = useState('');
 
-  const [addingNumber, setAddingNumber] = useState(false);
-  const [addNumberError, setAddNumberError] = useState('');
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState('');
+  // Three writes, three mutations. Each used to carry a hand-rolled pending flag and error
+  // string — six `useState`s for what `isPending`, `error` and `variables` already give.
+  const saveContact = useUpdateSiteSettings();
+  const addNumber = useCreateWhatsappNumber();
+  const deleteNumber = useDeleteWhatsappNumber();
+
+  const savingContact = saveContact.isPending;
+  const addingNumber = addNumber.isPending;
+  // Which row is spinning is the mutation's own input, not a second copy of it.
+  const deletingId = deleteNumber.isPending ? deleteNumber.variables : null;
+
+  const contactError = saveContact.error ? getErrorMessage(saveContact.error) : '';
+  const addNumberError = addNumber.error ? getErrorMessage(addNumber.error) : '';
+  const deleteError = deleteNumber.error ? getErrorMessage(deleteNumber.error) : '';
 
   // Both success flows hold a splash open, then redirect. Owning the timers in
   // effects (rather than starting them inside the handlers) means unmounting early
@@ -60,13 +74,13 @@ export function Settings() {
   }, [logoutSplashVisible, navigate]);
 
   const { data: numbers = [], isLoading } = useQuery({
-    queryKey: ['whatsapp-numbers'],
+    queryKey: settingsKeys.whatsappNumbers(),
     queryFn: fetchWhatsappNumbers,
     retry: false,
   });
 
   const { data: siteSettings, isLoading: loadingSettings } = useQuery({
-    queryKey: ['site-settings'],
+    queryKey: settingsKeys.siteSettings(),
     queryFn: fetchSiteSettings,
     retry: false,
   });
@@ -94,65 +108,52 @@ export function Settings() {
   });
 
   useEffect(() => {
-    if (siteSettings && !initialized) {
+    if (siteSettings && !initialized.current) {
       resetContact({
         email: siteSettings.email,
         phone: onlyDigits(siteSettings.phone).slice(0, 11),
         whatsapp: onlyDigits(siteSettings.whatsapp).slice(0, 11),
         hours: siteSettings.hours,
       });
-      setInitialized(true);
+      initialized.current = true;
     }
-  }, [siteSettings, initialized, resetContact]);
+  }, [siteSettings, resetContact]);
 
+  // The three handlers swallow the rejection rather than rethrow: the message is already on
+  // screen through `mutation.error`, and letting it escape an event handler would surface as
+  // an unhandled rejection instead.
   async function onSaveContact(values: SiteSettingsFormValues) {
-    setSavingContact(true);
-    setContactError('');
     try {
-      await updateSiteSettings(values);
-      await queryClient.invalidateQueries({ queryKey: ['site-settings'] });
+      await saveContact.mutateAsync(values);
       setSaved(true);
       setSplashVisible(true);
-    } catch (e) {
-      setContactError(getErrorMessage(e));
-    } finally {
-      setSavingContact(false);
+    } catch {
+      /* surfaced by `contactError` */
     }
   }
 
   async function onAddNumber(values: WhatsappNumberFormValues) {
-    setAddingNumber(true);
-    setAddNumberError('');
     try {
-      const created = await createWhatsappNumber({
+      const { created } = await addNumber.mutateAsync({
         number: values.number,
-        isActive: true,
+        isFirst: numbers.length === 0,
       });
+      // Mirror the promoted number into the contact field the operator is looking at, so it
+      // doesn't stay blank until the refetch lands.
       if (numbers.length === 0) {
-        const num = onlyDigits(created.number).slice(0, 11);
-        setContactValue('whatsapp', num);
-        await updateSiteSettings({ whatsapp: created.number });
-        await queryClient.invalidateQueries({ queryKey: ['site-settings'] });
+        setContactValue('whatsapp', onlyDigits(created.number).slice(0, 11));
       }
-      await queryClient.refetchQueries({ queryKey: ['whatsapp-numbers'] });
       resetNewNumber({ number: '' });
-    } catch (e) {
-      setAddNumberError(getErrorMessage(e));
-    } finally {
-      setAddingNumber(false);
+    } catch {
+      /* surfaced by `addNumberError` */
     }
   }
 
   async function handleDeleteNumber(id: string) {
-    setDeletingId(id);
-    setDeleteError('');
     try {
-      await deleteWhatsappNumber(id);
-      await queryClient.refetchQueries({ queryKey: ['whatsapp-numbers'] });
-    } catch (e) {
-      setDeleteError(getErrorMessage(e));
-    } finally {
-      setDeletingId(null);
+      await deleteNumber.mutateAsync(id);
+    } catch {
+      /* surfaced by `deleteError` */
     }
   }
 
