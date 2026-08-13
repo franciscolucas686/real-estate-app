@@ -112,6 +112,18 @@ export const handlers = [
     return errorResponse(401, 'E-mail ou senha incorretos.', 'Unauthorized');
   }),
 
+  /**
+   * The default session is "no session", which is what every page spec already assumed —
+   * they assert on what an anonymous visitor sees (`property-details` requires the status
+   * badge to be *absent*). It just wasn't declared: with no handler at all, MSW's
+   * `onUnhandledRequest: 'error'` logged a block per test, ~30 of them on CI, and a log
+   * that noisy is where a real failure hides.
+   *
+   * `protected-route.spec.tsx` overrides this with `server.use` for both the failing and the
+   * slow-succeeding session, and per-test handlers win over these.
+   */
+  http.get('/api/auth/me', () => errorResponse(401, 'Não autenticado.', 'Unauthorized')),
+
   http.post('/api/auth/refresh', () => new HttpResponse(null, { status: 401 })),
 
   http.get('/api/site-settings', () => HttpResponse.json(siteSettings)),
