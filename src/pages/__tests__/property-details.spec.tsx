@@ -42,10 +42,11 @@ const PROPERTY: PropertyDetailDto = {
   updatedAt: '2026-07-18T00:00:00.000Z',
 };
 
-const render = () =>
+const render = (state?: unknown) =>
   renderWithProviders(<PropertyDetails />, {
     route: '/properties/prop-1',
     path: '/properties/:id',
+    state,
   });
 
 /** Sete fotos: passa de cinco, que é o que faz o ladrilho "+N fotos" da tira existir. */
@@ -381,6 +382,58 @@ describe('PropertyDetails', () => {
 
       expect(strip).toHaveClass('hidden', 'lg:grid');
       expect(strip).not.toHaveClass('md:grid');
+    });
+  });
+
+  /**
+   * As duas telas do fluxo pós-criação dizem *qual* imóvel é o assunto. Antes nenhuma dizia:
+   * a de chegada não trazia nada do imóvel, e a de conclusão só o código, embutido no próprio
+   * título. Depois de cadastrar três imóveis seguidos, nenhuma das duas identificava um.
+   *
+   * O bloco é um só (`SplashIdentity`) justamente para as duas não divergirem, e é isso que
+   * estes dois casos fixam — em cada momento do fluxo, não no componente isolado.
+   */
+  describe('splashes do fluxo pós-criação', () => {
+    /**
+     * As consultas são escopadas na splash porque "Casa" e o código também aparecem na
+     * página atrás dela — no `h1`, na trilha e no rail. Sem o escopo o teste passaria com a
+     * splash vazia, afirmando só que a página existe.
+     */
+    const splash = async () =>
+      within(
+        (await screen.findByText(/com sucesso!|criado!/)).closest(
+          '[data-slot="success-splash"]',
+        ) as HTMLElement,
+      );
+
+    it('a splash de chegada identifica o imóvel recém-criado', async () => {
+      render({ context: 'post-create', showSplash: true });
+
+      // O título e o que fazer em seguida seguem sendo o assunto principal; a identidade
+      // entra abaixo, sem disputar com eles.
+      const s = await splash();
+      expect(s.getByText('Imóvel criado!')).toBeInTheDocument();
+      expect(s.getByText('Revise o imóvel e finalize o cadastro.')).toBeInTheDocument();
+      expect(s.getByText(/Casa/)).toBeInTheDocument();
+      expect(s.getByText(/Sorocaba/)).toBeInTheDocument();
+      expect(s.getByText('Cód. 575301')).toBeInTheDocument();
+    });
+
+    it('a splash de conclusão identifica o imóvel, e o código sai do título', async () => {
+      const user = userEvent.setup();
+      // Sem `showSplash`: as duas splashes ficariam montadas ao mesmo tempo e cada texto
+      // apareceria em dobro. Aqui só a de conclusão existe.
+      render({ context: 'post-create' });
+
+      await user.click(await screen.findByRole('button', { name: 'Finalizar imóvel' }));
+
+      // Uma frase só. O título carregava o código com um `<br />` no meio — uma quebra
+      // posicionada para um comprimento de string específico, numa tela de largura variável.
+      const s = await splash();
+      expect(s.getByText('Imóvel finalizado com sucesso!')).toBeInTheDocument();
+      expect(s.getByText('Cód. 575301')).toBeInTheDocument();
+      expect(s.getByText(/Casa/)).toBeInTheDocument();
+      expect(s.getByText(/Sorocaba/)).toBeInTheDocument();
     });
   });
 });
