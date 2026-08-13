@@ -4,10 +4,13 @@ import { Phone, Mail, Clock, ChevronRight } from 'lucide-react';
 import { PageContainer } from '@/layout/page-container';
 import { buildWhatsAppUrl, formatPhone } from '@/shared/format';
 import { fetchSiteSettings } from '@/features/settings/site-settings-service';
+import { settingsKeys } from '@/features/settings/query-keys';
 
 export function Contact() {
+  // Same key the console writes through, from the factory rather than a matching literal:
+  // this page and `settings.tsx` read the same record, so saving there has to reach here.
   const { data: contact, isLoading } = useQuery({
-    queryKey: ['site-settings'],
+    queryKey: settingsKeys.siteSettings(),
     queryFn: fetchSiteSettings,
   });
 

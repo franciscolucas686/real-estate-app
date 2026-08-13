@@ -32,25 +32,32 @@ function invalidateDomain(queryClient: QueryClient) {
   return queryClient.invalidateQueries({ queryKey: propertyKeys.all });
 }
 
+/**
+ * The wizard's two writes.
+ *
+ * Unlike every other mutation here they do **not** toast. That is the same rule stated the
+ * other way round: the toast exists because the dashboard's writes fire from icon buttons
+ * inside cards, where there is nowhere to put an inline message. The wizard is a full-page
+ * form with an aggregated `role="alert"` banner that already carries validation errors —
+ * routing API failures there keeps one error surface instead of two, and the banner sits
+ * next to the fields the user has to fix. Callers read `error` off the mutation, or catch
+ * `mutateAsync`.
+ */
 export function useCreateProperty() {
   const queryClient = useQueryClient();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: (payload: CreatePropertyDto) => createProperty(payload),
-    onError: (error) => toast.error(getErrorMessage(error)),
     onSettled: () => invalidateDomain(queryClient),
   });
 }
 
 export function useUpdateProperty() {
   const queryClient = useQueryClient();
-  const toast = useToast();
 
   return useMutation({
     mutationFn: ({ id, payload }: { id: string; payload: Partial<CreatePropertyDto> }) =>
       updateProperty(id, payload),
-    onError: (error) => toast.error(getErrorMessage(error)),
     onSettled: (_data, _error, variables) => {
       void queryClient.invalidateQueries({ queryKey: propertyKeys.detail(variables.id) });
       return invalidateDomain(queryClient);

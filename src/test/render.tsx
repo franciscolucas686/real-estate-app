@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 import { render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, parsePath } from 'react-router-dom';
 import { ToastProvider } from '@/ui/toast';
 
 // Fresh QueryClient per render call so tests don't share cache/state.
@@ -11,9 +11,13 @@ import { ToastProvider } from '@/ui/toast';
 // whenever the component under test reads useParams(); without a matched
 // <Route>, react-router never populates params. Defaults to `route` itself,
 // which is fine for components that don't use route params (e.g. Login).
+// `state` is what `location.state` resolves to. The property detail's whole post-create
+// flow keys off it — `context: 'post-create'` raises the "Finalizar imóvel" bar and
+// `showSplash` the arrival splash — and with `initialEntries` taking a bare string there
+// was no way to reach any of it from a spec.
 export function renderWithProviders(
   ui: ReactElement,
-  { route = '/', path = route }: { route?: string; path?: string } = {},
+  { route = '/', path = route, state }: { route?: string; path?: string; state?: unknown } = {},
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
@@ -25,7 +29,11 @@ export function renderWithProviders(
     // that writes. Rendering without it throws.
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <MemoryRouter initialEntries={[route]}>
+        {/* `parsePath` and not `{ pathname: route }`: half the call sites pass a route with a
+            query string (`/imoveis?page=2`), and as a bare `pathname` that is taken
+            literally — the search never reaches `useSearchParams`, which is where the
+            filters live. */}
+        <MemoryRouter initialEntries={[{ ...parsePath(route), state }]}>
           <Routes>
             <Route path={path} element={ui} />
           </Routes>
