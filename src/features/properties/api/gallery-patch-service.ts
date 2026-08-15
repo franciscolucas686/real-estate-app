@@ -2,7 +2,7 @@ import {
   createRoom,
   updateRoom,
   deleteRoom,
-  deletePropertyImage,
+  bulkDeletePropertyImages,
   reorderPropertyImages,
   uploadPropertyImages,
 } from '@/features/properties/api/property-service';
@@ -43,8 +43,11 @@ export async function executeGalleryPatch(propertyId: string, patch: GalleryPatc
     await deleteRoom(propertyId, roomId);
   }
 
-  for (const imageId of patch.imagesToDelete) {
-    await deletePropertyImage(propertyId, imageId);
+  // Uma chamada, não uma por foto. O laço anterior mandava N requisições contra o
+  // endpoint singular, cujo teto é 100/60s — apagar uma galeria grande de uma vez
+  // se auto-limitava. O endpoint de lote já existia e só não era usado aqui.
+  if (patch.imagesToDelete.length > 0) {
+    await bulkDeletePropertyImages(propertyId, patch.imagesToDelete);
   }
 
   const uploadGroups = new Map<string | null, File[]>();
