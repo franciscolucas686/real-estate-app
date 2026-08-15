@@ -3,13 +3,22 @@ import type { ApiErrorResponse } from '@/shared/api/types';
 /**
  * Base das chamadas de API.
  *
- * Relativo por padrão, que é o que mantém tudo na mesma origem: em dev o proxy do
- * Vite encaminha `/api`, e em produção o rewrite do `vercel.json` faz o mesmo.
+ * Os dois ambientes resolvem isto de formas diferentes, de propósito:
  *
- * `VITE_API_BASE_URL` é o caminho de saída dessa indireção — quando app e API
- * passarem a viver em subdomínios do mesmo domínio (`app.` e `api.`), definir esta
- * variável com a URL completa da API (incluindo `/api`) faz o navegador falar
- * direto com o backend, sem o salto extra pelo Vercel. Aí o rewrite pode sair.
+ * - **Produção:** `VITE_API_BASE_URL` traz a raiz da API
+ *   (`https://api.francinegestoraimobiliaria.com`) e o navegador fala direto com ela.
+ *   Havia um rewrite de `/api` no `vercel.json` que encaminhava server-side; ele existia
+ *   só porque `*.vercel.app` e `*.onrender.com` são *sites* diferentes e os cookies
+ *   `sameSite: 'lax'` nunca sobreviveriam à travessia. Com apex e `api.` no mesmo domínio
+ *   registrável isso deixou de ser verdade, e o proxy virava um salto extra em toda
+ *   requisição — banda da Vercel inclusive nos uploads de foto.
+ * - **Dev:** a variável fica vazia, o cliente usa o relativo `/api` e o proxy do Vite
+ *   encaminha. Mantém tudo na mesma origem localmente, sem depender de CORS.
+ *
+ * **O `/api` é prefixo deste frontend, não do backend.** A API não tem prefixo global —
+ * suas rotas vivem na raiz do host (`/properties`). Ele existe só para dar ao proxy do
+ * Vite um padrão pelo qual casar, e o `rewrite:` de `vite.config.ts` o remove ao
+ * encaminhar. Por isso `VITE_API_BASE_URL` **não** termina em `/api`.
  *
  * Deliberadamente **não** é a `VITE_API_URL`: aquela é o *host raiz* que o proxy do
  * Vite usa como alvo em `vite.config.ts`, e sobrecarregar um nome com dois

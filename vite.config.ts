@@ -5,12 +5,11 @@ import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // This proxy target only affects `vite dev` (and `vite preview` of a build
-// made in that mode). It has no effect on the real production deployment —
-// Vercel serves the built static files and routes /api/* via the rewrite in
-// vercel.json instead, since it doesn't run Vite's dev server. Both files
-// read from VITE_API_URL (.env.development / .env.production) so there's a
-// single source of truth per environment, even though two config formats
-// (JS here, static JSON there) both need to know it.
+// made in that mode). It has no effect on the real production deployment, which
+// has no proxy at all: the client talks straight to the API via
+// VITE_API_BASE_URL, and vercel.json is down to the SPA fallback. The proxy
+// survives in dev because it keeps local requests same-origin, so a developer
+// never needs CORS or a second cookie configuration to log in.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const backendUrl = env.VITE_API_URL;
@@ -58,6 +57,11 @@ export default defineConfig(({ mode }) => {
           target: backendUrl,
           changeOrigin: true,
           secure: true,
+          // O backend não tem prefixo global: as rotas vivem na raiz do host
+          // (`/properties`, não `/api/properties`). O `/api` é um caminho local do
+          // frontend, que existe só para dar ao proxy — e ao rewrite do vercel.json,
+          // que faz o mesmo recorte na produção — um prefixo pelo qual casar.
+          rewrite: (path) => path.replace(/^\/api/, ''),
         },
       },
     },
