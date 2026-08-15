@@ -1,6 +1,22 @@
 import type { ApiErrorResponse } from '@/shared/api/types';
 
-const API_BASE = '/api';
+/**
+ * Base das chamadas de API.
+ *
+ * Relativo por padrão, que é o que mantém tudo na mesma origem: em dev o proxy do
+ * Vite encaminha `/api`, e em produção o rewrite do `vercel.json` faz o mesmo.
+ *
+ * `VITE_API_BASE_URL` é o caminho de saída dessa indireção — quando app e API
+ * passarem a viver em subdomínios do mesmo domínio (`app.` e `api.`), definir esta
+ * variável com a URL completa da API (incluindo `/api`) faz o navegador falar
+ * direto com o backend, sem o salto extra pelo Vercel. Aí o rewrite pode sair.
+ *
+ * Deliberadamente **não** é a `VITE_API_URL`: aquela é o *host raiz* que o proxy do
+ * Vite usa como alvo em `vite.config.ts`, e sobrecarregar um nome com dois
+ * significados é exatamente o tipo de ambiguidade que já custou caro neste arquivo.
+ * Deixando esta ausente em dev, o fluxo local segue idêntico.
+ */
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
 
 let isRefreshing = false;
 let pendingRefresh: Promise<boolean> | null = null;
