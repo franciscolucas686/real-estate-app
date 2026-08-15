@@ -31,6 +31,8 @@ export const ERROR_CODE_MESSAGES: Record<string, string> = {
 
   STORAGE_NOT_CONFIGURED: 'O envio de imagens está indisponível no momento.',
 
+  TOO_MANY_REQUESTS: 'Muitas requisições em pouco tempo. Aguarde um minuto e tente de novo.',
+
   VALIDATION_ERROR: 'Verifique os campos destacados e tente novamente.',
   INTERNAL_ERROR: 'Ocorreu um erro inesperado. Tente novamente em instantes.',
 };
