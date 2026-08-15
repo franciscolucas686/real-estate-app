@@ -54,6 +54,57 @@ describe('executeGalleryPatch', () => {
     ]);
   });
 
+  it('sobe 50 fotos de um mesmo ambiente em lotes, sem perder nenhuma', async () => {
+    const files = Array.from({ length: 50 }, (_, i) => new File([''], `foto-${i}.jpg`));
+
+    await executeGalleryPatch(
+      PROPERTY_ID,
+      patch({ imagesToUpload: files.map((file) => ({ roomId: 'r1', file })) }),
+    );
+
+    // O que importa é a distinção que o lote existe para preservar: o limite é por
+    // requisição, não por imóvel. Cinquenta fotos continuam chegando inteiras.
+    const enviadas = vi
+      .mocked(service.uploadPropertyImages)
+      .mock.calls.flatMap(([, batch]) => batch);
+    expect(enviadas).toHaveLength(50);
+    expect(enviadas).toEqual(files);
+
+    // ...distribuídas em lotes, nenhum acima do teto que o backend aceita.
+    const calls = vi.mocked(service.uploadPropertyImages).mock.calls;
+    expect(calls).toHaveLength(5);
+    for (const [, batch] of calls) {
+      expect(batch.length).toBeLessThanOrEqual(12);
+    }
+  });
+
+  it('mantém cada lote apontado para o ambiente certo', async () => {
+    const daSala = Array.from({ length: 13 }, (_, i) => new File([''], `sala-${i}.jpg`));
+    const doQuarto = [new File([''], 'quarto-0.jpg')];
+
+    await executeGalleryPatch(
+      PROPERTY_ID,
+      patch({
+        imagesToUpload: [
+          ...daSala.map((file) => ({ roomId: 'r1', file })),
+          ...doQuarto.map((file) => ({ roomId: 'r2', file })),
+        ],
+      }),
+    );
+
+    // 13 fotos da sala viram dois lotes, e ambos precisam continuar dizendo "r1" —
+    // fatiar sem carregar o roomId junto espalharia as fotos pelo ambiente errado.
+    const porAmbiente = vi
+      .mocked(service.uploadPropertyImages)
+      .mock.calls.map(([, batch, roomId]) => [roomId, batch.length]);
+
+    expect(porAmbiente).toEqual([
+      ['r1', 12],
+      ['r1', 1],
+      ['r2', 1],
+    ]);
+  });
+
   it('não chama o endpoint de lote quando não há nada a apagar', async () => {
     await executeGalleryPatch(
       PROPERTY_ID,
