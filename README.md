@@ -15,7 +15,7 @@
 [![Tailwind](https://img.shields.io/badge/Tailwind-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/franciscolucas686/real-estate-app/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/franciscolucas686/real-estate-app/actions)
-![Testes](https://img.shields.io/badge/testes-224%20passando-success?style=flat-square)
+![Testes](https://img.shields.io/badge/testes-231%20passando-success?style=flat-square)
 ![PWA](https://img.shields.io/badge/PWA-instal%C3%A1vel-5A0FC8?style=flat-square&logo=pwa)
 ![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT-lightgrey?style=flat-square)
 
@@ -96,7 +96,7 @@ Um app com duas caras, porque são duas pessoas com perguntas diferentes:
 | **Formulários** | React Hook Form + Zod 4 | Schemas espelhando as regras reais do backend |
 | **Mapas** | Leaflet | Seleção e exibição de coordenadas |
 | **Animação** | Motion | Transições de página respeitando `prefers-reduced-motion` |
-| **Testes** | Vitest + Testing Library + MSW | 224 testes sem back-end no ar |
+| **Testes** | Vitest + Testing Library + MSW | 231 testes sem back-end no ar |
 | **CI/CD** | GitHub Actions → Vercel | Lint, testes e build barram o merge |
 
 ---
@@ -192,7 +192,7 @@ exclusivas por CSS**, não um `if` em JS.
 
 <br>
 
-**224 testes, 27 arquivos, sem back-end rodando.** As requisições são interceptadas por
+**231 testes, 28 arquivos, sem back-end rodando.** As requisições são interceptadas por
 **MSW** — a rede é falsa, o componente é real.
 
 - **Unitários** — schemas Zod testados direto, cobrindo cada regra condicional
@@ -266,7 +266,7 @@ Pronto: `http://localhost:5173`.
 |---|---|
 | 📁 Arquivos de código | 114 |
 | 📝 Linhas de código | ~12.100 |
-| ✅ Testes automatizados | **224** em 27 arquivos |
+| ✅ Testes automatizados | **231** em 28 arquivos |
 | 🧪 Linhas de teste | ~3.800 |
 | 🔁 Dependências circulares | **0** |
 | 🗺️ Rotas | 13, incluindo catch-all |
