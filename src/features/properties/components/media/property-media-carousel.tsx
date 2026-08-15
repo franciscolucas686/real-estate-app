@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { cn } from '@/shared/cn';
+import { imageUrl } from '@/shared/image-url';
 import type { PropertyImageDto } from '@/shared/api/types';
 import { Carousel } from '@/ui/carousel';
 
@@ -78,7 +79,7 @@ export function PropertyMediaCarousel({
               than a stretch.
             */}
             <img
-              src={img.url}
+              src={imageUrl(img.url, 'card')}
               alt={img.label ?? `Foto ${i + 1}`}
               loading={i === 0 ? 'eager' : 'lazy'}
               draggable={false}

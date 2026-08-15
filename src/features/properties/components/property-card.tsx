@@ -4,6 +4,7 @@ import { Carousel } from '@/ui/carousel';
 import type { PropertyCardDto } from '@/shared/api/types';
 import { BusinessType } from '@/shared/api/types';
 import { formatMainPrice, PropertyTypeLabel, BusinessTypeLabel } from '@/shared/format';
+import { imageUrl } from '@/shared/image-url';
 import { Bed, Bath, Car } from 'lucide-react';
 
 interface PropertyCardProps {
@@ -34,7 +35,7 @@ export function PropertyCard({ property, className }: PropertyCardProps) {
             {property.previewImages.map((img, i) => (
               <img
                 key={img.id}
-                src={img.url}
+                src={imageUrl(img.url, 'thumb')}
                 alt={`${PropertyTypeLabel[property.type]} ${i + 1}`}
                 loading={i === 0 ? 'eager' : 'lazy'}
                 draggable={false}

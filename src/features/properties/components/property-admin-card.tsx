@@ -5,6 +5,7 @@ import { Pencil, Images, MoreVertical, PowerOff, Power, Trash2 } from 'lucide-re
 import type { PropertyCardDto } from '@/shared/api/types';
 import { BusinessType, PropertyStatus } from '@/shared/api/types';
 import { formatMainPrice, PropertyTypeLabel, BusinessTypeLabel } from '@/shared/format';
+import { imageUrl } from '@/shared/image-url';
 import { StatusBadge } from '@/features/properties/components/status-badge';
 import { Modal } from '@/ui/modal';
 import { ConfirmModalContent } from '@/ui/confirm-modal';
@@ -171,7 +172,7 @@ export function PropertyAdminCard({
           <div className="relative h-36">
             {firstImage ? (
               <img
-                src={firstImage.url}
+                src={imageUrl(firstImage.url, 'thumb')}
                 alt={PropertyTypeLabel[property.type]}
                 loading="lazy"
                 className="h-full w-full object-cover"
