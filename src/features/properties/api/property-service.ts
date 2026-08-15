@@ -120,6 +120,11 @@ export async function updatePropertyStatus(id: string, status: PropertyStatus) {
   });
 }
 
-export async function fetchStatusCounts(): Promise<Record<PropertyStatus, number>> {
-  return apiFetch<Record<PropertyStatus, number>>('/properties/status-counts');
+/**
+ * Parcial de propósito: a rota é auth-aware. Quem está autenticado recebe os três
+ * status; quem não está recebe só `ACTIVE` — é o número que a home mostra, e o
+ * tamanho da fila de PENDING/INACTIVE é informação de operação, não de vitrine.
+ */
+export async function fetchStatusCounts(): Promise<Partial<Record<PropertyStatus, number>>> {
+  return apiFetch<Partial<Record<PropertyStatus, number>>>('/properties/status-counts');
 }

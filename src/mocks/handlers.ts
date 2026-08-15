@@ -203,7 +203,12 @@ export const handlers = [
 
   // Declared before `/api/properties/:id` so `status-counts` isn't swallowed by the
   // dynamic segment.
-  http.get('/api/properties/status-counts', () => {
+  //
+  // A rota é auth-aware no backend (OptionalJwtGuard): anônimo recebe só a contagem
+  // de ACTIVE — que é o número da home — e autenticado recebe os três. Como a sessão
+  // padrão destes mocks é "sem sessão" (ver o handler de `/api/auth/me`), o default
+  // aqui é a resposta anônima; specs autenticados sobrescrevem com `server.use`.
+  http.get('/api/properties/status-counts', ({ cookies }) => {
     const counts: Record<PropertyStatus, number> = {
       [PropertyStatus.ACTIVE]: 0,
       [PropertyStatus.PENDING]: 0,
@@ -212,6 +217,11 @@ export const handlers = [
     mockProperties.forEach((property) => {
       counts[property.status] += 1;
     });
+
+    if (!cookies.accessToken) {
+      return HttpResponse.json({ [PropertyStatus.ACTIVE]: counts[PropertyStatus.ACTIVE] });
+    }
+
     return HttpResponse.json(counts);
   }),
 

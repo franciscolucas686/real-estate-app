@@ -286,8 +286,13 @@ export function Dashboard() {
         ) : (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 md:gap-4">
             {STATS.map(({ key, label, desc, card, labelColor, valueColor }) => {
+              // `counts` é parcial no tipo porque a rota é auth-aware (anônimo só
+              // recebe ACTIVE). Aqui sempre há sessão, então os três vêm — o `?? 0`
+              // é só o que o tipo exige, não um caso real deste painel.
               const value =
-                key === null ? Object.values(counts).reduce((a, b) => a + b, 0) : counts[key];
+                key === null
+                  ? Object.values(counts).reduce((a, b) => a + (b ?? 0), 0)
+                  : (counts[key] ?? 0);
               const selected = statusFilter === key;
 
               return (
