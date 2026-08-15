@@ -36,6 +36,7 @@ import { QuickSpecs } from '@/features/properties/components/quick-specs';
 import { SplashIdentity } from '@/features/properties/components/splash-identity';
 import { useMe } from '@/features/auth/use-auth';
 import { useScrollLock } from '@/shared/hooks/use-scroll-lock';
+import { imageUrl } from '@/shared/image-url';
 import { cn } from '@/shared/cn';
 import { usePropertyMutationRefresh } from '@/features/properties/hooks/use-property-mutation-refresh';
 
@@ -257,7 +258,7 @@ export function PropertyDetails() {
                     className="h-20 overflow-hidden rounded-lg"
                   >
                     <img
-                      src={img.url}
+                      src={imageUrl(img.url, 'thumb')}
                       alt={img.label ?? `Foto ${i + 1}`}
                       loading="lazy"
                       className="h-full w-full object-cover transition-opacity md:hover:opacity-80"
@@ -276,7 +277,7 @@ export function PropertyDetails() {
                     className="relative h-20 overflow-hidden rounded-lg"
                   >
                     <img
-                      src={allImages[5].url}
+                      src={imageUrl(allImages[5].url, 'thumb')}
                       alt=""
                       loading="lazy"
                       className="h-full w-full object-cover"

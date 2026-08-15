@@ -28,4 +28,9 @@ coverage
 *.njsproj
 *.sln
 *.sw?
+
+# Notas locais em markdown ficam de fora do repositório (CLAUDE.md e afins).
+# O README é a vitrine do projeto no GitHub, então é a exceção explícita —
+# sem esta linha ele nunca apareceria na página do repositório.
 *.md
+!README.md

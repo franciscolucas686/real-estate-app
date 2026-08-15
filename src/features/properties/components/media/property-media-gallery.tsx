@@ -1,4 +1,5 @@
 import { cn } from '@/shared/cn';
+import { imageUrl } from '@/shared/image-url';
 import type { PropertyImageDto } from '@/shared/api/types';
 import type { JSX } from 'react';
 
@@ -29,7 +30,7 @@ export function PropertyMediaGallery({
       blocks.push(
         <div key={`full-${blockNum}-0`} className="w-full">
           <img
-            src={img.url}
+            src={imageUrl(img.url, 'card')}
             alt={img.label ?? `Foto ${capturedIdx + 1}`}
             loading="lazy"
             draggable={false}
@@ -91,7 +92,7 @@ export function PropertyMediaGallery({
             {leftImages.map((img, li) => (
               <img
                 key={img.id}
-                src={img.url}
+                src={imageUrl(img.url, 'card')}
                 alt={img.label ?? `Foto ${leftIdxs[li] + 1}`}
                 loading="lazy"
                 draggable={false}
@@ -108,7 +109,7 @@ export function PropertyMediaGallery({
             {rightImages.map((img, ri) => (
               <img
                 key={img.id}
-                src={img.url}
+                src={imageUrl(img.url, 'card')}
                 alt={img.label ?? `Foto ${rightIdxs[ri] + 1}`}
                 loading="lazy"
                 draggable={false}

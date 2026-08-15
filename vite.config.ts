@@ -42,7 +42,16 @@ export default defineConfig(({ mode }) => {
     ],
     server: {
       host: true,
+      // The port is a contract, not a preference: the ngrok tunnel below dials a
+      // fixed localhost:5173, so it cannot follow the server elsewhere. Without
+      // strictPort, Vite silently walks to the next free port when a stale
+      // `npm run dev` still holds 5173 — it prints the new URL and everything
+      // looks fine locally, while the tunnel keeps answering ERR_NGROK_8012
+      // ("connection refused") to whoever was sent the link. Failing to boot is
+      // the cheaper error. Same reason `allowedHosts` names the domain outright:
+      // the port and the host are one pair, and changing either means changing both.
       port: 5173,
+      strictPort: true,
       allowedHosts: ['exuvial-transfusable-nidia.ngrok-free.dev'],
       proxy: {
         '/api': {

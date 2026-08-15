@@ -16,6 +16,12 @@ export const ERROR_CODE_MESSAGES: Record<string, string> = {
   INVALID_BUSINESS_TYPE_CONFIG: 'Verifique os valores de preço informados para este imóvel.',
   INVALID_SUBTYPE_DATA: 'Verifique os dados informados para este tipo de imóvel.',
 
+  // O Multer rejeita antes de qualquer código nosso rodar e sua mensagem é o
+  // literal "File too large", em inglês. O backend carimba este code para que a
+  // tradução aconteça aqui, como em qualquer outro erro.
+  PAYLOAD_TOO_LARGE: 'Alguma foto é grande demais (máximo de 15MB por arquivo).',
+  UNSUPPORTED_MEDIA_TYPE: 'Formato de arquivo não suportado. Envie imagens JPG ou PNG.',
+
   IMAGE_NOT_FOUND: 'Esta imagem não foi encontrada.',
   IMAGE_NOT_BELONG_TO_PROPERTY: 'Esta imagem não pertence a este imóvel.',
   PROPERTY_IMAGE_FILE_MISSING: 'Selecione uma imagem antes de enviar.',
@@ -30,6 +36,8 @@ export const ERROR_CODE_MESSAGES: Record<string, string> = {
   GEOCODING_SERVICE_ERROR: 'Não foi possível consultar a localização agora. Tente novamente.',
 
   STORAGE_NOT_CONFIGURED: 'O envio de imagens está indisponível no momento.',
+
+  TOO_MANY_REQUESTS: 'Muitas requisições em pouco tempo. Aguarde um minuto e tente de novo.',
 
   VALIDATION_ERROR: 'Verifique os campos destacados e tente novamente.',
   INTERNAL_ERROR: 'Ocorreu um erro inesperado. Tente novamente em instantes.',

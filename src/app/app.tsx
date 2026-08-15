@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Route, Routes, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion, MotionConfig } from 'motion/react';
@@ -7,6 +7,7 @@ import { SiteShell } from '@/layout/site-shell';
 import { ConsoleShell } from '@/layout/console-shell';
 import { ProtectedRoute } from '@/app/protected-route';
 import { ToastProvider } from '@/ui/toast';
+import { PageLoading } from '@/ui/page-loading';
 import { SplashScreen } from '@/ui/splash-screen';
 import { APP_ROUTES, NOT_FOUND_ROUTE, resolveRoute, type AppRoute } from '@/app/routes';
 import { useSiteNavItems } from '@/app/use-site-nav-items';
@@ -61,14 +62,20 @@ function AppRoutes() {
   // Nesting the shells as layout routes would put them inside `key={location.pathname}`,
   // so the console sidebar would unmount and re-animate on every navigation within the
   // console — exactly the persistence it exists to provide.
+  // Suspense por dentro da shell, e não em volta dela: as rotas pesadas são
+  // `lazy` (ver routes.tsx), e um boundary externo faria a nav inteira sumir e
+  // voltar a cada navegação para uma delas — piscando exatamente a chrome que as
+  // duas shells existem para manter estável. Aqui só a área de conteúdo espera.
   const pages = (
     <AnimatePresence mode="popLayout">
-      <Routes location={location} key={location.pathname}>
-        {APP_ROUTES.map((r) => (
-          <Route key={r.path} path={r.path} element={renderElement(r)} />
-        ))}
-        <Route path="*" element={renderElement(NOT_FOUND_ROUTE)} />
-      </Routes>
+      <Suspense fallback={<PageLoading />}>
+        <Routes location={location} key={location.pathname}>
+          {APP_ROUTES.map((r) => (
+            <Route key={r.path} path={r.path} element={renderElement(r)} />
+          ))}
+          <Route path="*" element={renderElement(NOT_FOUND_ROUTE)} />
+        </Routes>
+      </Suspense>
     </AnimatePresence>
   );
 

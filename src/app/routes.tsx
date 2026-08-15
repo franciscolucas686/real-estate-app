@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { lazy, type ReactNode } from 'react';
 import { Navigate, matchRoutes } from 'react-router-dom';
 import type { HTMLMotionProps } from 'motion/react';
 
@@ -6,13 +6,37 @@ import { Home } from '@/pages/home';
 import { Properties } from '@/pages/properties';
 import { Contact } from '@/pages/contact';
 import { Profile } from '@/pages/profile';
-import { PropertyDetails } from '@/pages/property-details';
 import { Login } from '@/pages/login';
-import { Dashboard } from '@/pages/dashboard';
-import { Settings } from '@/pages/settings';
-import { PropertyForm } from '@/pages/property-form';
-import { GalleryManagement } from '@/pages/gallery-management';
 import { NotFound } from '@/pages/not-found';
+
+/**
+ * As telas acima ficam no chunk inicial porque são a vitrine: quem chega pelo link
+ * de um imóvel ou pelo Google entra por uma delas, e um round-trip a mais antes do
+ * primeiro pixel é o que menos se quer aí.
+ *
+ * As cinco abaixo saem dele. Tudo era um bundle único de ~900KB, e o custo maior nem
+ * é o tamanho das páginas em si: `property-details` e `property-form` arrastam o
+ * Leaflet junto, que é pesado e não serve para nada em quem só abre a home. As três
+ * do console então só existem para quem fez login.
+ *
+ * `.then` remapeando para `default` porque as páginas usam named export, e `lazy`
+ * espera um módulo com export default. A alternativa seria mudar o export de cinco
+ * arquivos e de todos os specs que os importam — bem mais estrago do que esta linha.
+ *
+ * O `<Suspense>` que sustenta isso está em `app.tsx`, por dentro da shell: a nav
+ * continua na tela enquanto o chunk chega.
+ */
+const PropertyDetails = lazy(() =>
+  import('@/pages/property-details').then((m) => ({ default: m.PropertyDetails })),
+);
+const Dashboard = lazy(() => import('@/pages/dashboard').then((m) => ({ default: m.Dashboard })));
+const Settings = lazy(() => import('@/pages/settings').then((m) => ({ default: m.Settings })));
+const PropertyForm = lazy(() =>
+  import('@/pages/property-form').then((m) => ({ default: m.PropertyForm })),
+);
+const GalleryManagement = lazy(() =>
+  import('@/pages/gallery-management').then((m) => ({ default: m.GalleryManagement })),
+);
 
 /**
  * Which chrome a route renders inside.

@@ -1,5 +1,6 @@
 import { Check } from 'lucide-react';
 import { cn } from '@/shared/cn';
+import { imageUrl } from '@/shared/image-url';
 import type { PropertyImageDto } from '@/shared/api/types';
 
 interface GalleryImageProps {
@@ -48,7 +49,7 @@ export function GalleryImage({
   const figure = (
     <>
       <img
-        src={image.url}
+        src={imageUrl(image.url, 'thumb')}
         alt={image.label ?? `Foto ${position}`}
         className={cn(
           'h-full w-full rounded-xl object-cover transition-all',
