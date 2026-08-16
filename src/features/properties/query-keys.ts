@@ -23,4 +23,12 @@ export const propertyKeys = {
   detail: (id: string) => [...propertyKeys.details(), id] as const,
 
   statusCounts: () => [...propertyKeys.all, 'status-counts'] as const,
+
+  /**
+   * Sob a mesma raiz de propósito: restaurar um imóvel muda a lixeira **e** as
+   * listagens, e apagar um faz o contrário. Com a raiz compartilhada, o
+   * `invalidateQueries({ queryKey: propertyKeys.all })` que as mutações já disparam
+   * cobre os dois lados sem ninguém precisar lembrar da lixeira.
+   */
+  trash: (skip: number, take: number) => [...propertyKeys.all, 'trash', skip, take] as const,
 };

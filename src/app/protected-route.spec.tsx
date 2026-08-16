@@ -33,8 +33,6 @@ const USER: UserProfile = {
   id: 'user-1',
   email: 'admin@example.com',
   name: 'Admin',
-  createdAt: new Date().toISOString(),
-  updatedAt: new Date().toISOString(),
 };
 
 function makeClient() {

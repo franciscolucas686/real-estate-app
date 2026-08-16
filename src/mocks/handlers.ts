@@ -69,6 +69,12 @@ export function makePropertyCard(overrides: Partial<PropertyCardDto> = {}): Prop
     bedrooms: 3,
     bathrooms: 2,
     parkingSpaces: 2,
+    suites: null,
+    totalArea: null,
+    builtArea: null,
+    condoFee: null,
+    createdAt: '2026-07-01T00:00:00.000Z',
+    deletedAt: null,
     previewImages: [],
     status: PropertyStatus.ACTIVE,
     ...overrides,
@@ -189,7 +195,7 @@ export const handlers = [
       gallery: { rooms: [], unassigned: [] },
       details:
         body.house ?? body.apartment ?? body.land ?? body.smallFarm ?? body.countryHouse ?? null,
-      whatsappContact: body.whatsappContact ?? null,
+      whatsappContact: null,
       location:
         body.latitude != null && body.longitude != null
           ? {
@@ -205,6 +211,29 @@ export const handlers = [
       updatedAt: new Date().toISOString(),
     };
     return HttpResponse.json(created, { status: 201 });
+  }),
+
+  // Declarado antes de `/api/properties/:id` pelo mesmo motivo do status-counts: o
+  // segmento dinâmico engoliria 'trash'.
+  http.get('/api/properties/trash', ({ request }) => {
+    const url = new URL(request.url);
+    const skip = Number(url.searchParams.get('skip') ?? 0);
+    const take = Number(url.searchParams.get('take') ?? 20);
+    const deletados = mockProperties.filter((p) => p.deletedAt !== null);
+    const body: PropertyListResponseDto = {
+      data: deletados.slice(skip, skip + take),
+      total: deletados.length,
+      skip,
+      take,
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.patch('/api/properties/:id/restore', ({ params }) => {
+    mockProperties = mockProperties.map((p) =>
+      p.id === params.id ? { ...p, deletedAt: null } : p,
+    );
+    return HttpResponse.json({ id: params.id });
   }),
 
   // Declared before `/api/properties/:id` so `status-counts` isn't swallowed by the

@@ -31,6 +31,7 @@ const PropertyDetails = lazy(() =>
 );
 const Dashboard = lazy(() => import('@/pages/dashboard').then((m) => ({ default: m.Dashboard })));
 const Settings = lazy(() => import('@/pages/settings').then((m) => ({ default: m.Settings })));
+const Trash = lazy(() => import('@/pages/trash').then((m) => ({ default: m.Trash })));
 const PropertyForm = lazy(() =>
   import('@/pages/property-form').then((m) => ({ default: m.PropertyForm })),
 );
@@ -113,6 +114,7 @@ export const APP_ROUTES: AppRoute[] = [
   // ── Console ────────────────────────────────────────────────────────────────
   { path: '/dashboard', element: <Dashboard />, shell: 'console', guarded: true },
   { path: '/settings', element: <Settings />, shell: 'console', guarded: true },
+  { path: '/trash', element: <Trash />, shell: 'console', guarded: true },
   {
     path: '/properties/new',
     element: <PropertyForm />,

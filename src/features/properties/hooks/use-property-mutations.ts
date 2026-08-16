@@ -15,6 +15,7 @@ import type {
   PropertyCardDto,
   PropertyDetailDto,
   PropertyListResponseDto,
+  UpdatePropertyDto,
 } from '@/shared/api/types';
 
 /**
@@ -56,7 +57,7 @@ export function useUpdateProperty() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, payload }: { id: string; payload: Partial<CreatePropertyDto> }) =>
+    mutationFn: ({ id, payload }: { id: string; payload: UpdatePropertyDto }) =>
       updateProperty(id, payload),
     onSettled: (_data, _error, variables) => {
       void queryClient.invalidateQueries({ queryKey: propertyKeys.detail(variables.id) });
