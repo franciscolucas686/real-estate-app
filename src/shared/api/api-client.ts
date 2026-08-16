@@ -25,7 +25,19 @@ import type { ApiErrorResponse } from '@/shared/api/types';
  * significados é exatamente o tipo de ambiguidade que já custou caro neste arquivo.
  * Deixando esta ausente em dev, o fluxo local segue idêntico.
  */
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api';
+/*
+ * `||`, não `??`, e a diferença é o caso que realmente acontece.
+ *
+ * O jeito de "desligar" a variável num arquivo `.env` é deixá-la vazia — é o que
+ * `.env.production` faz com a `VITE_API_URL` ao lado. O Vite injeta `""`, que `??` não
+ * considera ausente: a base virava string vazia e toda chamada saía como `/properties`,
+ * na origem do app. Em produção o fallback SPA responde a isso com o `index.html`, ou
+ * seja, 200 com HTML no lugar de JSON — a falha mais difícil de diagnosticar que existe
+ * aqui, e a que os comentários do `.env.production` já descreviam como sendo `/api`.
+ * Com `||`, vazia e ausente significam a mesma coisa, que é o que o resto do projeto
+ * assume.
+ */
+const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 let isRefreshing = false;
 let pendingRefresh: Promise<boolean> | null = null;
