@@ -22,13 +22,6 @@ export async function createWhatsappNumber(payload: CreateWhatsappNumberDto) {
   });
 }
 
-export async function updateWhatsappNumber(id: string, payload: Partial<CreateWhatsappNumberDto>) {
-  return apiFetch<WhatsappNumber>(`/whatsapp-numbers/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(payload),
-  });
-}
-
 export async function deleteWhatsappNumber(id: string) {
   return apiFetch<void>(`/whatsapp-numbers/${id}`, {
     method: 'DELETE',

@@ -119,12 +119,3 @@ export function serializeFilters(filters: PropertyFilters): URLSearchParams {
 
   return params;
 }
-
-/**
- * True when the URL carries no filter at all — used to tell "no results because the
- * catalogue is empty" apart from "no results because of this filter", which are
- * different messages with different next steps.
- */
-export function hasAnyFilter(filters: PropertyFilters): boolean {
-  return serializeFilters(filters).size > 0;
-}

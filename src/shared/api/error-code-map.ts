@@ -10,8 +10,8 @@ export const ERROR_CODE_MESSAGES: Record<string, string> = {
   ADMIN_SECRET_FORBIDDEN: 'Você não tem permissão para realizar esta ação.',
 
   PROPERTY_NOT_FOUND: 'Este imóvel não foi encontrado — ele pode ter sido removido.',
-  PROPERTY_FORBIDDEN: 'Você não tem permissão para modificar este imóvel.',
   PROPERTY_NOT_DELETED: 'Este imóvel não está excluído.',
+  INCOMPLETE_LOCATION_UPDATE: 'Para mudar a localização, informe bairro, cidade e estado juntos.',
   INVALID_STATUS_TRANSITION: 'Não é possível alterar o status deste imóvel dessa forma.',
   INVALID_BUSINESS_TYPE_CONFIG: 'Verifique os valores de preço informados para este imóvel.',
   INVALID_SUBTYPE_DATA: 'Verifique os dados informados para este tipo de imóvel.',
