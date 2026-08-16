@@ -99,7 +99,18 @@ export function PropertyDetails() {
   useScrollLock(mapFullscreen);
 
   const allImages = property ? flattenGallery(property) : [];
-  const coverUrl = allImages[0]?.url;
+  /*
+   * Exatamente a URL que o carrossel vai pedir — `imageUrl(url, 'card')`, não o
+   * original.
+   *
+   * Sem o `imageUrl` aqui, este pré-carregamento baixava os ~350KB da versão de
+   * 1920px que **nenhum elemento da página exibe**, e só então liberava o esqueleto;
+   * o `<img>` do carrossel começava aí o download da variante de 1600px, do zero. Duas
+   * cópias da mesma foto e a primeira pintura esperando a errada. É inofensivo hoje
+   * só porque `VITE_IMAGE_CDN` está vazia e `imageUrl` devolve a URL intacta — no dia
+   * em que a flag subir, as duas URLs passam a divergir.
+   */
+  const coverUrl = allImages[0] ? imageUrl(allImages[0].url, 'card') : undefined;
 
   useEffect(() => {
     if (!coverUrl) return;
