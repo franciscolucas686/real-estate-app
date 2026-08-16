@@ -77,6 +77,26 @@ export interface PropertyCardDto {
   bedrooms: number | null;
   bathrooms: number | null;
   parkingSpaces: number | null;
+
+  /*
+   * Os cinco campos abaixo o backend já enviava e este tipo não declarava, então a
+   * listagem não conseguia lê-los mesmo recebendo-os em toda página. Eles existem no
+   * PropertyCardDto do backend de propósito — para uma listagem densa poder ser
+   * renderizada sem uma segunda requisição por linha — e declará-los aqui é o que
+   * torna esse propósito alcançável.
+   */
+  suites: number | null;
+  totalArea: number | null;
+  builtArea: number | null;
+  condoFee: string | null;
+  createdAt: string;
+
+  /**
+   * Preenchido apenas pelos cards de `GET /properties/trash`; `null` em toda listagem
+   * normal. É a partir dele que a lixeira calcula quanto resta dos 30 dias de retenção.
+   */
+  deletedAt: string | null;
+
   previewImages: PreviewImageDto[];
   status: PropertyStatus;
 }
@@ -204,12 +224,22 @@ export interface LoginDto {
   password: string;
 }
 
+/**
+ * O que `GET /auth/me` devolve — os três campos, e só eles.
+ *
+ * `createdAt`/`updatedAt` estavam declarados aqui e nunca chegam: o handler monta
+ * `{ id, email, name }` à mão. Ninguém os lia, mas um tipo que promete campos
+ * inexistentes é um convite a lê-los e receber `undefined` em produção.
+ *
+ * `name` é anulável porque a coluna é (`name String?` no schema do Prisma) e o backend
+ * repassa o `null`. Declarado como `string`, ele derrubava o dashboard inteiro:
+ * `user?.name.split(' ')` protege o `user`, não o `name`, e o throw acontece durante o
+ * render — o que a `ErrorBoundary` mostra como página em branco.
+ */
 export interface UserProfile {
   id: string;
   email: string;
-  name: string;
-  createdAt: string;
-  updatedAt: string;
+  name: string | null;
 }
 
 export interface FilterPropertyDto {
@@ -255,7 +285,6 @@ export interface CreatePropertyDto {
   bathrooms?: number;
   suites?: number;
   parkingSpaces?: number;
-  whatsappContact?: string;
   latitude?: number;
   longitude?: number;
   house?: HouseDetailsDto;
@@ -265,9 +294,30 @@ export interface CreatePropertyDto {
   countryHouse?: CountryHouseDetailsDto;
 }
 
-export interface UpdatePropertyStatusDto {
-  status: PropertyStatus;
-}
+/**
+ * Campos que o formulário de edição pode **esvaziar**, e que por isso viajam como
+ * `null` explícito num PATCH em vez de serem omitidos.
+ *
+ * A distinção não existe na criação (ausente e vazio são a mesma coisa) e é tudo na
+ * edição: `PATCH` é parcial, então omitir significa "mantenha o que está lá". Omitir
+ * era o que o payload fazia com todo campo vazio — apagar a taxa de condomínio,
+ * salvar, e encontrá-la de volta no recarregamento.
+ */
+export type ClearablePropertyField =
+  | 'price'
+  | 'rentPrice'
+  | 'condoFee'
+  | 'bedrooms'
+  | 'bathrooms'
+  | 'suites'
+  | 'parkingSpaces'
+  | 'totalArea'
+  | 'builtArea';
+
+/** Corpo de `PATCH /properties/:id`. Ver `ClearablePropertyField`. */
+export type UpdatePropertyDto = Partial<Omit<CreatePropertyDto, ClearablePropertyField>> & {
+  [K in ClearablePropertyField]?: CreatePropertyDto[K] | null;
+};
 
 export interface CreateRoomDto {
   name: string;

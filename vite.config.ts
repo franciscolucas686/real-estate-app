@@ -59,8 +59,9 @@ export default defineConfig(({ mode }) => {
           secure: true,
           // O backend não tem prefixo global: as rotas vivem na raiz do host
           // (`/properties`, não `/api/properties`). O `/api` é um caminho local do
-          // frontend, que existe só para dar ao proxy — e ao rewrite do vercel.json,
-          // que faz o mesmo recorte na produção — um prefixo pelo qual casar.
+          // frontend, que existe só para dar a este proxy um prefixo pelo qual casar.
+          // O rewrite equivalente no `vercel.json` não existe mais — em produção o
+          // cliente chama `VITE_API_BASE_URL` direto, sem `/api` nenhum no caminho.
           rewrite: (path) => path.replace(/^\/api/, ''),
         },
       },

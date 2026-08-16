@@ -24,7 +24,7 @@ import { Step3 } from '@/features/properties/components/form/step-3';
 import type { FormState } from '@/features/properties/components/form/form-state';
 import { fetchPropertyById } from '@/features/properties/api/property-service';
 import { useDisablePullToRefresh } from '@/shared/hooks/use-disable-pull-to-refresh';
-import type { CreatePropertyDto, PropertyDetailDto } from '@/shared/api/types';
+import type { CreatePropertyDto, PropertyDetailDto, UpdatePropertyDto } from '@/shared/api/types';
 import {
   propertyFormSchema,
   STEP_FIELDS,
@@ -142,6 +142,39 @@ function buildPayload(f: FormState): CreatePropertyDto {
   }
 
   return base;
+}
+
+/**
+ * Payload de edição: o de criação, mais um `null` explícito para cada campo opcional
+ * que ficou vazio.
+ *
+ * `buildPayload` omite o que está vazio, e na criação isso é exatamente certo. Num
+ * `PATCH` não é: omitir significa "mantenha o que está lá", então **esvaziar um campo
+ * no formulário não fazia nada**. Apagar a taxa de condomínio, salvar e recarregar
+ * devolvia a taxa; o mesmo valia para quartos, banheiros, suítes, vagas e as áreas.
+ *
+ * O preço do outro tipo de negócio entra pelo mesmo motivo, e o efeito é maior:
+ * mudar um imóvel de venda para aluguel deixava a coluna `price` preenchida com o
+ * valor antigo, que a ordenação por preço e o `price ?? rentPrice` dos cards leem
+ * como se fosse o valor corrente.
+ *
+ * Isto depende de o backend tratar `null` como valor efetivo na validação
+ * condicional — ver `effectiveValue` em `properties.service.ts`. Antes disso, um
+ * `null` era gravado sem passar pela regra, que é o defeito oposto e pior.
+ */
+function buildUpdatePayload(f: FormState): UpdatePropertyDto {
+  return {
+    ...buildPayload(f),
+    price: f.businessType === BusinessType.SALE ? f.price : null,
+    rentPrice: f.businessType === BusinessType.RENT ? f.rentPrice : null,
+    condoFee: f.condoFee || null,
+    bedrooms: n(f.bedrooms) ?? null,
+    bathrooms: n(f.bathrooms) ?? null,
+    suites: n(f.suites) ?? null,
+    parkingSpaces: n(f.parkingSpaces) ?? null,
+    totalArea: n(f.totalArea) ?? null,
+    builtArea: n(f.builtArea) ?? null,
+  };
 }
 
 // ─── Edit mode hydration ─────────────────────────────────────────────────────
@@ -372,16 +405,15 @@ function PropertyFormInner({
       async (values) => {
         setError('');
         try {
-          const payload = buildPayload(values);
           if (isEdit && id) {
-            await updateMutation.mutateAsync({ id, payload });
+            await updateMutation.mutateAsync({ id, payload: buildUpdatePayload(values) });
             if (fromContext === 'post-create') {
               navigate(`/properties/${id}/gallery`, { state: { context: 'post-create' } });
             } else {
               navigate(`/dashboard${dashboardSearch}`);
             }
           } else {
-            const created = await createMutation.mutateAsync(payload);
+            const created = await createMutation.mutateAsync(buildPayload(values));
             navigate(`/properties/${created.id}/gallery`, {
               state: { context: 'post-create', showSplash: true },
             });

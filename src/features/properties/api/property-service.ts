@@ -7,6 +7,7 @@ import type {
   PropertyListResponseDto,
   PropertyStatus,
   ReorderImagesDto,
+  UpdatePropertyDto,
 } from '@/shared/api/types';
 
 function buildQuery(params: FilterPropertyDto = {}) {
@@ -43,7 +44,7 @@ export async function createProperty(payload: CreatePropertyDto) {
   });
 }
 
-export async function updateProperty(id: string, payload: Partial<CreatePropertyDto>) {
+export async function updateProperty(id: string, payload: UpdatePropertyDto) {
   return apiFetch<PropertyDetailDto>(`/properties/${id}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
@@ -54,6 +55,12 @@ export async function softDeleteProperty(id: string) {
   return apiFetch<void>(`/properties/${id}`, {
     method: 'DELETE',
   });
+}
+
+/** Imóveis na lixeira — excluídos e ainda dentro dos 30 dias de retenção. */
+export async function fetchTrash(skip = 0, take = 20) {
+  const params = new URLSearchParams({ skip: String(skip), take: String(take) });
+  return apiFetch<PropertyListResponseDto>(`/properties/trash?${params}`);
 }
 
 export async function restoreProperty(id: string) {
@@ -90,12 +97,6 @@ export async function uploadPropertyImages(propertyId: string, images: File[], r
   return apiFetch<{ images: unknown[]; total: number }>(`/properties/${propertyId}/images`, {
     method: 'POST',
     body: formData,
-  });
-}
-
-export async function deletePropertyImage(propertyId: string, imageId: string) {
-  return apiFetch<void>(`/properties/${propertyId}/images/${imageId}`, {
-    method: 'DELETE',
   });
 }
 

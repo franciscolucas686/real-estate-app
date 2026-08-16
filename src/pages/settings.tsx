@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Plus, Trash2, Check, CheckCircle, Loader2 } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useLogout } from '@/features/auth/use-auth';
+import { useLogout, useLogoutAll } from '@/features/auth/use-auth';
 import { PageContainer } from '@/layout/page-container';
 import { BOTTOM_NAV_CLEARANCE } from '@/layout/app-nav';
 import { cn } from '@/shared/cn';
@@ -28,10 +28,12 @@ import {
   type WhatsappNumberFormValues,
 } from '@/features/settings/site-settings.schema';
 import { getErrorMessage } from '@/shared/api/api-error';
+import { ConfirmModal } from '@/ui/confirm-modal';
 
 export function Settings() {
   const navigate = useNavigate();
   const logout = useLogout();
+  const logoutAll = useLogoutAll();
   const queryClient = useQueryClient();
 
   const [saved, setSaved] = useState(false);
@@ -42,6 +44,7 @@ export function Settings() {
   const initialized = useRef(false);
   const [splashVisible, setSplashVisible] = useState(false);
   const [logoutSplashVisible, setLogoutSplashVisible] = useState(false);
+  const [confirmLogoutAll, setConfirmLogoutAll] = useState(false);
 
   // Three writes, three mutations. Each used to carry a hand-rolled pending flag and error
   // string — six `useState`s for what `isPending`, `error` and `variables` already give.
@@ -159,6 +162,15 @@ export function Settings() {
 
   async function handleLogout() {
     await logout.mutateAsync();
+    queryClient.clear();
+    setLogoutSplashVisible(true);
+  }
+
+  // Reaproveita o splash e o efeito de navegação do logout comum: para este
+  // dispositivo o desfecho é idêntico, só o alcance no servidor difere.
+  async function handleLogoutAll() {
+    setConfirmLogoutAll(false);
+    await logoutAll.mutateAsync();
     queryClient.clear();
     setLogoutSplashVisible(true);
   }
@@ -394,17 +406,35 @@ export function Settings() {
         </section>
 
         {/* Logout */}
-        <section className="mb-6">
+        <section className="mb-6 flex flex-col gap-3">
           <button
             type="button"
             onClick={handleLogout}
-            disabled={logout.isPending || logoutSplashVisible}
+            disabled={logout.isPending || logoutAll.isPending || logoutSplashVisible}
             className="flex h-14 w-full items-center justify-center rounded-xl border border-danger text-sm font-semibold text-danger transition-colors active:bg-danger/10 disabled:opacity-60 md:hover:bg-danger/10"
           >
             {logout.isPending ? 'Saindo...' : 'Sair da conta'}
           </button>
+
+          <button
+            type="button"
+            onClick={() => setConfirmLogoutAll(true)}
+            disabled={logout.isPending || logoutAll.isPending || logoutSplashVisible}
+            className="flex h-12 w-full items-center justify-center rounded-xl text-sm font-medium text-foreground-subtle transition-colors active:bg-surface-subtle disabled:opacity-60 md:hover:bg-surface-subtle"
+          >
+            {logoutAll.isPending ? 'Encerrando sessões...' : 'Sair de todos os dispositivos'}
+          </button>
         </section>
       </PageContainer>
+
+      <ConfirmModal
+        open={confirmLogoutAll}
+        onClose={() => setConfirmLogoutAll(false)}
+        title="Sair de todos os dispositivos"
+        message="Todas as sessões desta conta serão encerradas, inclusive a deste aparelho. Quem estiver logado em outro celular ou computador precisará entrar de novo."
+        confirmLabel="Sim, encerrar todas"
+        onConfirm={handleLogoutAll}
+      />
 
       <SuccessSplash visible={splashVisible}>
         <CheckCircle size={64} className="text-action" />

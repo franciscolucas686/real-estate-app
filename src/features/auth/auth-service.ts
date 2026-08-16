@@ -29,8 +29,19 @@ export async function getMe() {
   return apiFetch<UserProfile>('/auth/me');
 }
 
+/** Encerra só este dispositivo. As outras sessões da conta seguem abertas. */
 export async function logout() {
   return apiFetch<void>('/auth/logout', {
+    method: 'POST',
+  });
+}
+
+/**
+ * Encerra a sessão em todos os dispositivos, inclusive neste. É a ação a usar quando
+ * se suspeita que uma sessão vazou — o logout comum só fecha a porta local.
+ */
+export async function logoutAll() {
+  return apiFetch<{ message: string; count: number }>('/auth/logout-all', {
     method: 'POST',
   });
 }

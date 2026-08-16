@@ -38,10 +38,14 @@ function resolveRoomId(roomId: string | null, idMap: Map<string, string>): strin
   return idMap.get(roomId) ?? roomId;
 }
 
-// Executes a GalleryPatch against the API, in the order required to keep the
-// backend consistent: create/rename rooms, move photos out of rooms that are
-// about to be deleted, delete rooms, delete remaining removed photos, then
-// upload new ones.
+// Executes a GalleryPatch against the API, in the order required to keep the backend
+// consistent: create/rename rooms, move photos out of rooms that are about to be
+// deleted, delete rooms, delete the removed photos, then upload the new ones.
+//
+// Deleting a room does not delete its photos — the FK is `onDelete: SetNull`, so they
+// come back as "Sem ambiente" (see `buildGalleryPatch`). That is why the delete step
+// still has work to do after the room is gone, and why it must come after: the ids
+// survive the room, so `bulkDeletePropertyImages` still matches them.
 export async function executeGalleryPatch(propertyId: string, patch: GalleryPatch): Promise<void> {
   const idMap = new Map<string, string>();
 

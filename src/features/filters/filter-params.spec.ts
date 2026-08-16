@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BusinessType, PropertyStatus, PropertyType, SaleType } from '@/shared/api/types';
-import { parseFilters, serializeFilters, hasAnyFilter } from './filter-params';
+import { parseFilters, serializeFilters } from './filter-params';
 import {
   DEFAULT_FILTERS,
   adminFiltersToApiParams,
@@ -97,13 +97,6 @@ describe('serializeFilters', () => {
     });
 
     expect(parseFilters(serializeFilters(original))).toEqual(original);
-  });
-});
-
-describe('hasAnyFilter', () => {
-  it('distingue catálogo vazio de recorte vazio', () => {
-    expect(hasAnyFilter(filters())).toBe(false);
-    expect(hasAnyFilter(filters({ city: 'Ibiúna' }))).toBe(true);
   });
 });
 

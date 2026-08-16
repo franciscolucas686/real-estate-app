@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { HelpCircle, Plus, Search as SearchIcon, Settings } from 'lucide-react';
+import { HelpCircle, Plus, Search as SearchIcon, Settings, Trash2 } from 'lucide-react';
 import { useProperties } from '@/features/properties/hooks/use-properties';
 import { usePropertyStatusCounts } from '@/features/properties/hooks/use-property-status-counts';
 import {
@@ -176,7 +176,9 @@ export function Dashboard() {
   }, [codeDraft, codeSearch, setParam]);
 
   const { data: user } = useMe();
-  const firstName = user?.name.split(' ')[0] ?? '';
+  // `name` é anulável na coluna e o backend repassa o null — ver `UserProfile`. O `?.`
+  // que existia cobria só o `user`, então uma conta sem nome derrubava o render inteiro.
+  const firstName = user?.name?.split(' ')[0] ?? '';
 
   const { counts, isLoading: countsLoading } = usePropertyStatusCounts(true);
 
@@ -265,6 +267,11 @@ export function Dashboard() {
             aria-label="O que significam os status"
           >
             <HelpCircle size={24} aria-hidden="true" />
+          </Button>
+          <Button asChild variant="outline" size="icon" shape="pill">
+            <Link to="/trash" aria-label="Lixeira">
+              <Trash2 size={24} aria-hidden="true" />
+            </Link>
           </Button>
           <Button asChild variant="outline" size="icon" shape="pill">
             <Link to="/settings" aria-label="Configurações">

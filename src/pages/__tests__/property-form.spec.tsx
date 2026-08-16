@@ -303,6 +303,49 @@ describe('PropertyForm — modo edição', () => {
       ).not.toBeInTheDocument(),
     );
   });
+
+  /**
+   * Campo vazio num PATCH tem de viajar como `null`, não ser omitido.
+   *
+   * O payload de edição era o mesmo da criação, que descarta o que está vazio — e
+   * `PATCH` lê ausência como "mantenha o que está lá". Efeito prático: apagar a taxa de
+   * condomínio (ou os quartos, ou a área construída) salvava sem erro e devolvia o
+   * valor antigo no recarregamento. O `rentPrice` entra na mesma asserção porque este
+   * imóvel é de venda: a coluna do outro tipo de negócio precisa ser limpa, ou a
+   * ordenação por preço passa a ler um valor que não vale mais.
+   */
+  it('esvaziar um campo manda null explícito, não omite a chave', async () => {
+    const user = userEvent.setup();
+    setMockProperty(EXISTING);
+
+    let patched: Record<string, unknown> | null = null;
+    server.use(
+      http.patch('/api/properties/:id', async ({ request }) => {
+        patched = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(EXISTING);
+      }),
+    );
+
+    renderEditPropertyForm();
+    await screen.findByDisplayValue('R$ 450.000');
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+    await user.click(await screen.findByRole('button', { name: 'Continuar' }));
+    await user.click(await screen.findByRole('button', { name: 'Salvar alterações' }));
+
+    await waitFor(() => expect(patched).not.toBeNull());
+    expect(patched).toMatchObject({
+      condoFee: null,
+      bedrooms: null,
+      bathrooms: null,
+      suites: null,
+      parkingSpaces: null,
+      builtArea: null,
+      rentPrice: null,
+      // O que está preenchido continua indo com valor.
+      price: '450000.00',
+      totalArea: 500,
+    });
+  });
 });
 
 /**

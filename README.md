@@ -19,8 +19,7 @@
 ![PWA](https://img.shields.io/badge/PWA-instal%C3%A1vel-5A0FC8?style=flat-square&logo=pwa)
 ![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT-lightgrey?style=flat-square)
 
-<!-- 📌 SUBSTITUA pela URL do seu deploy na Vercel -->
-**[🔗 Ver aplicação](https://SEU-DEPLOY.vercel.app)** · **[⚙️ Repositório da API](https://github.com/franciscolucas686/api-real-estate)**
+**[🔗 Ver aplicação](https://francinegestoraimobiliaria.com)** · **[⚙️ Repositório da API](https://github.com/franciscolucas686/api-real-estate)**
 
 </div>
 

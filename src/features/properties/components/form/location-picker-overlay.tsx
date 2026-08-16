@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import { apiFetch } from '@/shared/api/api-client';
 import { useState } from 'react';
@@ -84,7 +84,18 @@ export function LocationPickerOverlay({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /**
+   * Sequência do clique mais recente. Sem ela, dois toques rápidos no mapa deixavam a
+   * última resposta a chegar vencer — que pode ser a do clique anterior, já que o
+   * backend espaça as chamadas ao Nominatim em até 1s. O marcador ficava no ponto
+   * novo e o endereço resolvido descrevia o antigo, e era esse endereço que o
+   * formulário salvava.
+   */
+  const cliqueAtual = useRef(0);
+
   const handleClick = useCallback(async (lat: number, lng: number) => {
+    const sequencia = ++cliqueAtual.current;
+
     setMarkerPos([lat, lng]);
     setLoading(true);
     try {
@@ -92,11 +103,13 @@ export function LocationPickerOverlay({
         method: 'POST',
         body: JSON.stringify({ latitude: lat, longitude: lng }),
       });
-      setResolved(result);
+      if (sequencia === cliqueAtual.current) setResolved(result);
     } catch {
-      setResolved(null);
+      if (sequencia === cliqueAtual.current) setResolved(null);
     } finally {
-      setLoading(false);
+      // O loading também é do clique corrente: desligá-lo a partir de uma resposta
+      // velha esconderia o spinner enquanto a requisição atual ainda está em curso.
+      if (sequencia === cliqueAtual.current) setLoading(false);
     }
   }, []);
 
