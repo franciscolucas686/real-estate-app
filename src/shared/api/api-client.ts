@@ -42,30 +42,68 @@ let lastRefreshFailure = 0;
  */
 const REFRESH_FAILURE_COOLDOWN_MS = 30_000;
 
-async function refreshToken(): Promise<boolean> {
-  if (isRefreshing && pendingRefresh) return pendingRefresh;
+/**
+ * Rotas cujo 401 significa "credencial errada", nunca "access token expirado".
+ *
+ * Sem esta lista, uma senha digitada errada com sessão ainda válida no cookie jar
+ * entrava em laço: `/auth/login` responde 401, o refresh (que continua válido) devolve
+ * 200, a requisição é repetida, o login responde 401 de novo — e como o cooldown é
+ * zerado a cada refresh bem-sucedido, nada interrompia o ciclo até o teto de 30/5min
+ * de `POST /auth/refresh` estourar. Ou seja: um erro de digitação queimava o balde de
+ * refresh do IP inteiro por cinco minutos, derrubando a sessão de quem estivesse
+ * trabalhando. É a mesma falha que o cooldown foi criado para evitar, por outra porta.
+ */
+const CREDENTIAL_ROUTES = ['/auth/login', '/auth/register', '/auth/refresh'];
 
+function isCredentialRoute(path: string): boolean {
+  return CREDENTIAL_ROUTES.some((route) => path.startsWith(route));
+}
+
+async function runRefresh(): Promise<boolean> {
   if (Date.now() - lastRefreshFailure < REFRESH_FAILURE_COOLDOWN_MS) return false;
 
-  isRefreshing = true;
-  pendingRefresh = fetch(`${API_BASE}/auth/refresh`, {
+  const ok = await fetch(`${API_BASE}/auth/refresh`, {
     method: 'POST',
     credentials: 'include',
   })
     .then((res) => res.ok)
-    .catch(() => false)
-    .then((ok) => {
-      // Zerado no sucesso para não penalizar quem acabou de logar depois de uma
-      // sessão anônima: o cooldown mede falhas seguidas, não o histórico da aba.
-      lastRefreshFailure = ok ? 0 : Date.now();
-      return ok;
-    })
-    .finally(() => {
-      isRefreshing = false;
-      pendingRefresh = null;
-    });
+    .catch(() => false);
 
-  return pendingRefresh;
+  // Zerado no sucesso para não penalizar quem acabou de logar depois de uma
+  // sessão anônima: o cooldown mede falhas seguidas, não o histórico da aba.
+  lastRefreshFailure = ok ? 0 : Date.now();
+  return ok;
+}
+
+/**
+ * A dedupe por promessa cobre chamadas concorrentes **desta** aba. Entre abas ela não
+ * ajuda: são contextos JS separados que dividem o mesmo cookie jar, expiram juntos e
+ * disparam dois refresh com o mesmo token — o segundo chega depois da rotação do
+ * primeiro e leva 401, deslogando quem tinha sessão válida.
+ *
+ * `navigator.locks` é travado por origem, então serializa as abas: a segunda espera,
+ * e ao entrar encontra o cookie já renovado. `apiFetch` reaproveita isso retentando a
+ * requisição original antes de pedir refresh de novo.
+ */
+async function refreshUnderLock(): Promise<boolean> {
+  // Sem Web Locks (Safari antigo, jsdom) o comportamento é o de antes: só a dedupe
+  // por aba. Nada quebra, a corrida entre abas apenas continua possível.
+  if (typeof navigator === 'undefined' || !navigator.locks) return runRefresh();
+
+  return navigator.locks.request('auth-refresh', () => runRefresh());
+}
+
+function refreshToken(): Promise<boolean> {
+  if (isRefreshing && pendingRefresh) return pendingRefresh;
+
+  isRefreshing = true;
+  const inFlight = refreshUnderLock().finally(() => {
+    isRefreshing = false;
+    pendingRefresh = null;
+  });
+  pendingRefresh = inFlight;
+
+  return inFlight;
 }
 
 /** Chamado no login para que a primeira requisição autenticada não caia no cooldown. */
@@ -73,7 +111,12 @@ export function resetRefreshCooldown(): void {
   lastRefreshFailure = 0;
 }
 
-export async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(
+  path: string,
+  options: RequestInit = {},
+  /** Interno: marca a chamada como sendo já a segunda tentativa. */
+  retried = false,
+): Promise<T> {
   const headers = new Headers(options.headers);
   const hasBody = options.body !== undefined;
 
@@ -87,10 +130,12 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     credentials: 'include',
   });
 
-  if (response.status === 401) {
+  // Uma tentativa só, e nunca nas rotas de credencial. As duas guardas são o que
+  // impede o laço descrito em CREDENTIAL_ROUTES — a recursão aqui não tinha teto.
+  if (response.status === 401 && !retried && !isCredentialRoute(path)) {
     const refreshed = await refreshToken();
     if (refreshed) {
-      return apiFetch<T>(path, options);
+      return apiFetch<T>(path, options, true);
     }
   }
 

@@ -111,4 +111,57 @@ describe('apiFetch — tentativa de refresh em 401', () => {
     expect(refreshCount).toBe(1);
     expect(protegidoCount).toBe(2);
   });
+
+  // O laço: senha errada com sessão ainda válida. `/auth/login` devolve 401, o refresh
+  // devolve 200, a requisição é repetida, o login devolve 401 de novo — e o cooldown,
+  // zerado a cada refresh bem-sucedido, não segurava nada. Só parava no teto de 30/5min
+  // de POST /auth/refresh, queimando o balde do IP inteiro por causa de um typo.
+  it('não tenta refresh quando o 401 vem de /auth/login', async () => {
+    let loginCount = 0;
+    server.use(
+      http.post('/api/auth/refresh', () => {
+        refreshCount += 1;
+        return new HttpResponse(null, { status: 200 });
+      }),
+      http.post('/api/auth/login', () => {
+        loginCount += 1;
+        return HttpResponse.json(
+          { statusCode: 401, message: 'Email ou senha inválidos', error: 'Unauthorized' },
+          { status: 401 },
+        );
+      }),
+    );
+
+    const { apiFetch } = await freshClient();
+
+    await expect(
+      apiFetch('/auth/login', { method: 'POST', body: JSON.stringify({}) }),
+    ).rejects.toMatchObject({ statusCode: 401 });
+
+    expect(loginCount).toBe(1);
+    expect(refreshCount).toBe(0);
+  });
+
+  it('tenta o refresh uma vez só, mesmo que a repetição também devolva 401', async () => {
+    let protegidoCount = 0;
+    server.use(
+      http.post('/api/auth/refresh', () => {
+        refreshCount += 1;
+        return new HttpResponse(null, { status: 200 });
+      }),
+      http.get('/api/protegido', () => {
+        protegidoCount += 1;
+        return HttpResponse.json({ statusCode: 401, message: 'x', error: 'e' }, { status: 401 });
+      }),
+    );
+
+    const { apiFetch } = await freshClient();
+
+    await expect(apiFetch('/protegido')).rejects.toMatchObject({ statusCode: 401 });
+
+    // Duas chamadas ao recurso (original + uma repetição) e um refresh. Sem o teto, a
+    // recursão não tinha fim — cada 401 pedia refresh, que sucedia, que repetia.
+    expect(protegidoCount).toBe(2);
+    expect(refreshCount).toBe(1);
+  });
 });
