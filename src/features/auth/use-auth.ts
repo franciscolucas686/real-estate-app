@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getMe, login, logout } from '@/features/auth/auth-service';
+import { getMe, login, logout, logoutAll } from '@/features/auth/auth-service';
 import type { LoginDto } from '@/shared/api/types';
 
 export function useMe() {
@@ -32,6 +32,21 @@ export function useLogout() {
 
   return useMutation({
     mutationFn: logout,
+    onSuccess: () => {
+      queryClient.clear();
+    },
+  });
+}
+
+/**
+ * Igual ao `useLogout` do ponto de vista deste dispositivo — o cache é limpo do mesmo
+ * jeito. A diferença está no servidor, que apaga todas as sessões da conta.
+ */
+export function useLogoutAll() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: logoutAll,
     onSuccess: () => {
       queryClient.clear();
     },

@@ -126,6 +126,12 @@ export const handlers = [
 
   http.post('/api/auth/refresh', () => new HttpResponse(null, { status: 401 })),
 
+  http.post('/api/auth/logout', () => new HttpResponse(null, { status: 200 })),
+
+  http.post('/api/auth/logout-all', () =>
+    HttpResponse.json({ message: 'Sessões encerradas em todos os dispositivos', count: 2 }),
+  ),
+
   http.get('/api/site-settings', () => HttpResponse.json(siteSettings)),
 
   http.patch('/api/site-settings', async ({ request }) => {
