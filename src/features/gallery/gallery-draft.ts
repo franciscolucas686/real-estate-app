@@ -46,23 +46,30 @@ export function buildGalleryPatch(
     .map((r) => ({ roomId: r.id, name: r.name }));
 
   const roomsToDelete = draftRooms.filter((r) => !r.isNew && r.deleted).map((r) => r.id);
-  const deletedRoomIds = new Set(roomsToDelete);
 
-  // Existing photos whose room changed — resolved/executed before any room
-  // deletion so photos rescued out of a doomed room aren't cascaded away.
+  // Existing photos whose room changed. Executed before any room deletion so a photo
+  // moved out of a doomed room keeps its new room instead of being reset by the
+  // `SetNull` below.
   const imagesToMove = draftImages
     .filter((img) => !img.isNew && !img.deleted && img.roomId !== img.originalRoomId)
     .map((img) => ({ imageId: img.id, roomId: img.roomId }));
 
-  // Individually-removed existing photos, excluding ones already covered by
-  // a room deletion above (the backend cascades those away with the room).
+  /*
+   * Every existing photo marked as removed — including the ones that belonged to a
+   * room being deleted in the same patch.
+   *
+   * Those used to be excluded, on the belief that "the backend cascades those away
+   * with the room". It does not: `PropertyImage.room` is `onDelete: SetNull` in the
+   * Prisma schema, and `DELETE /properties/:id/rooms/:roomId` says so in its own
+   * summary ("imagens mantidas sem associacao"). So deleting an ambiente detached its
+   * photos instead of deleting them, and since `GalleryManagement.handleDeleteRoom`
+   * also marks them `deleted`, the patch skipped them entirely: the operator confirmed
+   * "excluir o ambiente", watched the photos disappear, saved — and on the next load
+   * they were all back under "Sem ambiente", still in the bucket, still counting for
+   * the property's ACTIVE status.
+   */
   const imagesToDelete = draftImages
-    .filter(
-      (img) =>
-        !img.isNew &&
-        img.deleted &&
-        !(img.originalRoomId !== null && deletedRoomIds.has(img.originalRoomId)),
-    )
+    .filter((img) => !img.isNew && img.deleted)
     .map((img) => img.id);
 
   const imagesToUpload = draftImages
