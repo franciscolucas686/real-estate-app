@@ -89,7 +89,7 @@ export function TopNav({
     >
       <Link
         to="/"
-        className="hidden items-center gap-2 text-lg font-semibold text-primary-foreground transition-opacity md:hover:opacity-80 lg:flex"
+        className="hidden items-center gap-4 text-lg font-semibold text-primary-foreground transition-opacity md:hover:opacity-80 lg:flex"
       >
         <BrandMark className="size-7" />
         Francine Gestora Imobiliária
