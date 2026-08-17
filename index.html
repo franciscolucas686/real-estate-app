@@ -2,20 +2,44 @@
 <html lang="pt-br">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/favicon/favicon-96x96.png" sizes="96x96" />
-    <link rel="icon" type="image/svg+xml" href="/favicon/favicon.svg" />
-    <link rel="shortcut icon" href="/favicon/favicon.ico" />
-    <link rel="apple-touch-icon" sizes="180x180" href="/favicon/apple-touch-icon.png" />
+    <!-- O `rel="icon" type="image/svg+xml"` que existia aqui apontava para um favicon.svg de
+         681KB que não era vetor: um `<image ... base64>` dentro de um `<svg>`, zero `<path>`.
+         O Chrome prefere o SVG ao PNG quando os dois existem, então a aba custava 681KB para
+         desenhar 16px — e sem nitidez extra, já que por dentro era um bitmap de 484px. -->
+    <!-- O `.ico` fica na **raiz**, não em `/icons/`, porque o navegador pede `/favicon.ico`
+         sozinho quando nenhum `<link>` serve o caso dele — e num SPA com fallback esse pedido
+         voltava o `index.html` com status 200, ou seja, HTML no lugar de imagem. Ele carrega
+         16/32/48 num arquivo só (PNG embutido, com alpha); o de 96 existe para telas densas,
+         onde 48 seria reescalado. -->
+    <link rel="icon" href="/favicon.ico" sizes="16x16 32x32 48x48" />
+    <link rel="icon" type="image/png" href="/icons/favicon-96.png" sizes="96x96" />
+    <!-- Opaco e de cantos retos de propósito: o iOS compõe transparência sobre **preto** e
+         aplica o arredondamento dele por cima. Um ícone com alpha sai com fundo preto. Isto vale
+         só aqui e nos `maskable`; os ícones `any` do manifest são transparentes justamente pelo
+         motivo oposto — ver o comentário deles em `vite.config.ts`. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
     <!-- `maximum-scale=1, user-scalable=no` was removed: blocking pinch-zoom is a
          direct WCAG 1.4.4 (Resize Text, AA) failure. It was there to stop iOS from
          auto-zooming when focusing an input, which is really a font-size problem —
          iOS only zooms for fields under 16px — so the inputs are 16px instead. -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <link rel="manifest" href="/manifest.json" />
+    <!-- Não declare `rel="manifest"` aqui. O vite-plugin-pwa injeta o dele no fim do
+         `<head>`, e o manifest é declarado uma vez só, em `vite.config.ts` — ver o comentário
+         no bloco `VitePWA`. Dois `<link rel="manifest">` fazem o navegador usar o primeiro e
+         ignorar o outro, o que já mascarou um manifest sem ícone algum. -->
     <meta name="theme-color" content="#00072D" />
     <meta name="mobile-web-app-capable" content="yes" />
+    <!-- O prefixado não é redundante com o de cima: o iOS só lê o `display: standalone` do
+         manifest a partir do Safari 17.4. Antes disso, sem esta tag o app abre com a barra do
+         navegador **e** o `apple-mobile-web-app-status-bar-style` logo abaixo é ignorado junto —
+         o que num app mobile-first cheio de `env(safe-area-inset-*)` desalinha o layout inteiro. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>Imobiliária Francine</title>
+    <!-- Igual ao `short_name` do manifest, e pela mesma razão que ele existe: sem esta tag o
+         rótulo na tela inicial do iOS cai no `<title>` abaixo, que a springboard trunca em ~12
+         caracteres — "Imobiliária F…". O `short_name` só é lido pelo iOS 17.4+. -->
+    <meta name="apple-mobile-web-app-title" content="Imob Francine" />
+    <title>Francine Gestora Imobiliária</title>
   </head>
   <body>
     <div id="root"></div>

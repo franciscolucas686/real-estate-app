@@ -139,5 +139,13 @@ export default tseslint.config(
     rules: { 'no-restricted-imports': 'off' },
   },
 
+  {
+    // Ferramentas de build rodam no Node, não no navegador. Sem isto o `console` e o `process`
+    // de `scripts/*.mjs` caem em `no-undef` — a regra só é desligada automaticamente nos
+    // arquivos `.ts`, pelo preset do typescript-eslint, e estes são JS puro.
+    files: ['scripts/**/*.mjs'],
+    languageOptions: { globals: globals.node },
+  },
+
   prettierPlugin,
 );
