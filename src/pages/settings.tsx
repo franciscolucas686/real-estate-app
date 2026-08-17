@@ -413,14 +413,14 @@ export function Settings() {
             disabled={logout.isPending || logoutAll.isPending || logoutSplashVisible}
             className="flex h-14 w-full items-center justify-center rounded-xl border border-danger text-sm font-semibold text-danger transition-colors active:bg-danger/10 disabled:opacity-60 md:hover:bg-danger/10"
           >
-            {logout.isPending ? 'Saindo...' : 'Sair da conta'}
+            {logout.isPending ? 'Saindo...' : 'Sair deste dispositivo'}
           </button>
 
           <button
             type="button"
             onClick={() => setConfirmLogoutAll(true)}
             disabled={logout.isPending || logoutAll.isPending || logoutSplashVisible}
-            className="flex h-12 w-full items-center justify-center rounded-xl text-sm font-medium text-foreground-subtle transition-colors active:bg-surface-subtle disabled:opacity-60 md:hover:bg-surface-subtle"
+            className="flex h-14 w-full items-center justify-center rounded-xl border border-danger text-sm font-medium text-danger transition-colors active:bg-danger/10 disabled:opacity-60 md:hover:bg-danger/10"
           >
             {logoutAll.isPending ? 'Encerrando sessões...' : 'Sair de todos os dispositivos'}
           </button>
@@ -431,7 +431,7 @@ export function Settings() {
         open={confirmLogoutAll}
         onClose={() => setConfirmLogoutAll(false)}
         title="Sair de todos os dispositivos"
-        message="Todas as sessões desta conta serão encerradas, inclusive a deste aparelho. Quem estiver logado em outro celular ou computador precisará entrar de novo."
+        message="Todas as sessões desta conta serão encerradas, inclusive a deste aparelho. Se você estiver logado em outro celular ou computador precisará entrar de novo."
         confirmLabel="Sim, encerrar todas"
         onConfirm={handleLogoutAll}
       />
