@@ -36,9 +36,11 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <!-- Igual ao `short_name` do manifest, e pela mesma razão que ele existe: sem esta tag o
-         rótulo na tela inicial do iOS cai no `<title>` abaixo, que a springboard trunca em ~12
-         caracteres — "Imobiliária F…". O `short_name` só é lido pelo iOS 17.4+. -->
-    <meta name="apple-mobile-web-app-title" content="Imob Francine" />
+         rótulo na tela inicial do iOS cai no `<title>` abaixo, e a springboard trunca em ~12
+         caracteres — "Francine Gestora Imobiliária" viraria "Francine Ges…". O `short_name` só é
+         lido pelo iOS 17.4+, então esta tag é o que cobre todo o resto. Se um dos dois mudar, o
+         outro muda junto: são o mesmo rótulo declarado duas vezes por limitação de plataforma. -->
+    <meta name="apple-mobile-web-app-title" content="Francine Gestora" />
     <title>Francine Gestora Imobiliária</title>
   </head>
   <body>

@@ -56,8 +56,13 @@ export default defineConfig(({ mode }) => {
           ],
         },
         manifest: {
+          // Os dois nomes que o app já usa na tela, e não uma terceira variação: `name` é a
+          // forma longa do `<title>` e da topbar, usada no diálogo de instalação, onde há
+          // espaço; `short_name` é a forma curta que a sidebar do console mostra, e é o que vai
+          // parar sob o ícone na tela inicial. Precisa acompanhar `apple-mobile-web-app-title`
+          // em `index.html`, que é quem cumpre este papel no iOS anterior ao 17.4.
           name: 'Francine Gestora Imobiliária',
-          short_name: 'Francine Ges. Imobiliaria',
+          short_name: 'Francine Gestora',
           description:
             'Plataforma de gestão e divulgação de imóveis da Francine Gestora Imobiliária.',
           // `id` fixa a identidade da instalação. Sem ele o Chrome deriva a identidade do
