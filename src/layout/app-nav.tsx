@@ -1,5 +1,4 @@
 import type { ComponentProps, ReactNode } from 'react';
-import { Home } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/shared/cn';
 
@@ -13,6 +12,35 @@ export interface NavItem {
 /** A nav entry in a list, with the React key the caller uses. */
 export interface NavItemDescriptor extends NavItem {
   key: string;
+}
+
+/**
+ * A marca da imobiliária, para as duas shells. Um `<img>` e não um glyph do lucide porque o mark
+ * é uma ilustração fotográfica (globo, mãos, cidade), não um ícone de linha — antes daqui a
+ * topbar desenhava um `Home` genérico e a sidebar do console as iniciais "FG".
+ *
+ * **`alt=""` é obrigatório, não descuido.** Os dois call sites já nomeiam o link que envolve a
+ * imagem: a topbar pelo texto irmão, que é visível sempre que o link é; o console por um
+ * `aria-label`, porque lá o texto ao lado é `hidden lg:inline` e some da árvore de
+ * acessibilidade no rail estreito. Um `alt` preenchido faria o leitor de tela anunciar a marca
+ * duas vezes.
+ *
+ * **28px é o piso desta arte.** Ela é fotográfica: abaixo disso as mãos e os prédios viram um
+ * borrão azul ao lado de um texto nítido. Se um slot novo precisar de menos que isso, o certo é
+ * não usar o mark ali, não encolhê-lo.
+ *
+ * O caminho do arquivo vive aqui e em nenhum outro lugar destas duas shells:
+ * `scripts/generate-icons.mjs` é quem decide os degraus da escada, e renomear um degrau lá não
+ * pode virar caça em dois arquivos. Note que ele **não** passa por `imageUrl()` — aquilo
+ * reescreve para `/cdn-cgi/image/...` e existe para foto de imóvel vinda da API; este é um asset
+ * estático do próprio deploy.
+ */
+export function BrandMark({ className }: { className?: string }) {
+  return (
+    // 128 cobre os dois slots em DPR 3 (40 × 3 = 120). Um degrau só, sem `srcSet`: a topbar
+    // aparece em toda página da vitrine, então um arquivo cacheado bate três alternativas.
+    <img src="/icons/logo-128.webp" alt="" className={cn('shrink-0 object-contain', className)} />
+  );
 }
 
 /**
@@ -61,10 +89,10 @@ export function TopNav({
     >
       <Link
         to="/"
-        className="hidden items-center gap-2 text-lg font-semibold text-primary-foreground transition-opacity md:hover:opacity-80 lg:flex"
+        className="hidden items-center gap-4 text-lg font-semibold text-primary-foreground transition-opacity md:hover:opacity-80 lg:flex"
       >
-        <Home size={20} className="text-action" aria-hidden="true" />
-        Minha Imobiliária
+        <BrandMark className="size-7" />
+        Francine Gestora Imobiliária
       </Link>
       {/* Absolutely positioned so it centers on the nav's full width, ignoring the
           asymmetric widths of the logo (left) and rightSlot (right). */}

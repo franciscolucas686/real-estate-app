@@ -59,7 +59,23 @@ export function Login() {
       <div className="w-full max-w-sm md:mb-16">
         {/* Logo */}
         <div className="mb-10 flex justify-center">
-          <img src="/logo.png" alt="Logo" className="h-20 object-contain" />
+          {/* Mesma escada da splash (`ui/splash-screen.tsx`), com o `sizes` deste slot: a
+              logo é quadrada e `h-20` são 80px, então nem em DPR 3 (240px) isto passa do
+              degrau de 384 — a tela de login nunca baixa o arquivo grande.
+
+              O degrau de 128 existe para os brand marks das navs (`BrandMark` em
+              `layout/app-nav.tsx`) e entra aqui de carona: ele serve **só o DPR 1**, onde 80px
+              pedem 80px e o 128 é o primeiro candidato que cobre — 9KB no lugar de 50. De DPR 2
+              para cima, 160px já não cabem em 128 e a escolha volta a ser o 384, que é o motivo
+              de o `src` de fallback continuar sendo ele. A splash não ganha um degrau desses: o
+              slot dela é de 288px, que nem em DPR 1 o 128 alcança. */}
+          <img
+            src="/icons/logo-384.webp"
+            srcSet="/icons/logo-128.webp 128w, /icons/logo-384.webp 384w, /icons/logo-576.webp 576w, /icons/logo-1024.webp 1024w"
+            sizes="80px"
+            alt="Logo"
+            className="h-20 object-contain"
+          />
         </div>
 
         <h1 className="mb-8 text-center text-2xl font-bold text-foreground">

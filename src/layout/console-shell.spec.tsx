@@ -101,7 +101,7 @@ describe('ConsoleShell', () => {
     it('a marca leva para a home, como a da topbar', () => {
       renderAt('/dashboard');
 
-      expect(sidebar().getByRole('link', { name: /Minha Imobiliária/ })).toHaveAttribute(
+      expect(sidebar().getByRole('link', { name: /Francine Gestora/ })).toHaveAttribute(
         'href',
         '/',
       );

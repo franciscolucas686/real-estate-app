@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/shared/cn';
 import { SkipLink } from '@/layout/skip-link';
-import { BottomNav, BottomNavItem, type NavItemDescriptor } from '@/layout/app-nav';
+import { BottomNav, BottomNavItem, BrandMark, type NavItemDescriptor } from '@/layout/app-nav';
 
 /**
  * Console paths that belong to `/dashboard` without sharing its prefix — the property
@@ -92,12 +92,21 @@ export function ConsoleShell({
             the only chrome with no one-click way out to the public site. */}
         <Link
           to="/"
-          className="mb-4 flex items-center gap-2 rounded-xl px-2 py-2 text-primary-foreground transition-opacity md:hover:opacity-80"
+          // O `aria-label` é o nome do link, e ele é necessário: abaixo de `lg` o texto ao lado é
+          // `hidden`, ou seja `display:none`, e sai da árvore de acessibilidade. Enquanto a marca
+          // era o `<span>FG</span>` o nome vinha dele; com um `<img alt="">` no lugar, o link
+          // ficaria **sem nome nenhum** no rail estreito (WCAG 4.1.2). Em `lg` ele casa exatamente
+          // com o texto visível, então 2.5.3 também fecha. Nenhum spec pega isto: o jsdom não
+          // aplica CSS, então o texto oculto continua na árvore durante o teste.
+          aria-label="Francine Gestora"
+          // `px-1` abaixo de `lg` é aritmética, não gosto: o `<aside>` é `w-16 px-2`, ou seja 48px
+          // de caixa de conteúdo, e com o `px-2` que este link tinha sobrariam 32 — a marca de
+          // 40px estouraria o padding. 48 − 8 = 40 exatos. O `justify-center` a assenta no meio
+          // do rail; a partir de `lg` a sidebar abre para `w-56` e tudo volta a alinhar à esquerda.
+          className="mb-4 flex items-center justify-center gap-2 rounded-xl px-1 py-2 text-primary-foreground transition-opacity md:hover:opacity-80 lg:justify-start lg:px-2"
         >
-          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-action text-sm font-bold">
-            MI
-          </span>
-          <span className="hidden truncate text-sm font-semibold lg:inline">Minha Imobiliária</span>
+          <BrandMark className="size-10" />
+          <span className="hidden truncate text-sm font-semibold lg:inline">Francine Gestora</span>
         </Link>
 
         {/* Same entries as the bottom bar and as the storefront's top nav. `title` carries the

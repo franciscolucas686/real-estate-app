@@ -19,5 +19,23 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./src/test/setup.ts'],
     css: true,
+    // O default do Vitest é 5s, e a suíte não tinha margem para ele. Medido com
+    // `--reporter=verbose` nesta máquina (16 núcleos, ocioso), os mais lentos são
+    // ~1,5–2,2s: "mostra 12 imóveis por página" (2177ms) renderiza doze cards com
+    // carrossel, e os três do `property-form` percorrem um wizard inteiro digitando com
+    // `user-event`. Isso é fator 2,3 de folga — qualquer coisa que deixe a máquina 2,5×
+    // mais lenta derruba um teste, e o runner do GitHub Actions é bem mais lento que este.
+    //
+    // Foi exatamente assim que apareceu: uma execução falhou um único teste com
+    // `environment` em 129s no lugar dos 35s habituais, porque um `eslint --fix` disputava
+    // CPU ao lado. Confirmado depois estreitando o teto de propósito — com
+    // `--testTimeout=2000` caem seis testes, todos por timeout e nenhum por asserção.
+    //
+    // A lentidão é legítima e não vale "otimizar": `test/render.tsx` já desliga o retry do
+    // React Query (`retry: false`), então não há backoff escondido aqui — o custo é o de
+    // dirigir formulários reais através do DOM real, que é justamente o que estes testes
+    // existem para fazer. O que estava errado era o teto, não os testes.
+    testTimeout: 20_000,
+    hookTimeout: 20_000,
   },
 });
