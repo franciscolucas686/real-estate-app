@@ -20,13 +20,18 @@ import type { UserProfile } from '@/shared/api/types';
  * was fire-and-forget, so `mutateAsync` resolved with `['me']` still empty and the caller
  * navigated into a guard that had no session yet.
  *
- * The `ProtectedRoute` specs are characterisation: the guard is already correct and these
- * lock it that way. Worth stating why, because the reasoning is not obvious from the code
- * — a data-less query that starts fetching is reset to `status: 'pending'` with its error
- * cleared (v5's `Query` reducer), so `isLoading` covers the refetch-after-401 window and
- * the guard shows its loader rather than reading the gap as "no session". Anyone tempted
- * to "fix" that by reaching for `isFetching`/`isError` will find these tests already
- * describe the behaviour.
+ * The `ProtectedRoute` specs are characterisation. What they lock is the consequence of
+ * `getMe` treating a 401 as the **answer** `null` rather than as an error: `['me']` now
+ * always carries data, so `isLoading` is true only on the very first fetch, and a session
+ * known to be absent redirects at once instead of holding a loader through a background
+ * refetch. That is the point — the guard has a definitive answer and should act on it.
+ *
+ * This used to read the opposite way, and for a real reason at the time: a data-less query
+ * that starts fetching is reset to `status: 'pending'` with its error cleared, so the
+ * error model made the guard wait. Modelling "anonymous" as an error is exactly what kept
+ * `/auth/me` permanently stale and refetching, so it went; the guarantee that login does
+ * not race the guard now comes from `useLogin` awaiting its own invalidation, which the
+ * spec at the bottom of this file pins.
  */
 
 const USER: UserProfile = {
@@ -72,11 +77,16 @@ function renderGuarded(client: QueryClient) {
   );
 }
 
-/** Drives `['me']` into the errored state the anonymous 401 leaves behind. */
-async function seedErroredSession(client: QueryClient) {
+/**
+ * Drives `['me']` into the state an anonymous visitor leaves behind: **success**, carrying
+ * `null`. The assertions are the contract of `getMe` — a 401 must arrive as data, or the query
+ * goes back to being permanently stale and `/auth/me` starts repeating on every focus.
+ */
+async function seedAnonymousSession(client: QueryClient) {
   meFails();
-  await client.fetchQuery({ queryKey: ['me'], queryFn: getMe }).catch(() => undefined);
-  expect(client.getQueryState(['me'])?.status).toBe('error');
+  await client.fetchQuery({ queryKey: ['me'], queryFn: getMe });
+  expect(client.getQueryState(['me'])?.status).toBe('success');
+  expect(client.getQueryData(['me'])).toBeNull();
 }
 
 describe('ProtectedRoute', () => {
@@ -92,22 +102,25 @@ describe('ProtectedRoute', () => {
     expect(screen.queryByText('Formulário de login')).not.toBeInTheDocument();
   });
 
-  it('does not bounce to /login while an already-errored session is refetching', async () => {
+  it('redirects at once on a known-absent session, without waiting out a background refetch', async () => {
     const client = makeClient();
-    await seedErroredSession(client);
+    await seedAnonymousSession(client);
 
-    // The state right after a successful login: the cached session is still an error, and
-    // the refetch that will replace it has not landed yet.
+    // A refetch is pending and will eventually answer with a user, but the cache already
+    // holds a definitive `null`. Holding a loader over a known answer is what the old error
+    // model did; the honest response is the redirect. Nothing reaches this window through
+    // login, because `useLogin` keeps its mutation pending until the refetch has landed —
+    // the spec at the bottom of this file is what guarantees that.
     meSucceedsSlowly();
     renderGuarded(client);
 
-    expect(await screen.findByText('Painel')).toBeInTheDocument();
-    expect(screen.queryByText('Formulário de login')).not.toBeInTheDocument();
+    expect(await screen.findByText('Formulário de login')).toBeInTheDocument();
+    expect(screen.queryByText('Painel')).not.toBeInTheDocument();
   });
 
   it('still redirects when the session is genuinely absent', async () => {
     const client = makeClient();
-    await seedErroredSession(client);
+    await seedAnonymousSession(client);
 
     // No refetch pending and no user: this is the case the guard exists for.
     client.setDefaultOptions({ queries: { retry: false, enabled: false } });
@@ -148,7 +161,7 @@ describe('useLogin', () => {
   it('keeps the mutation pending until the session query has refetched', async () => {
     const user = userEvent.setup();
     const client = makeClient();
-    await seedErroredSession(client);
+    await seedAnonymousSession(client);
     meSucceedsSlowly();
 
     render(

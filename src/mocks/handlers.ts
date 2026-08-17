@@ -128,7 +128,16 @@ export const handlers = [
    * `protected-route.spec.tsx` overrides this with `server.use` for both the failing and the
    * slow-succeeding session, and per-test handlers win over these.
    */
-  http.get('/api/auth/me', () => errorResponse(401, 'Não autenticado.', 'Unauthorized')),
+  /*
+   * 200 com `null`, e não 401, porque é o que a API responde a quem não tem sessão nenhuma —
+   * a rota é auth-aware (`OptionalJwtGuard`). Ela só devolve 401 quando existe cookie de
+   * refresh, ou seja, quando renovar pode de fato resolver; é o que impede que um visitante
+   * anônimo dispare um `POST /auth/refresh` sem ter o que renovar.
+   *
+   * O caminho do 401 continua coberto: `protected-route.spec.tsx` o força com `server.use`,
+   * exercitando a tradução de 401 para `null` que `getMe` faz para o refresh expirado.
+   */
+  http.get('/api/auth/me', () => HttpResponse.json(null)),
 
   http.post('/api/auth/refresh', () => new HttpResponse(null, { status: 401 })),
 
