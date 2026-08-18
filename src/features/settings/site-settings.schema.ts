@@ -1,23 +1,34 @@
 import { z } from 'zod';
 
-// api-real-estate's UpdateSiteSettingsDto only validates these as @IsString()
-// (no format checks). We add real format validation here because these fields
-// are actually consumed as structured data in the app, not just free text:
-// - `whatsapp`/`phone` feed wa.me links (buildWhatsAppUrl in utils/format.ts),
-//   same digit-only shape backend enforces for CreateWhatsappNumberDto.number.
-// - `email` feeds a mailto: link in pages/contact.tsx.
-// Callers are expected to already strip non-digits on input (see formatPhone
-// / formatPhoneAdaptive in utils/format.ts, used the same way today) — this
-// only validates the resulting digit string, it doesn't transform it, so the
-// schema's input/output types stay identical for react-hook-form's resolver.
+// Estes campos são consumidos como dado estruturado, não como texto livre, e é por isso que
+// há validação de formato aqui e não só no backend:
+// - `whatsapp` alimenta um link wa.me (buildWhatsAppUrl em shared/format.ts), na mesma forma
+//   de-só-dígitos que o backend exige em CreateWhatsappNumberDto.number.
+// - `email` alimenta um mailto: em pages/contact.tsx.
+// - `instagram` alimenta buildInstagramUrl, e por isso guarda o handle puro — o `@Matches`
+//   de UpdateSiteSettingsDto no backend recusa `@` e URL exatamente igual.
+//
+// Nenhum destes transforma: quem normaliza é o campo, antes de escrever no formulário
+// (`onlyDigits` / `normalizeInstagramHandle` no onChange). Assim os tipos de entrada e saída
+// do schema continuam idênticos, que é o que o resolver do react-hook-form espera.
+//
+// Todos aceitam string vazia, que é o valor de "não configurado" — sem isso não haveria como
+// limpar um campo depois de preenchido.
 const phoneDigits = z
   .string()
   .refine((v) => v === '' || /^\d{8,15}$/.test(v), 'Telefone deve ter entre 8 e 15 dígitos.');
 
+const instagramHandle = z
+  .string()
+  .refine(
+    (v) => v === '' || (/^[A-Za-z0-9._]{1,30}$/.test(v) && !v.startsWith('.') && !v.endsWith('.')),
+    'Use apenas letras, números, ponto e underline (até 30 caracteres).',
+  );
+
 export const siteSettingsSchema = z.object({
   whatsapp: phoneDigits,
   email: z.union([z.literal(''), z.string().email('E-mail inválido.')]),
-  phone: phoneDigits,
+  instagram: instagramHandle,
   hours: z.string(),
 });
 
