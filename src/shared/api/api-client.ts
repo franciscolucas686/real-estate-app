@@ -37,7 +37,7 @@ import type { ApiErrorResponse } from '@/shared/api/types';
  * Com `||`, vazia e ausente significam a mesma coisa, que é o que o resto do projeto
  * assume.
  */
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 let isRefreshing = false;
 let pendingRefresh: Promise<boolean> | null = null;

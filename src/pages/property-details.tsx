@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { AnimatePresence, useIsPresent } from 'motion/react';
 import { motion } from 'motion/react';
-import { ChevronLeft, Pencil, CheckCircle, MapPin } from 'lucide-react';
+import { ChevronLeft, Pencil, CheckCircle, MapPin, Share2 } from 'lucide-react';
 import { FaWhatsapp } from 'react-icons/fa';
 import { useProperty } from '@/features/properties/hooks/use-property';
 import { PropertyMediaCarousel } from '@/features/properties/components/media/property-media-carousel';
@@ -36,6 +36,8 @@ import { QuickSpecs } from '@/features/properties/components/quick-specs';
 import { SplashIdentity } from '@/features/properties/components/splash-identity';
 import { useMe } from '@/features/auth/use-auth';
 import { useScrollLock } from '@/shared/hooks/use-scroll-lock';
+import { buildPropertyShareUrl } from '@/shared/share-url';
+import { useToast } from '@/ui/toast-context';
 import { imageUrl } from '@/shared/image-url';
 import { cn } from '@/shared/cn';
 import { usePropertyMutationRefresh } from '@/features/properties/hooks/use-property-mutation-refresh';
@@ -82,6 +84,7 @@ export function PropertyDetails() {
   const ctaRef = useRef<HTMLDivElement>(null);
   const stickyHeaderRef = useRef<HTMLDivElement>(null);
   const isPresent = useIsPresent();
+  const toast = useToast();
 
   useEffect(() => {
     if (!splashVisible) return;
@@ -97,6 +100,40 @@ export function PropertyDetails() {
 
   useScrollLock(galleryOpen);
   useScrollLock(mapFullscreen);
+
+  /**
+   * Compartilhar o imóvel.
+   *
+   * `navigator.share` primeiro: no celular ele abre a bandeja nativa, onde o WhatsApp já
+   * está — que é para onde este link vai na prática. Onde a API não existe (a maioria dos
+   * desktops), copia e avisa.
+   *
+   * O `AbortError` é o usuário fechando a bandeja. Não é falha e não pode virar toast; sem
+   * este ramo, desistir de compartilhar acusaria um erro que não houve.
+   */
+  async function handleShare() {
+    if (!property) return;
+    const url = buildPropertyShareUrl(property.id);
+    const title = `${PropertyTypeLabel[property.type]} · ${property.neighborhood}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title, url });
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === 'AbortError') return;
+        // Qualquer outra falha cai no copiar, que é o mesmo destino de quem não tem a API.
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success('Link copiado!');
+    } catch {
+      // Resta o caso sem contexto seguro e sem bandeja — nada a fazer além de avisar.
+      toast.error('Não foi possível copiar o link.');
+    }
+  }
 
   const allImages = property ? flattenGallery(property) : [];
   /*
@@ -176,6 +213,18 @@ export function PropertyDetails() {
     ? buildWhatsAppUrl(property.whatsappContact, property.code)
     : null;
 
+  /*
+   * Só imóvel publicado é compartilhável.
+   *
+   * A rota de share resolve apenas `status: ACTIVE` — é a mesma regra que impede inventário
+   * não publicado de vazar. Oferecer o botão num rascunho geraria um link que abre "Imóvel
+   * não encontrado" para quem recebe, e o operador só descobriria pelo outro lado.
+   *
+   * Para o visitante isto é sempre verdadeiro, já que ele não enxerga outro status; quem vê
+   * o botão sumir é o operador, nos imóveis que ainda não publicou.
+   */
+  const canShare = property.status === PropertyStatus.ACTIVE;
+
   return (
     <article data-slot="page-property-details" className="flex flex-col">
       {/*
@@ -235,6 +284,25 @@ export function PropertyDetails() {
                   className="absolute left-3 top-[calc(env(safe-area-inset-top,12px)+12px)] z-(--z-raised) flex size-12 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-transform active:scale-90 md:hidden"
                 >
                   <ChevronLeft size={22} aria-hidden="true" />
+                </button>
+              )}
+
+              {/* Espelha o botão voltar do outro lado, e fica **fora** do ternário acima de
+                  propósito: os dois ramos de lá são o controle da esquerda, e compartilhar
+                  precisa existir nos dois — inclusive no estado pós-criação.
+
+                  Sem nenhuma classe `md:`, pela mesma razão que o voltar não tem: o elemento
+                  não renderiza nessa largura, então qualquer estilo de desktop seria morto e
+                  enganaria quem lesse depois. De `md` para cima quem carrega esta ação é o
+                  rail. */}
+              {canShare && (
+                <button
+                  type="button"
+                  onClick={() => void handleShare()}
+                  aria-label="Compartilhar"
+                  className="absolute right-3 top-[calc(env(safe-area-inset-top,12px)+12px)] z-(--z-raised) flex size-12 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-transform active:scale-90 md:hidden"
+                >
+                  <Share2 size={22} aria-hidden="true" />
                 </button>
               )}
             </div>
@@ -367,6 +435,25 @@ export function PropertyDetails() {
                   Conversar conosco agora
                 </a>
               </div>
+            )}
+
+            {/* A ação de compartilhar no desktop. `hidden md:flex` porque abaixo de `md` ela
+                já existe sobre o carrossel e na barra fixa — este é o terceiro lugar da
+                mesma ação, não um quarto controle.
+
+                Secundário de propósito: o CTA do WhatsApp acima é o que a página quer que
+                aconteça, e dois botões preenchidos disputando a mesma coluna diluiriam os
+                dois. Fora do `whatsUrl` porque compartilhar não depende de haver número de
+                contato cadastrado. */}
+            {canShare && (
+              <button
+                type="button"
+                onClick={() => void handleShare()}
+                className="hidden h-12 w-full items-center justify-center gap-2 rounded-full border border-border bg-transparent text-sm font-semibold text-foreground-subtle transition-colors md:flex md:hover:bg-border/60 md:hover:text-foreground"
+              >
+                <Share2 size={18} aria-hidden="true" />
+                Compartilhar imóvel
+              </button>
             )}
           </aside>
 
@@ -666,6 +753,24 @@ export function PropertyDetails() {
                   className="flex size-10 items-center justify-center rounded-full bg-black/40 text-white transition-transform active:scale-90 md:hover:bg-black/55"
                 >
                   <ChevronLeft size={24} />
+                </button>
+              )}
+
+              {/* A cópia rolada do botão sobre o carrossel — a barra é a mesma ação depois
+                  que a foto sai de vista, e as duas precisam andar juntas.
+
+                  `ml-auto` empurra para a direita: a barra é um `flex gap-3` cujo único
+                  outro filho é o controle da esquerda. `size-10` como o irmão ao lado, o que
+                  mantém a altura da barra — que o handler de scroll **mede** para decidir o
+                  CTA fixo. Mudar este tamanho realimenta aquele cálculo. */}
+              {canShare && (
+                <button
+                  type="button"
+                  onClick={() => void handleShare()}
+                  aria-label="Compartilhar"
+                  className="ml-auto flex size-10 items-center justify-center rounded-full bg-black/40 text-white transition-transform active:scale-90 md:hover:bg-black/55"
+                >
+                  <Share2 size={24} />
                 </button>
               )}
             </motion.div>
