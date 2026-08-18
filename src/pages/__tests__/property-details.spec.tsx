@@ -1,7 +1,9 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { renderWithProviders } from '@/test/render';
+import { server } from '@/mocks/server';
 import { setMockProperty } from '@/mocks/handlers';
 import { BusinessType, PropertyStatus, PropertyType, SaleType } from '@/shared/api/types';
 import type { PropertyDetailDto } from '@/shared/api/types';
@@ -430,6 +432,117 @@ describe('PropertyDetails', () => {
       expect(s.getByText('Cód. 575301')).toBeInTheDocument();
       expect(s.getByText(/Casa/)).toBeInTheDocument();
       expect(s.getByText(/Sorocaba/)).toBeInTheDocument();
+    });
+  });
+
+  /**
+   * O link aponta para o backend, não para a SPA, e isso não é detalhe de implementação —
+   * é a feature. O app é servido como um `index.html` único sem meta tag nenhuma, e o
+   * crawler do WhatsApp não executa JavaScript; quem entrega as Open Graph é a rota
+   * `/share/properties/:id` da API. Um "conserto" que apontasse este link para a URL da
+   * SPA devolveria o card vazio, e nada além destes casos perceberia.
+   */
+  describe('compartilhar', () => {
+    const originalShare = navigator.share;
+    const originalClipboard = navigator.clipboard;
+
+    /**
+     * A ordem importa e custou um teste vermelho: `userEvent.setup()` instala o próprio
+     * dublê de `navigator.clipboard`. Chamá-lo depois daqui sobrescreveria o `writeText`
+     * que estes casos observam, e a asserção falharia sem nada de errado no código —
+     * por isso o `user` é criado antes e passado para cá.
+     */
+    function stubShareApis({ hasShare }: { hasShare: boolean }) {
+      const share = vi.fn().mockResolvedValue(undefined);
+      const writeText = vi.fn().mockResolvedValue(undefined);
+
+      Object.defineProperty(navigator, 'share', {
+        value: hasShare ? share : undefined,
+        configurable: true,
+        writable: true,
+      });
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText },
+        configurable: true,
+        writable: true,
+      });
+
+      return { share, writeText };
+    }
+
+    afterEach(() => {
+      Object.defineProperty(navigator, 'share', {
+        value: originalShare,
+        configurable: true,
+        writable: true,
+      });
+      Object.defineProperty(navigator, 'clipboard', {
+        value: originalClipboard,
+        configurable: true,
+        writable: true,
+      });
+    });
+
+    it('usa a bandeja nativa quando existe, com a URL da rota de share da API', async () => {
+      const user = userEvent.setup();
+      const { share } = stubShareApis({ hasShare: true });
+      render();
+
+      await user.click((await screen.findAllByRole('button', { name: 'Compartilhar' }))[0]);
+
+      expect(share).toHaveBeenCalledTimes(1);
+      expect(share.mock.calls[0][0].url).toContain('/share/properties/prop-1');
+    });
+
+    it('sem bandeja nativa, copia o link e avisa', async () => {
+      const user = userEvent.setup();
+      const { writeText } = stubShareApis({ hasShare: false });
+      render();
+
+      await user.click((await screen.findAllByRole('button', { name: 'Compartilhar' }))[0]);
+
+      expect(writeText).toHaveBeenCalledTimes(1);
+      expect(writeText.mock.calls[0][0]).toContain('/share/properties/prop-1');
+      expect(await screen.findByText('Link copiado!')).toBeInTheDocument();
+    });
+
+    it('fechar a bandeja não é erro — nada é copiado e nada é anunciado', async () => {
+      const user = userEvent.setup();
+      const { share, writeText } = stubShareApis({ hasShare: true });
+      share.mockRejectedValue(new DOMException('cancelado', 'AbortError'));
+      render();
+
+      await user.click((await screen.findAllByRole('button', { name: 'Compartilhar' }))[0]);
+
+      expect(writeText).not.toHaveBeenCalled();
+      expect(screen.queryByText('Link copiado!')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Não foi possível/)).not.toBeInTheDocument();
+    });
+
+    it('não se oferece para um imóvel que ainda não está publicado', async () => {
+      // A rota de share só resolve ACTIVE; o link de um rascunho abriria "Imóvel não
+      // encontrado" para quem recebesse.
+      //
+      // A sessão é obrigatória para o caso não ser vazio: um visitante anônimo num imóvel
+      // PENDING recebe a própria tela de "não encontrado", sem botão nenhum — o teste
+      // passaria sem provar nada sobre compartilhar. Quem de fato enxerga um rascunho é o
+      // operador, e é nele que o botão precisa sumir.
+      server.use(
+        http.get('/api/auth/me', () =>
+          HttpResponse.json({ id: 'user-1', email: 'operador@test.local', name: 'Operador' }),
+        ),
+      );
+      setMockProperty({ ...PROPERTY, status: PropertyStatus.PENDING });
+      render();
+
+      await screen.findByRole('heading', { level: 1, name: 'Casa' });
+      expect(screen.queryByRole('button', { name: 'Compartilhar' })).not.toBeInTheDocument();
+    });
+
+    it('se oferece quando o imóvel está publicado — o contraponto do caso acima', async () => {
+      render();
+
+      expect(await screen.findAllByRole('button', { name: 'Compartilhar' })).not.toHaveLength(0);
     });
   });
 });
