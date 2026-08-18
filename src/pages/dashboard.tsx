@@ -216,7 +216,10 @@ export function Dashboard() {
   const deleteProperty = useSoftDeleteProperty();
   const changeStatus = useUpdatePropertyStatus();
 
-  const handleDelete = useCallback((id: string) => deleteProperty.mutate(id), [deleteProperty]);
+  const handleDelete = useCallback(
+    (id: string, code: string) => deleteProperty.mutate({ id, code }),
+    [deleteProperty],
+  );
   const handleActivate = useCallback(
     (id: string) => changeStatus.mutate({ id, status: PropertyStatus.ACTIVE }),
     [changeStatus],
@@ -228,7 +231,7 @@ export function Dashboard() {
 
   /** Which card, if any, has a write in flight. v5 exposes `variables` while pending. */
   const pendingId =
-    (deleteProperty.isPending ? deleteProperty.variables : undefined) ??
+    (deleteProperty.isPending ? deleteProperty.variables?.id : undefined) ??
     (changeStatus.isPending ? changeStatus.variables?.id : undefined);
 
   const hasFilter = Boolean(statusFilter) || Boolean(codeSearch.trim());

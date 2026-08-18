@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { ChevronLeft, Plus, Check, Loader2 } from 'lucide-react';
+import { ChevronLeft, Plus, Check, Loader2, CheckCircle } from 'lucide-react';
 import { useProperty } from '@/features/properties/hooks/use-property';
 import { PropertyTypeLabel } from '@/shared/format';
 import { useSwipeToSelect } from '@/shared/hooks/use-swipe-to-select';
@@ -8,6 +8,8 @@ import { useDisablePullToRefresh } from '@/shared/hooks/use-disable-pull-to-refr
 import { PageContainer, MAX_WIDTH_CENTER } from '@/layout/page-container';
 import { PropertyDetailSkeleton } from '@/features/properties/components/property-skeletons';
 import { ConfirmModal } from '@/ui/confirm-modal';
+import { SuccessSplash } from '@/ui/success-splash';
+import { SplashIdentity } from '@/features/properties/components/splash-identity';
 import { useCommitGalleryPatch } from '@/features/gallery/use-commit-gallery-patch';
 import {
   buildGalleryPatch,
@@ -72,6 +74,9 @@ export function GalleryManagement() {
   const confirming = commitGallery.isPending;
   const [roomToDelete, setRoomToDelete] = useState<{ id: string; name: string } | null>(null);
   const [confirmDeletePhotosOpen, setConfirmDeletePhotosOpen] = useState(false);
+  // Success splash for a plain gallery edit (not the post-create wizard, which already
+  // chains into its own splash on `property-details.tsx` and must not get a second one).
+  const [gallerySplashVisible, setGallerySplashVisible] = useState(false);
 
   /**
    * The room currently open in `RoomFullscreen` — an object rather than a bare `string | null`
@@ -190,6 +195,19 @@ export function GalleryManagement() {
       roomOpenerRef.current = null;
     }
   }, [fullscreenRoom]);
+
+  useEffect(() => {
+    if (!gallerySplashVisible) return;
+    const t = setTimeout(() => {
+      setGallerySplashVisible(false);
+      if (fromDashboard) {
+        navigate(`/dashboard${dashboardSearch}`);
+      } else {
+        navigate(`/properties/${id}`);
+      }
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [gallerySplashVisible, fromDashboard, dashboardSearch, id, navigate]);
 
   if (isLoading || isPlaceholderData) return <PropertyDetailSkeleton />;
 
@@ -429,19 +447,15 @@ export function GalleryManagement() {
       // mutateAsync resolves only after onSuccess finishes invalidating, so the next
       // screen never renders from a cache that predates the upload.
       await commitGallery.mutateAsync(buildGalleryPatch(draftRooms, draftImages));
-      navigateAfterFinish();
+      if (fromContext === 'post-create') {
+        // This leg has its own splash sequence, chained on `property-details.tsx` —
+        // showing `gallerySplashVisible` here too would stack a second one.
+        navigate(`/properties/${id}`, { state: { context: 'post-create', showSplash } });
+      } else {
+        setGallerySplashVisible(true);
+      }
     } catch (e) {
       setConfirmError(getErrorMessage(e));
-    }
-  }
-
-  function navigateAfterFinish() {
-    if (fromDashboard) {
-      navigate(`/dashboard${dashboardSearch}`);
-    } else if (fromContext === 'post-create') {
-      navigate(`/properties/${id}`, { state: { context: 'post-create', showSplash } });
-    } else {
-      navigate(`/properties/${id}`);
     }
   }
 
@@ -681,6 +695,12 @@ export function GalleryManagement() {
           swipeProps={swipeSelectProps}
         />
       )}
+
+      <SuccessSplash visible={gallerySplashVisible}>
+        <CheckCircle size={64} className="text-action" />
+        <p className="text-xl font-bold text-foreground">Galeria atualizada!</p>
+        <SplashIdentity property={property} />
+      </SuccessSplash>
     </>
   );
 }

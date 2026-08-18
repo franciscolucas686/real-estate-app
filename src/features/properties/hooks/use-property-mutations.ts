@@ -125,12 +125,26 @@ export function useUpdatePropertyStatus() {
       toast.error(getErrorMessage(error));
     },
 
-    onSuccess: (updated) => {
+    onSuccess: (updated, variables) => {
       // The server is the authority on the resulting status — see the docblock.
       patchStatusInCache(queryClient, updated.id, updated.status, null);
       queryClient.setQueryData(propertyKeys.detail(updated.id), (prev?: PropertyDetailDto) =>
         prev ? { ...prev, status: updated.status } : prev,
       );
+      // Deactivate always toasts against the requested status. Activate toasts against
+      // `updated.status` instead of `variables.status` — the backend can resolve an
+      // activation request to PENDING when the property has no photos (see the
+      // docblock), and a toast claiming "ativo" for a property that just became
+      // "pendente" would be the same lie the optimistic update above is written to avoid.
+      if (variables.status === PropertyStatus.INACTIVE) {
+        toast.success(`Imóvel ${updated.code} inativo.`);
+      } else if (variables.status === PropertyStatus.ACTIVE) {
+        toast.success(
+          updated.status === PropertyStatus.ACTIVE
+            ? `Imóvel ${updated.code} ativo.`
+            : `Imóvel ${updated.code} pendente.`,
+        );
+      }
     },
 
     onSettled: () => invalidateDomain(queryClient),
@@ -202,13 +216,20 @@ function restoreSnapshot(queryClient: QueryClient, snapshot: StatusSnapshot) {
  * refetch. Callers read `isPending` together with `variables?.id` to disable just the
  * row being deleted.
  */
+interface DeleteVariables {
+  id: string;
+  code: string;
+}
+
 export function useSoftDeleteProperty() {
   const queryClient = useQueryClient();
   const toast = useToast();
 
   return useMutation({
-    mutationFn: (id: string) => softDeleteProperty(id),
-    onSuccess: () => toast.success('Imóvel excluído.'),
+    mutationFn: ({ id }: DeleteVariables) => softDeleteProperty(id),
+    // The delete endpoint returns void, so the code for the message has to travel in via
+    // the mutation's own variables — the caller already has it off the card/property.
+    onSuccess: (_data, variables) => toast.success(`Imóvel ${variables.code} excluído.`),
     onError: (error) => toast.error(getErrorMessage(error)),
     onSettled: () => invalidateDomain(queryClient),
   });
