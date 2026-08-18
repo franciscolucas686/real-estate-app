@@ -170,12 +170,6 @@ export function GalleryManagement() {
     };
   }, []);
 
-  // The room view pushes a history entry when it opens, so the hardware/gesture back button
-  // closes *it* instead of leaving the whole gallery page — `closeRoomFullscreen` consumes that
-  // entry via `history.back()`, and this listener is what actually clears the state once that
-  // pop happens. The selection is cleared here too, inline rather than through
-  // `exitSelectMode`, because this handler is registered once and must not close over a stale
-  // render's setters.
   useEffect(() => {
     function handlePopState() {
       // Starts the exit rather than unmounting; `handleRoomExited` clears the state and the
