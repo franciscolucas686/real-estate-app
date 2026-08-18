@@ -357,7 +357,8 @@ export interface SiteSettings {
   id: string;
   whatsapp: string;
   email: string;
-  phone: string;
+  /** Handle do Instagram, sem `@` e sem URL — ver `normalizeInstagramHandle`. */
+  instagram: string;
   hours: string;
   updatedAt: string;
 }
@@ -365,6 +366,6 @@ export interface SiteSettings {
 export interface UpdateSiteSettingsDto {
   whatsapp?: string;
   email?: string;
-  phone?: string;
+  instagram?: string;
   hours?: string;
 }

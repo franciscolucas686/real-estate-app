@@ -1,8 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { FaWhatsapp } from 'react-icons/fa';
-import { Phone, Mail, Clock, ChevronRight } from 'lucide-react';
+import { FaWhatsapp, FaInstagram } from 'react-icons/fa';
+import { Mail, Clock, ChevronRight } from 'lucide-react';
 import { PageContainer } from '@/layout/page-container';
-import { buildWhatsAppUrl, formatPhone } from '@/shared/format';
+import {
+  buildWhatsAppUrl,
+  buildInstagramUrl,
+  formatPhone,
+  normalizeInstagramHandle,
+} from '@/shared/format';
 import { fetchSiteSettings } from '@/features/settings/site-settings-service';
 import { settingsKeys } from '@/features/settings/query-keys';
 
@@ -88,18 +93,23 @@ export function Contact() {
           </a>
         )}
 
-        {/* Phone card */}
-        {contact.phone && (
+        {/* Instagram card — link externo, então leva `target`/`rel` como o do WhatsApp.
+            O card de telefone que ficava aqui não levava: `tel:` abre o discador, não uma aba. */}
+        {contact.instagram && (
           <a
-            href={`tel:${contact.phone}`}
+            href={buildInstagramUrl(contact.instagram)}
+            target="_blank"
+            rel="noopener noreferrer"
             className="flex items-center gap-4 rounded-2xl border border-border bg-surface-raised px-5 py-4 transition-colors active:bg-border md:hover:border-foreground-subtle/30 md:hover:bg-border/20"
           >
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-action/10 text-action">
-              <Phone size={20} />
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-instagram/10 text-instagram">
+              <FaInstagram size={22} />
             </div>
             <div className="flex-1">
-              <p className="text-sm font-semibold text-foreground">Telefone</p>
-              <p className="text-xs text-foreground-subtle">{formatPhone(contact.phone)}</p>
+              <p className="text-sm font-semibold text-foreground">Instagram</p>
+              <p className="text-xs text-foreground-subtle">
+                @{normalizeInstagramHandle(contact.instagram)}
+              </p>
             </div>
             <ChevronRight size={18} className="text-muted-foreground" />
           </a>

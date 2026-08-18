@@ -53,7 +53,7 @@ const MORE_ACTION_ROW =
 
 interface PropertyAdminCardProps {
   property: PropertyCardDto;
-  onDelete: (id: string) => void;
+  onDelete: (id: string, code: string) => void;
   onActivate: (id: string) => void;
   onDeactivate: (id: string) => void;
   /**
@@ -143,7 +143,7 @@ export function PropertyAdminCard({
     <ConfirmModalContent
       message="Tem certeza que deseja excluir este imóvel?"
       onConfirm={() => {
-        onDelete(property.id);
+        onDelete(property.id, property.code);
         closeMore();
       }}
       onClose={() => setConfirmDelete(false)}

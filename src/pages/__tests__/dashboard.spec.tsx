@@ -150,11 +150,24 @@ describe('Dashboard', () => {
     expect(screen.getByRole('link', { name: 'Cadastrar meu primeiro imóvel' })).toBeInTheDocument();
   });
 
-  it('recorte vazio oferece limpar filtros, não cadastrar', async () => {
+  it('um recorte vazio por status sozinho não oferece nem limpar nem cadastrar', async () => {
+    // Um filtro de status sem resultado está fazendo exatamente o que foi pedido — não há
+    // nada "sujo" para limpar, e o catálogo não está vazio, então "Cadastrar" seria enganoso.
     setMockProperties(seed(3, PropertyStatus.ACTIVE));
     render('/dashboard?status=INACTIVE');
 
     expect(await screen.findByText('Nenhum imóvel inativo')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Limpar filtro' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('link', { name: 'Cadastrar meu primeiro imóvel' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('uma busca por código sem resultado oferece limpar filtros, não cadastrar', async () => {
+    setMockProperties(seed(3, PropertyStatus.ACTIVE));
+    render('/dashboard?code=999999');
+
+    expect(await screen.findByText('Nenhum imóvel com esse código')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Limpar filtro' })).toBeInTheDocument();
     expect(
       screen.queryByRole('link', { name: 'Cadastrar meu primeiro imóvel' }),

@@ -19,7 +19,7 @@ let siteSettings: SiteSettings = {
   id: 'settings-1',
   whatsapp: '11999990000',
   email: 'contato@imobiliaria.com',
-  phone: '1122223333',
+  instagram: 'francinegestora',
   hours: 'Seg-Sex: 9h às 18h',
   updatedAt: new Date().toISOString(),
 };
@@ -88,7 +88,7 @@ export function resetMockData() {
     id: 'settings-1',
     whatsapp: '11999990000',
     email: 'contato@imobiliaria.com',
-    phone: '1122223333',
+    instagram: 'francinegestora',
     hours: 'Seg-Sex: 9h às 18h',
     updatedAt: new Date().toISOString(),
   };

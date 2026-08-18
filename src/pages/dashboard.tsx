@@ -216,7 +216,10 @@ export function Dashboard() {
   const deleteProperty = useSoftDeleteProperty();
   const changeStatus = useUpdatePropertyStatus();
 
-  const handleDelete = useCallback((id: string) => deleteProperty.mutate(id), [deleteProperty]);
+  const handleDelete = useCallback(
+    (id: string, code: string) => deleteProperty.mutate({ id, code }),
+    [deleteProperty],
+  );
   const handleActivate = useCallback(
     (id: string) => changeStatus.mutate({ id, status: PropertyStatus.ACTIVE }),
     [changeStatus],
@@ -228,10 +231,14 @@ export function Dashboard() {
 
   /** Which card, if any, has a write in flight. v5 exposes `variables` while pending. */
   const pendingId =
-    (deleteProperty.isPending ? deleteProperty.variables : undefined) ??
+    (deleteProperty.isPending ? deleteProperty.variables?.id : undefined) ??
     (changeStatus.isPending ? changeStatus.variables?.id : undefined);
 
-  const hasFilter = Boolean(statusFilter) || Boolean(codeSearch.trim());
+  // "Limpar filtro" só aparece para um vazio causado pela busca por código — um filtro de
+  // status vazio (ex.: "Inativos" sem nenhum imóvel inativo) já está fazendo exatamente o
+  // que foi pedido, e `emptyMessage()` já deixa isso claro sem precisar de uma ação para
+  // desfazer.
+  const hasCodeSearch = Boolean(codeSearch.trim());
 
   return (
     <div data-slot="page-dashboard" className={BOTTOM_RESERVE}>
@@ -384,7 +391,7 @@ export function Dashboard() {
         ) : properties.length === 0 ? (
           <div className="flex flex-col items-center gap-4 py-16">
             <p className="text-center text-base font-medium text-foreground">{emptyMessage()}</p>
-            {hasFilter ? (
+            {hasCodeSearch ? (
               <Button
                 variant="secondary"
                 shape="pill"
@@ -393,9 +400,14 @@ export function Dashboard() {
                 Limpar filtro
               </Button>
             ) : (
-              <Button asChild shape="pill">
-                <Link to="/properties/new">Cadastrar meu primeiro imóvel</Link>
-              </Button>
+              statusFilter === null && (
+                // A status-only filter with no matches is doing exactly what it was asked —
+                // there's nothing to offer here beyond the message above. This CTA is only
+                // for the unfiltered, genuinely empty catalog.
+                <Button asChild shape="pill">
+                  <Link to="/properties/new">Cadastrar meu primeiro imóvel</Link>
+                </Button>
+              )
             )}
           </div>
         ) : (

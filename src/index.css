@@ -65,6 +65,16 @@
      raw `emerald-500`, which is not even the brand hue. */
   --color-whatsapp: #1a9e4d;
 
+  /* Brand — Instagram. A marca é um gradiente (#833AB4 → #E1306C → #F77737) e um token é uma
+     cor só, então este é o roxo-magenta do meio dele, que é a parte que as pessoas reconhecem
+     como Instagram sem depender do degradê.
+     Medido pela mesma régua do token acima — o ícone é desenhado sobre `bg-instagram/10`, e a
+     cor adjacente que a WCAG 1.4.11 mede é essa tinta, não o card: 5.11:1 contra o branco do
+     `surface-raised` e 4.43:1 contra a tinta (#f9ebf3). Passa 3:1 nos dois com folga, e ao
+     contrário do verde do WhatsApp também passa 4.5:1 contra branco — este daria para pôr em
+     texto, se um dia precisar. */
+  --color-instagram: #c13584;
+
   /* Border / ring */
   --color-border: #e2e8f0;
   --color-ring: #1a7fd4;

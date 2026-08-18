@@ -3,11 +3,13 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ChevronLeft, ArrowRight } from 'lucide-react';
+import { ChevronLeft, ArrowRight, CheckCircle } from 'lucide-react';
 import { cn } from '@/shared/cn';
 import { PropertyTypeLabel, BusinessTypeLabel } from '@/shared/format';
 import { PageContainer } from '@/layout/page-container';
 import { Button } from '@/ui/button';
+import { SuccessSplash } from '@/ui/success-splash';
+import { SplashIdentity } from '@/features/properties/components/splash-identity';
 import {
   PropertyType,
   BusinessType,
@@ -316,12 +318,31 @@ function PropertyFormInner({
   const [mapOpen, setMapOpen] = useState(false);
   const errorRef = useRef<HTMLParagraphElement>(null);
 
+  // Success splash shown after an edit completes — same pattern as the post-create splashes
+  // in `property-details.tsx`. Holds the freshly-updated property so `SplashIdentity` reads
+  // its current type/city/code rather than the (possibly stale) `initialData`.
+  const [editSplashVisible, setEditSplashVisible] = useState(false);
+  const [editedProperty, setEditedProperty] = useState<PropertyDetailDto | null>(null);
+
   useEffect(() => {
     if (!error) return;
     requestAnimationFrame(() => {
       errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   }, [error, submitCount]);
+
+  useEffect(() => {
+    if (!editSplashVisible) return;
+    const t = setTimeout(() => {
+      setEditSplashVisible(false);
+      if (fromContext === 'post-create') {
+        navigate(`/properties/${id}/gallery`, { state: { context: 'post-create' } });
+      } else {
+        navigate(`/dashboard${dashboardSearch}`);
+      }
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [editSplashVisible, fromContext, id, dashboardSearch, navigate]);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     // react-hook-form's setValue() infers its value type per literal path,
@@ -406,12 +427,12 @@ function PropertyFormInner({
         setError('');
         try {
           if (isEdit && id) {
-            await updateMutation.mutateAsync({ id, payload: buildUpdatePayload(values) });
-            if (fromContext === 'post-create') {
-              navigate(`/properties/${id}/gallery`, { state: { context: 'post-create' } });
-            } else {
-              navigate(`/dashboard${dashboardSearch}`);
-            }
+            const updated = await updateMutation.mutateAsync({
+              id,
+              payload: buildUpdatePayload(values),
+            });
+            setEditedProperty(updated);
+            setEditSplashVisible(true);
           } else {
             const created = await createMutation.mutateAsync(buildPayload(values));
             navigate(`/properties/${created.id}/gallery`, {
@@ -593,6 +614,12 @@ function PropertyFormInner({
       </div>
 
       {mapOverlay}
+
+      <SuccessSplash visible={editSplashVisible}>
+        <CheckCircle size={64} className="text-action" />
+        <p className="text-xl font-bold text-foreground">Imóvel atualizado!</p>
+        {editedProperty && <SplashIdentity property={editedProperty} />}
+      </SuccessSplash>
     </div>
   );
 }

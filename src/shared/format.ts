@@ -103,22 +103,41 @@ export function formatPhone(raw: string): string {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
-// Adapts to landline (10 digits → 4-4) or mobile (11 digits → 5-4)
-export function formatPhoneAdaptive(raw: string): string {
-  const d = onlyDigits(raw).slice(0, 11);
-  if (d.length === 0) return '';
-  if (d.length <= 2) return `(${d}`;
-  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
-  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
-  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
-}
-
 export function buildWhatsAppUrl(contact: string, propertyCode?: string): string {
   const number = `55${onlyDigits(contact)}`;
   const message = propertyCode
     ? `Olá! Tenho interesse no imóvel de código ${propertyCode}.`
     : 'Olá! Tenho interesse em um imóvel.';
   return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+}
+
+/**
+ * Reduz qualquer forma de escrever um perfil ao handle puro — sem `@`, sem URL.
+ *
+ * O que se guarda é o handle, pelo mesmo motivo que o WhatsApp guarda só dígitos: é a
+ * identidade do perfil, e o link é uma **apresentação** dela. Guardar a URL faria o banco
+ * carregar `www.`, barra final e o `?igshid=…` que o próprio Instagram cola ao compartilhar.
+ *
+ * A normalização acontece no `onChange` do campo em `settings.tsx`, e é o que faz colar a URL
+ * inteira simplesmente funcionar em vez de virar erro de validação.
+ */
+export function normalizeInstagramHandle(raw: string): string {
+  return (
+    raw
+      .trim()
+      .replace(/^(https?:\/\/)?(www\.)?instagram\.com\//i, '')
+      // Corta barra final, query e fragmento — o handle é o primeiro segmento e nada além.
+      .split(/[/?#]/)[0]
+      .replace(/^@+/, '')
+  );
+}
+
+/**
+ * Re-normaliza por dentro pelo mesmo motivo que `buildWhatsAppUrl` chama `onlyDigits`:
+ * defesa contra valor gravado antes de a regra existir.
+ */
+export function buildInstagramUrl(handle: string): string {
+  return `https://instagram.com/${normalizeInstagramHandle(handle)}`;
 }
 
 export function isPending(property: PropertyCardDto): boolean {

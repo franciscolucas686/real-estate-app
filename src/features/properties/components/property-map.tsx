@@ -40,7 +40,11 @@ export const PropertyMap = memo<PropertyMapProps>(
           <TileLayer
             url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-            maxZoom={18}
+            // 19, not 18: with detectRetina on, Leaflet auto-decrements the layer's own
+            // maxZoom by 1 on retina screens (to compensate for @2x tiles), which used to
+            // leave it one level below the map's maxZoom=18 and blanked tiles at max zoom
+            // on retina devices. 19 here lands on 18 after that adjustment.
+            maxZoom={19}
             maxNativeZoom={18}
             minZoom={10}
             tileSize={256}

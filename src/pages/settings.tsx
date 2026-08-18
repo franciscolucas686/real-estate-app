@@ -17,7 +17,7 @@ import {
   useDeleteWhatsappNumber,
   useUpdateSiteSettings,
 } from '@/features/settings/use-settings-mutations';
-import { formatPhone, formatPhoneAdaptive } from '@/shared/format';
+import { formatPhone, normalizeInstagramHandle } from '@/shared/format';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { SettingsSkeleton } from '@/features/settings/settings-skeleton';
 import { SuccessSplash } from '@/ui/success-splash';
@@ -97,7 +97,7 @@ export function Settings() {
     formState: { errors: contactErrors },
   } = useForm<SiteSettingsFormValues>({
     resolver: zodResolver(siteSettingsSchema),
-    defaultValues: { email: '', phone: '', whatsapp: '', hours: '' },
+    defaultValues: { email: '', instagram: '', whatsapp: '', hours: '' },
   });
 
   const {
@@ -114,7 +114,7 @@ export function Settings() {
     if (siteSettings && !initialized.current) {
       resetContact({
         email: siteSettings.email,
-        phone: onlyDigits(siteSettings.phone).slice(0, 11),
+        instagram: normalizeInstagramHandle(siteSettings.instagram),
         whatsapp: onlyDigits(siteSettings.whatsapp).slice(0, 11),
         hours: siteSettings.hours,
       });
@@ -310,7 +310,7 @@ export function Settings() {
               )}
             </div>
 
-            {/* E-mail/Telefone: stacked on mobile, side by side once there's room */}
+            {/* E-mail/Instagram: stacked on mobile, side by side once there's room */}
             <div className="flex flex-col gap-3 md:grid md:grid-cols-2">
               <div>
                 <label className="mb-1 block text-xs text-muted-foreground">E-mail</label>
@@ -327,23 +327,26 @@ export function Settings() {
                 )}
               </div>
               <div>
-                <label className="mb-1 block text-xs text-muted-foreground">Telefone</label>
+                <label className="mb-1 block text-xs text-muted-foreground">Instagram</label>
                 <Controller
                   control={contactControl}
-                  name="phone"
+                  name="instagram"
                   render={({ field }) => (
                     <Input
-                      inputMode="numeric"
-                      value={formatPhoneAdaptive(field.value)}
-                      onChange={(e) => field.onChange(onlyDigits(e.target.value).slice(0, 11))}
-                      placeholder="(11) 99999-9999"
+                      // Normaliza no onChange pelo mesmo motivo que o WhatsApp roda
+                      // `onlyDigits` ali em cima: o que se guarda é o handle, então colar a
+                      // URL inteira do perfil — que é como o Instagram compartilha — tem de
+                      // funcionar em vez de virar erro de validação.
+                      value={field.value}
+                      onChange={(e) => field.onChange(normalizeInstagramHandle(e.target.value))}
+                      placeholder="suaimobiliaria"
                       className="h-11 w-full px-3"
                     />
                   )}
                 />
-                {contactErrors.phone && (
+                {contactErrors.instagram && (
                   <p className="mt-1 text-sm font-medium text-danger">
-                    {contactErrors.phone.message}
+                    {contactErrors.instagram.message}
                   </p>
                 )}
               </div>

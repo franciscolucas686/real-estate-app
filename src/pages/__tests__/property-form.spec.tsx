@@ -296,11 +296,15 @@ describe('PropertyForm — modo edição', () => {
     await user.click(await screen.findByRole('button', { name: 'Salvar alterações' }));
 
     await waitFor(() => expect(patched).not.toBeNull());
-    // A navegação de saída desmonta o próprio botão de envio.
-    await waitFor(() =>
-      expect(
-        screen.queryByRole('button', { name: /Salvar alterações|Salvando/ }),
-      ).not.toBeInTheDocument(),
+    // A splash de sucesso aparece antes da navegação de saída — mesmo padrão visual
+    // da criação — e só depois dela é que o botão de envio se desmonta.
+    expect(await screen.findByText('Imóvel atualizado!')).toBeInTheDocument();
+    await waitFor(
+      () =>
+        expect(
+          screen.queryByRole('button', { name: /Salvar alterações|Salvando/ }),
+        ).not.toBeInTheDocument(),
+      { timeout: 3000 },
     );
   });
 

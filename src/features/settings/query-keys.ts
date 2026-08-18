@@ -15,7 +15,7 @@
 export const settingsKeys = {
   all: ['site-settings'] as const,
 
-  /** The public contact block: e-mail, phone, WhatsApp, opening hours. */
+  /** The public contact block: e-mail, Instagram, WhatsApp, opening hours. */
   siteSettings: () => [...settingsKeys.all] as const,
 
   /** The operator's list of WhatsApp numbers, which feeds the block above. */
