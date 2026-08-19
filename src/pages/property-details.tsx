@@ -750,7 +750,7 @@ export function PropertyDetails() {
                   type="button"
                   onClick={() => navigate(-1)}
                   aria-label="Voltar"
-                  className="flex size-10 items-center justify-center rounded-full bg-black/40 text-white transition-transform active:scale-90 md:hover:bg-black/55"
+                  className="flex size-12 items-center justify-center rounded-full bg-black/40 text-white transition-transform active:scale-90 md:hover:bg-black/55"
                 >
                   <ChevronLeft size={24} />
                 </button>
@@ -768,7 +768,7 @@ export function PropertyDetails() {
                   type="button"
                   onClick={() => void handleShare()}
                   aria-label="Compartilhar"
-                  className="ml-auto flex size-10 items-center justify-center rounded-full bg-black/40 text-white transition-transform active:scale-90 md:hover:bg-black/55"
+                  className="ml-auto flex size-12 items-center justify-center rounded-full bg-black/40 text-white transition-transform active:scale-90 md:hover:bg-black/55"
                 >
                   <Share2 size={24} />
                 </button>
