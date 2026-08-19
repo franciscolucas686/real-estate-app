@@ -1,3 +1,4 @@
+import os from 'node:os';
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
@@ -37,5 +38,18 @@ export default defineConfig({
     // existem para fazer. O que estava errado era o teto, não os testes.
     testTimeout: 20_000,
     hookTimeout: 20_000,
+    // Vitest's default is one worker process per spec file, up to the CPU
+    // count — with 32-ish spec files that's effectively unbounded
+    // oversubscription on anything but a very wide machine, and it's the
+    // other half of the timeout story above: a `property-form.spec.tsx` test
+    // that measured ~1.5–2.2s standalone started timing out under `npm test`
+    // (never the same test twice — a resource-contention lottery, not a
+    // logic bug), reproduced here with `Failed to start forks worker` errors
+    // when the host was already under heavy load. Capping at half the CPUs
+    // still runs several files in parallel while leaving headroom so one
+    // slow file doesn't starve the next one's process spawn. Trades total
+    // suite wall-clock time for not needing testTimeout to absorb full
+    // oversubscription on top of its own margin.
+    maxWorkers: Math.max(1, Math.floor(os.cpus().length / 2)),
   },
 });
