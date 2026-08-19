@@ -1,6 +1,7 @@
 import type { Ref } from 'react';
 import { Check, X } from 'lucide-react';
 import { cn } from '@/shared/cn';
+import { capitalizeFirstLetter } from '@/shared/format';
 
 // The inline "new room name" form, at the end of the stacked sections list.
 interface AddRoomInlineProps {
@@ -32,7 +33,7 @@ export function AddRoomInline({
         <input
           autoFocus
           value={name}
-          onChange={(e) => onNameChange(e.target.value)}
+          onChange={(e) => onNameChange(capitalizeFirstLetter(e.target.value))}
           onFocus={onFocus}
           onBlur={onBlur}
           placeholder="Nome do ambiente"

@@ -2,6 +2,7 @@ import { Check, Pencil, Settings2, Trash2, X } from 'lucide-react';
 import { ActionTile } from '@/features/gallery/components/action-tile';
 import { GalleryImage } from '@/features/gallery/components/gallery-image';
 import type { GallerySection } from '@/features/gallery/gallery-section';
+import { capitalizeFirstLetter } from '@/shared/format';
 
 /**
  * Which photo tiles a room's grid shows, by index. CSS only — every photo is still rendered
@@ -63,7 +64,7 @@ export function RoomSection({
             <input
               autoFocus
               value={newRoomName}
-              onChange={(e) => onNewRoomNameChange(e.target.value)}
+              onChange={(e) => onNewRoomNameChange(capitalizeFirstLetter(e.target.value))}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') onRenameRoom(section.roomId!);
                 if (e.key === 'Escape') onCancelEdit();

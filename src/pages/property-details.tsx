@@ -65,6 +65,19 @@ export function PropertyDetails() {
   const locationState = location.state as { context?: string; showSplash?: boolean } | null;
   const isPostCreate = locationState?.context === 'post-create';
 
+  // `navigate(-1)` is a no-op when this is the tab's first history entry — the
+  // case for a share link opened from WhatsApp, which lands here directly with
+  // no prior in-app route to return to. React Router tags every entry it pushes
+  // with an increasing `idx` on `window.history.state`, starting at 0, so that's
+  // the signal for "nothing to go back to" without needing a link/backend change.
+  const handleBack = () => {
+    if ((window.history.state?.idx ?? 0) > 0) {
+      navigate(-1);
+    } else {
+      navigate('/imoveis');
+    }
+  };
+
   const { data: property, isLoading: propertyLoading, isPlaceholderData } = useProperty(id!);
   const { data: me, isLoading: authLoading } = useMe();
   // isPlaceholderData: useProperty seeds the query with a stale preview card
@@ -279,7 +292,7 @@ export function PropertyDetails() {
                    rather than merely different in size. */
                 <button
                   type="button"
-                  onClick={() => navigate(-1)}
+                  onClick={handleBack}
                   aria-label="Voltar"
                   className="absolute left-3 top-[calc(env(safe-area-inset-top,12px)+12px)] z-(--z-raised) flex size-12 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-transform active:scale-90 md:hidden"
                 >
@@ -383,7 +396,7 @@ export function PropertyDetails() {
             <div className="flex flex-wrap gap-2">
               {/* Only meaningful to someone who can change it. A visitor can only ever see
                   ACTIVE properties, so the badge would be a constant. */}
-              {isAuthenticated && <StatusBadge status={property.status} />}
+              {isAuthenticated && !isPostCreate && <StatusBadge status={property.status} />}
               <Badge color={property.businessType === BusinessType.SALE ? 'action' : 'accent'}>
                 {BusinessTypeLabel[property.businessType]}
               </Badge>
@@ -748,9 +761,9 @@ export function PropertyDetails() {
               ) : (
                 <button
                   type="button"
-                  onClick={() => navigate(-1)}
+                  onClick={handleBack}
                   aria-label="Voltar"
-                  className="flex size-10 items-center justify-center rounded-full bg-black/40 text-white transition-transform active:scale-90 md:hover:bg-black/55"
+                  className="flex size-12 items-center justify-center rounded-full bg-black/40 text-white transition-transform active:scale-90 md:hover:bg-black/55"
                 >
                   <ChevronLeft size={24} />
                 </button>
@@ -768,7 +781,7 @@ export function PropertyDetails() {
                   type="button"
                   onClick={() => void handleShare()}
                   aria-label="Compartilhar"
-                  className="ml-auto flex size-10 items-center justify-center rounded-full bg-black/40 text-white transition-transform active:scale-90 md:hover:bg-black/55"
+                  className="ml-auto flex size-12 items-center justify-center rounded-full bg-black/40 text-white transition-transform active:scale-90 md:hover:bg-black/55"
                 >
                   <Share2 size={24} />
                 </button>
