@@ -4,6 +4,7 @@ import { apiFetch } from '@/shared/api/api-client';
 import { useState } from 'react';
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet';
 import type { LatLngExpression } from 'leaflet';
+import '@/shared/leaflet-default-icon';
 
 interface GeoResult {
   neighborhood?: string;
