@@ -383,7 +383,7 @@ export function PropertyDetails() {
             <div className="flex flex-wrap gap-2">
               {/* Only meaningful to someone who can change it. A visitor can only ever see
                   ACTIVE properties, so the badge would be a constant. */}
-              {isAuthenticated && <StatusBadge status={property.status} />}
+              {isAuthenticated && !isPostCreate && <StatusBadge status={property.status} />}
               <Badge color={property.businessType === BusinessType.SALE ? 'action' : 'accent'}>
                 {BusinessTypeLabel[property.businessType]}
               </Badge>
