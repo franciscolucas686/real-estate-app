@@ -192,3 +192,7 @@ export function toPlaceCase(value: string): string {
     })
     .join(' ');
 }
+
+export function capitalizeFirstLetter(value: string): string {
+  return value.length === 0 ? value : value.charAt(0).toUpperCase() + value.slice(1);
+}
