@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import { MapContainer, TileLayer, Marker } from 'react-leaflet';
 import type { LatLngExpression } from 'leaflet';
+import '@/shared/leaflet-default-icon';
 
 interface PropertyMapProps {
   center: LatLngExpression;

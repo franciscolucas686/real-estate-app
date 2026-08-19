@@ -348,6 +348,14 @@ button:disabled {
   cursor: not-allowed;
 }
 
+/* Edge desenha seu próprio ícone nativo de revelar/limpar senha
+   (::-ms-reveal / ::-ms-clear) assim que o campo tem conteúdo, sobrepondo o
+   toggle Eye/EyeOff próprio da aplicação. Nenhum outro navegador tem isso. */
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
+  display: none;
+}
+
 *:focus-visible {
   outline: 2px solid var(--color-ring);
   outline-offset: 2px;

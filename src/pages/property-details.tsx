@@ -283,7 +283,7 @@ export function PropertyDetails() {
                   aria-label="Voltar"
                   className="absolute left-3 top-[calc(env(safe-area-inset-top,12px)+12px)] z-(--z-raised) flex size-12 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-transform active:scale-90 md:hidden"
                 >
-                  <ChevronLeft size={22} aria-hidden="true" />
+                  <ChevronLeft size={24} aria-hidden="true" />
                 </button>
               )}
 
@@ -302,7 +302,7 @@ export function PropertyDetails() {
                   aria-label="Compartilhar"
                   className="absolute right-3 top-[calc(env(safe-area-inset-top,12px)+12px)] z-(--z-raised) flex size-12 items-center justify-center rounded-full bg-black/40 text-white backdrop-blur-sm transition-transform active:scale-90 md:hidden"
                 >
-                  <Share2 size={22} aria-hidden="true" />
+                  <Share2 size={24} aria-hidden="true" />
                 </button>
               )}
             </div>
