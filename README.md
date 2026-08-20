@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🏡 Minha Imobiliária
+# Front-end Imobiliária
 
-**O catálogo de imóveis que tirou uma imobiliária inteira da galeria do celular.**
+**O catálogo de imóveis que tirou uma imobiliária da galeria do celular.**
 
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
@@ -20,48 +20,47 @@
 
 ---
 
-## 📖 A história
+## A história
 
-> Uma imobiliária real. Centenas de imóveis. **Zero organização.**
+> Uma imobiliária real. Vários de imóveis. **Zero organização.**
 
 As fotos viviam espalhadas entre a galeria do celular do corretor e pastas soltas no Drive.
 Achar "aquele apartamento de 2 quartos no Campolim até R$ 400 mil" significava rolar
-conversas de WhatsApp e abrir pasta por pasta. Do outro lado, o cliente esperava — e muitas
-vezes desistia antes da resposta chegar.
+conversas de WhatsApp e abrir pasta por pasta. Do outro lado, o cliente esperava e isso atrapalhava a venda.
 
 **O problema nunca foi falta de imóvel. Era falta de encontrabilidade.**
 
-### 💡 A solução
+### A solução
 
 Um app com duas caras, porque são duas pessoas com perguntas diferentes:
 
-| 👤 Quem usa | ❓ A pergunta que faz | 🎯 O que o app entrega |
+| Quem usa | A pergunta que faz | O que o app entrega |
 |---|---|---|
 | **Cliente final** | *"Tem alguma coisa que sirva pra mim?"* | Busca com filtros combináveis, galeria de fotos organizada por ambiente e contato direto no WhatsApp |
 | **Corretor** | *"Como eu ponho isso no ar rápido?"* | Cadastro guiado em 3 passos, upload de fotos por cômodo e controle de publicação |
 
 ---
 
-## ✨ Funcionalidades
+## Funcionalidades
 
 **Para o cliente**
-- [x] 🔎 Busca com filtros combináveis — tipo, negócio, faixa de preço, área, quartos, cidade
-- [x] 🔗 **Filtros na URL** — o link filtrado é compartilhável, sobrevive ao F5 e o botão voltar desfaz
-- [x] 🖼️ Galeria organizada por ambiente, com visualizador em tela cheia
-- [x] 🗺️ Localização no mapa (Leaflet)
-- [x] 💬 Contato direto via WhatsApp, com o código do imóvel já na mensagem
-- [x] 📱 PWA instalável, com suporte offline
+- [x] Busca com filtros combináveis — tipo, negócio, faixa de preço, área, quartos, cidade
+- [x] **Filtros na URL** — o link filtrado é compartilhável, sobrevive ao F5 e o botão voltar desfaz
+- [x] Galeria organizada por ambiente, com visualizador em tela cheia
+- [x] Localização no mapa (Leaflet)
+- [x] Contato direto via WhatsApp, com o código do imóvel já na mensagem
+- [x] PWA instalável, com suporte offline
 
 **Para o corretor**
-- [x] 🔐 Área autenticada com sessão por cookie e refresh automático de token
-- [x] 📝 Cadastro em 3 passos, com regras condicionais por tipo de imóvel
-- [x] 📸 Upload de fotos com organização por cômodo e seleção múltipla por gesto
-- [x] 🚦 Controle de status — ativo, pendente, inativo
-- [x] ⚙️ Configurações de contato público da imobiliária
+- [x] Área autenticada com sessão por cookie e refresh automático de token
+- [x] Cadastro em 3 passos, com regras condicionais por tipo de imóvel
+- [x] Upload de fotos com organização por cômodo e seleção múltipla por gesto
+- [x] Controle de status — ativo, pendente, inativo
+- [x] Configurações de contato público da imobiliária
 
 ---
 
-## 🛠️ Stack
+## Stack
 
 | Camada | Tecnologia | Por que |
 |---|---|---|
@@ -78,22 +77,22 @@ Um app com duas caras, porque são duas pessoas com perguntas diferentes:
 
 ---
 
-## 🏗️ Arquitetura
+## Arquitetura
 
 O que eu mais aprendi construindo isso não foi *usar* as bibliotecas — foi **decidir onde
 cada coisa mora** e fazer o projeto se defender de decisões ruins futuras.
 
 ```
 src/
-├── ui/          🎨 Design system. Zero domínio, zero rede, zero rota.
-├── layout/      📐 Estrutura de página. Conteúdo chega por children.
-├── features/    🧩 Um domínio por pasta, dono do seu api/hooks/components/schema
-├── pages/       📄 Rotas — apenas composição
-└── app/         🚀 Router, guards e composição das shells
+├── ui/          Design system. Zero domínio, zero rede, zero rota.
+├── layout/      Estrutura de página. Conteúdo chega por children.
+├── features/    Um domínio por pasta, dono do seu api/hooks/components/schema
+├── pages/       Rotas — apenas composição
+└── app/         Router, guards e composição das shells
 ```
 
 <details>
-<summary><b>🔒 As camadas não são convenção — são regra de lint</b></summary>
+<summary><b> As camadas não são convenção — são regra de lint</b></summary>
 
 <br>
 
@@ -133,7 +132,7 @@ Detalhes que a implementação precisou resolver:
 </details>
 
 <details>
-<summary><b>📱 Responsividade decidida em CSS, não em JavaScript</b></summary>
+<summary><b> Responsividade decidida em CSS, não em JavaScript</b></summary>
 
 <br>
 
@@ -150,7 +149,7 @@ exclusivas por CSS**, não um `if` em JS.
 </details>
 
 <details>
-<summary><b>♿ Acessibilidade tratada como requisito, não como enfeite</b></summary>
+<summary><b> Acessibilidade tratada como requisito, não como enfeite</b></summary>
 
 <br>
 
@@ -165,7 +164,7 @@ exclusivas por CSS**, não um `if` em JS.
 </details>
 
 <details>
-<summary><b>🧪 Como os testes são escritos</b></summary>
+<summary><b> Como os testes são escritos</b></summary>
 
 <br>
 
@@ -188,9 +187,9 @@ Duas regras que valem mais que a contagem:
 
 ---
 
-## 🚀 Rodando localmente
+##  Rodando localmente
 
-> Você vai precisar de **Node.js 22** na mochila — há um `.nvmrc`, então `nvm use` resolve.
+> Você vai precisar do **Node.js 22** — há um `.nvmrc`, então `nvm use` resolve.
 
 ```bash
 git clone https://github.com/franciscolucas686/real-estate-app.git
@@ -220,7 +219,7 @@ Só quer ver o código se comportando, sem infraestrutura? `npm test` roda os 27
 MSW interceptando a rede — nenhum servidor envolvido.
 
 <details>
-<summary><b>📜 Todos os comandos</b></summary>
+<summary><b> Todos os comandos</b></summary>
 
 <br>
 
@@ -240,50 +239,37 @@ MSW interceptando a rede — nenhum servidor envolvido.
 
 ---
 
-## 📊 O projeto em números
+##  O projeto em números
 
 | | |
 |---|---|
-| 📁 Arquivos de código | 122 |
-| 📝 Linhas de código | ~13.900 |
-| ✅ Testes automatizados | **272** em 33 arquivos |
-| 🧪 Linhas de teste | ~4.600 |
-| 🔁 Dependências circulares | **0** |
-| 🗺️ Rotas | 14, incluindo catch-all |
+| Arquivos de código | 122 |
+| Linhas de código | ~13.900 |
+| Testes automatizados | **272** em 33 arquivos |
+| Linhas de teste | ~4.600 |
+| Dependências circulares | **0** |
+| Rotas | 14, incluindo catch-all |
 
 ---
 
-## 🗺️ Próximos passos
-
-- [x] Filtros compartilháveis por URL
-- [x] Galeria organizada por ambiente
-- [x] PWA instalável
-- [x] Camadas verificadas por lint
-- [ ] 🔍 Auditoria com axe/Lighthouse na aplicação rodando
-- [ ] 🌙 Tema escuro (os tokens já estão prontos para isso)
-- [ ] ❤️ Favoritos para o cliente final
-- [ ] 📈 Métricas de visualização por imóvel para o corretor
-
----
-
-## 👨‍💻 Autor
+## Autor
 
 **Francisco Lucas**
 
 Desenvolvedor em transição de carreira, construindo software para resolver problemas reais de
-negócios reais. Este projeto nasceu de uma imobiliária que precisava sair da galeria do
+negócios reais. Este projeto foi criaddo para uma imobiliária que precisava sair da galeria do
 celular — e virou meu laboratório de arquitetura front-end.
 
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-conectar-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/francisco-lucas-dev/)
 [![GitHub](https://img.shields.io/badge/GitHub-seguir-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/franciscolucas686)
 [![Email](https://img.shields.io/badge/Email-falar-EA4335?style=for-the-badge&logo=gmail&logoColor=white)](mailto:franciscolucas686@gmail.com)
 
-## 📄 Licença
+## Licença
 
 MIT — veja [LICENSE](LICENSE).
 
 <div align="center">
 
-⭐ **Se este projeto te ajudou ou te interessou, deixe uma estrela!**
+ **Se este projeto te ajudou ou te interessou, deixe uma estrela!**
 
 </div>
