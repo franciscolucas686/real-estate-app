@@ -12,7 +12,13 @@ import { VitePWA } from 'vite-plugin-pwa';
 // never needs CORS or a second cookie configuration to log in.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  const backendUrl = env.VITE_API_URL;
+  // O default existe para que `npm install && npm run dev` funcione num clone recém-feito,
+  // sem criar `.env.development` antes. Sem ele o proxy abaixo recebe `target: undefined` e
+  // o dev-server morre num erro do http-proxy que não menciona variável de ambiente nenhuma —
+  // o passo esquecido e o sintoma ficam a uma distância que ninguém percorre na primeira vez.
+  // É o mesmo endereço que o `.env.example` traz, então não há segunda fonte de verdade: a
+  // variável continua sendo quem manda quando está definida.
+  const backendUrl = env.VITE_API_URL || 'http://localhost:3000';
 
   return {
     // Must stay in sync with the `paths` entry in tsconfig.app.json and the alias
