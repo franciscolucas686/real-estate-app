@@ -1,10 +1,5 @@
 <div align="center">
 
-<!-- 📌 SUBSTITUA por um banner seu (1280×400). Sugestão: Figma ou canva.com,
-     com o nome do app, um mockup do celular e a paleta navy/azul do projeto.
-     Salve em `docs/banner.png` e o caminho abaixo já funciona. -->
-<img src="docs/banner.png" alt="Minha Imobiliária" width="100%" />
-
 # 🏡 Minha Imobiliária
 
 **O catálogo de imóveis que tirou uma imobiliária inteira da galeria do celular.**
@@ -15,7 +10,7 @@
 [![Tailwind](https://img.shields.io/badge/Tailwind-4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 
 [![CI](https://img.shields.io/github/actions/workflow/status/franciscolucas686/real-estate-app/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/franciscolucas686/real-estate-app/actions)
-![Testes](https://img.shields.io/badge/testes-231%20passando-success?style=flat-square)
+![Testes](https://img.shields.io/badge/testes-272%20passando-success?style=flat-square)
 ![PWA](https://img.shields.io/badge/PWA-instal%C3%A1vel-5A0FC8?style=flat-square&logo=pwa)
 ![Licença](https://img.shields.io/badge/licen%C3%A7a-MIT-lightgrey?style=flat-square)
 
@@ -44,23 +39,6 @@ Um app com duas caras, porque são duas pessoas com perguntas diferentes:
 |---|---|---|
 | **Cliente final** | *"Tem alguma coisa que sirva pra mim?"* | Busca com filtros combináveis, galeria de fotos organizada por ambiente e contato direto no WhatsApp |
 | **Corretor** | *"Como eu ponho isso no ar rápido?"* | Cadastro guiado em 3 passos, upload de fotos por cômodo e controle de publicação |
-
----
-
-## 🎬 Demonstração
-
-<!-- 📌 GRAVE 3 GIFs curtos (10–15s) com ScreenToGif, LICEcap ou Kap.
-     Salve em `docs/` e os caminhos abaixo já funcionam.
-     Dica: grave em janela estreita (390px) pra mostrar que é mobile-first. -->
-
-<div align="center">
-
-| 🔍 Busca e filtros | 🖼️ Galeria por ambiente | ✍️ Cadastro do imóvel |
-|:---:|:---:|:---:|
-| <img src="docs/demo-filtros.gif" width="260" /> | <img src="docs/demo-galeria.gif" width="260" /> | <img src="docs/demo-cadastro.gif" width="260" /> |
-| Filtros que viram link compartilhável | Fotos organizadas por cômodo | Wizard em 3 passos com validação |
-
-</div>
 
 ---
 
@@ -95,7 +73,7 @@ Um app com duas caras, porque são duas pessoas com perguntas diferentes:
 | **Formulários** | React Hook Form + Zod 4 | Schemas espelhando as regras reais do backend |
 | **Mapas** | Leaflet | Seleção e exibição de coordenadas |
 | **Animação** | Motion | Transições de página respeitando `prefers-reduced-motion` |
-| **Testes** | Vitest + Testing Library + MSW | 231 testes sem back-end no ar |
+| **Testes** | Vitest + Testing Library + MSW | 272 testes sem back-end no ar |
 | **CI/CD** | GitHub Actions → Vercel | Lint, testes e build barram o merge |
 
 ---
@@ -191,7 +169,7 @@ exclusivas por CSS**, não um `if` em JS.
 
 <br>
 
-**231 testes, 28 arquivos, sem back-end rodando.** As requisições são interceptadas por
+**272 testes, 33 arquivos, sem back-end rodando.** As requisições são interceptadas por
 **MSW** — a rede é falsa, o componente é real.
 
 - **Unitários** — schemas Zod testados direto, cobrindo cada regra condicional
@@ -212,33 +190,30 @@ Duas regras que valem mais que a contagem:
 
 ## 🚀 Rodando localmente
 
-> Uma jornada de três paradas. Você vai precisar de **Node.js 20+** na mochila.
-
-**1ª parada — clonar e instalar**
+> Você vai precisar de **Node.js 22** na mochila — há um `.nvmrc`, então `nvm use` resolve.
 
 ```bash
 git clone https://github.com/franciscolucas686/real-estate-app.git
 cd real-estate-app
 npm install
+npm run dev
 ```
 
-**2ª parada — apontar para o back-end**
+Pronto: `http://localhost:5173`. Não é preciso criar nenhum `.env` — sem `VITE_API_URL` o
+proxy do Vite já mira `http://localhost:3000`, que é onde a API roda. Para apontar para outro
+back-end, copie o template e edite:
 
 ```bash
 cp .env.example .env.development
 ```
 
-O arquivo já aponta para `http://localhost:3000`, onde a
-[API](https://github.com/franciscolucas686/api-real-estate) roda. Prefere só ver a interface?
-Os testes rodam com MSW e não precisam de servidor nenhum.
+**Este app é a metade visível de um par.** Os imóveis vêm da
+[`api-real-estate`](https://github.com/franciscolucas686/api-real-estate) — **suba a API
+primeiro**, ou a home carrega vazia e parece defeito. O README de lá tem o passo a passo
+(`docker compose up -d` para Postgres + MinIO, migration, seed).
 
-**3ª parada — subir**
-
-```bash
-npm run dev
-```
-
-Pronto: `http://localhost:5173`.
+Só quer ver o código se comportando, sem infraestrutura? `npm test` roda os 272 testes com
+MSW interceptando a rede — nenhum servidor envolvido.
 
 <details>
 <summary><b>📜 Todos os comandos</b></summary>
@@ -251,6 +226,8 @@ Pronto: `http://localhost:5173`.
 | `npm run build` | Checagem de tipos (`tsc -b`) + build de produção |
 | `npm run preview` | Serve o build local |
 | `npm run lint` | ESLint, incluindo as regras de camada |
+| `npm run typecheck` | `tsc --noEmit`, sem gerar build |
+| `npm run format` · `format:check` | Prettier, escrevendo ou só verificando |
 | `npm test` | Todos os testes, uma vez |
 | `npm run test:watch` | Testes em watch mode |
 | `npm run test:cov` | Relatório de cobertura |
@@ -263,12 +240,12 @@ Pronto: `http://localhost:5173`.
 
 | | |
 |---|---|
-| 📁 Arquivos de código | 114 |
-| 📝 Linhas de código | ~12.100 |
-| ✅ Testes automatizados | **231** em 28 arquivos |
-| 🧪 Linhas de teste | ~3.800 |
+| 📁 Arquivos de código | 122 |
+| 📝 Linhas de código | ~13.900 |
+| ✅ Testes automatizados | **272** em 33 arquivos |
+| 🧪 Linhas de teste | ~4.600 |
 | 🔁 Dependências circulares | **0** |
-| 🗺️ Rotas | 13, incluindo catch-all |
+| 🗺️ Rotas | 14, incluindo catch-all |
 
 ---
 
@@ -293,9 +270,12 @@ Desenvolvedor em transição de carreira, construindo software para resolver pro
 negócios reais. Este projeto nasceu de uma imobiliária que precisava sair da galeria do
 celular — e virou meu laboratório de arquitetura front-end.
 
-[![LinkedIn](https://img.shields.io/badge/LinkedIn-conectar-0A66C2?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/in/SEU-PERFIL)
 [![GitHub](https://img.shields.io/badge/GitHub-seguir-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/franciscolucas686)
 [![Email](https://img.shields.io/badge/Email-falar-EA4335?style=for-the-badge&logo=gmail&logoColor=white)](mailto:franciscolucas686@gmail.com)
+
+## 📄 Licença
+
+MIT — veja [LICENSE](LICENSE).
 
 <div align="center">
 
