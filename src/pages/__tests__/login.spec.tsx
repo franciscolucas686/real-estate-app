@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { Login } from '../login';
-import { renderWithProviders } from '../../test/render';
+import { Login } from '@/pages/login';
+import { renderWithProviders } from '@/test/render';
 
 describe('Login', () => {
   it('shows Zod validation errors and never calls the API when the form is invalid', async () => {

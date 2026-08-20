@@ -1,39 +1,33 @@
 import { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { usePropertyMutationRefresh } from '../hooks/use-property-mutation-refresh';
+import { ChevronLeft, Plus, Check, Loader2, CheckCircle } from 'lucide-react';
+import { useProperty } from '@/features/properties/hooks/use-property';
+import { PropertyTypeLabel } from '@/shared/format';
+import { useSwipeToSelect } from '@/shared/hooks/use-swipe-to-select';
+import { useDisablePullToRefresh } from '@/shared/hooks/use-disable-pull-to-refresh';
+import { PageContainer, MAX_WIDTH_CENTER } from '@/layout/page-container';
+import { PropertyDetailSkeleton } from '@/features/properties/components/property-skeletons';
+import { ConfirmModal } from '@/ui/confirm-modal';
+import { SuccessSplash } from '@/ui/success-splash';
+import { SplashIdentity } from '@/features/properties/components/splash-identity';
+import { useCommitGalleryPatch } from '@/features/gallery/use-commit-gallery-patch';
 import {
-  ChevronLeft,
-  Plus,
-  Trash2,
-  Upload,
-  Pencil,
-  Check,
-  X,
-  Loader2,
-  Image as ImageIcon,
-  MoveRight,
-} from 'lucide-react';
-import { useProperty } from '../hooks/use-property';
-import { PropertyTypeLabel } from '../utils/format';
-import { useSwipeToSelect } from '../hooks/use-swipe-to-select';
-import { useScrollIntoView } from '../hooks/use-scroll-into-view';
-import { useDisablePullToRefresh } from '../hooks/use-disable-pull-to-refresh';
-import { PageContainer } from '../components/ui/page-container';
-import { PropertyDetailSkeleton } from '../components/ui/skeletons';
-import { ConfirmBottomSheet } from '../components/ui/confirm-bottom-sheet';
-import { twMerge } from 'tailwind-merge';
-import { executeGalleryPatch } from '../services/gallery-patch-service';
-import { buildGalleryPatch, type DraftRoom, type DraftImage } from '../utils/gallery-draft';
-import type { PropertyImageDto } from '../types/api';
-import { galleryRoomSchema, isImageFile } from '../schemas/gallery-room.schema';
-import { getErrorMessage } from '../utils/api-error';
+  buildGalleryPatch,
+  type DraftRoom,
+  type DraftImage,
+} from '@/features/gallery/gallery-draft';
+import type { PropertyImageDto } from '@/shared/api/types';
+import { galleryRoomSchema, isImageFile } from '@/features/gallery/gallery-room.schema';
+import { getErrorMessage } from '@/shared/api/api-error';
+import type { GallerySection } from '@/features/gallery/gallery-section';
+import { AddRoomInline } from '@/features/gallery/components/add-room-inline';
+import { MoveDialog } from '@/features/gallery/components/move-dialog';
+import { RoomFullscreen } from '@/features/gallery/components/room-fullscreen';
+import { RoomSection } from '@/features/gallery/components/room-section';
 
-type Mode = 'view' | 'photo-select';
-
-interface GallerySection {
-  roomId: string | null;
-  name: string;
-  images: PropertyImageDto[];
+/** Key for room-keyed state maps — `roomId` is `null` for "Sem ambiente". */
+function sectionKey(roomId: string | null): string {
+  return roomId ?? 'unassigned';
 }
 
 function toImageDto(img: DraftImage): PropertyImageDto {
@@ -45,19 +39,27 @@ export function GalleryManagement() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
-  const refreshPropertyQueries = usePropertyMutationRefresh();
   const locationState = location.state as {
     from?: string;
     context?: string;
     showSplash?: boolean;
+    dashboardSearch?: string;
   } | null;
   const fromDashboard = locationState?.from === 'dashboard';
   const fromContext = locationState?.context;
   const showSplash = Boolean(locationState?.showSplash);
+  // Carried from `PropertyAdminCard` when opened from a filtered dashboard (e.g.
+  // `?status=PENDING`), so "Voltar" and finishing the gallery return to that same filtered
+  // view instead of resetting it.
+  const dashboardSearch = locationState?.dashboardSearch ?? '';
   const { data: property, isLoading, isPlaceholderData } = useProperty(id!);
 
-  // State machine
-  const [mode, setMode] = useState<Mode>('view');
+  /**
+   * Selection state. It only ever means anything while `fullscreenRoom` is open: the stacked
+   * sections on the page are a read-only index now, and every write action (select, delete,
+   * move) lives inside the room view. Both are cleared whenever that view closes.
+   */
+  const [selecting, setSelecting] = useState(false);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState<string[]>([]);
 
   const [editingRoomId, setEditingRoomId] = useState<string | null>(null);
@@ -67,11 +69,43 @@ export function GalleryManagement() {
   const [addRoomName, setAddRoomName] = useState('');
   const [addRoomError, setAddRoomError] = useState('');
   const [showMoveDialog, setShowMoveDialog] = useState(false);
-  const [addRoomInputFocused, setAddRoomInputFocused] = useState(false);
-  const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState('');
+  const commitGallery = useCommitGalleryPatch(id!);
+  const confirming = commitGallery.isPending;
   const [roomToDelete, setRoomToDelete] = useState<{ id: string; name: string } | null>(null);
   const [confirmDeletePhotosOpen, setConfirmDeletePhotosOpen] = useState(false);
+  // Success splash for a plain gallery edit (not the post-create wizard, which already
+  // chains into its own splash on `property-details.tsx` and must not get a second one).
+  const [gallerySplashVisible, setGallerySplashVisible] = useState(false);
+
+  /**
+   * The room currently open in `RoomFullscreen` — an object rather than a bare `string | null`
+   * so "closed" (`null`) and "open on the unassigned room" (`{ roomId: null }`) stay
+   * distinguishable.
+   *
+   * `state: 'closed'` is the stretch where the panel is still mounted running its exit
+   * animation — the same thing Radix's `Presence` does inside `ui/modal.tsx`. Without it the
+   * element was destroyed in the same frame the user asked to close, so no exit animation could
+   * ever run.
+   */
+  const [fullscreenRoom, setFullscreenRoom] = useState<{
+    roomId: string | null;
+    state: 'open' | 'closed';
+  } | null>(null);
+
+  /**
+   * Which room the shared file picker is aimed at.
+   *
+   * A ref, not state: `null` is a real room ("Sem ambiente"), so it cannot double as "nothing
+   * pending"; the value is only ever read from the input's own `change` handler; and as state it
+   * was a batched write that the synchronous `.click()` on the next line raced in principle.
+   */
+  const pendingUploadRoomRef = useRef<string | null>(null);
+
+  /** What to give focus back to when the room view closes — captured at the click that opens
+   *  it, because by `change` time `document.activeElement` is the hidden file input. */
+  const roomOpenerRef = useRef<HTMLElement | null>(null);
+  const uploadInputRef = useRef<HTMLInputElement>(null);
 
   // Draft gallery state, seeded once from the server on load.
   const [draftRooms, setDraftRooms] = useState<DraftRoom[]>([]);
@@ -83,11 +117,9 @@ export function GalleryManagement() {
   }, [draftImages]);
 
   const { containerProps: swipeSelectProps } = useSwipeToSelect({
-    enabled: mode === 'photo-select',
+    enabled: selecting,
     onToggle: togglePhotoSelection,
   });
-
-  const addRoomInputRef = useScrollIntoView<HTMLDivElement>(addingRoom);
 
   useEffect(() => {
     if (property && !isPlaceholderData && !draftInitialized) {
@@ -138,11 +170,44 @@ export function GalleryManagement() {
     };
   }, []);
 
+  useEffect(() => {
+    function handlePopState() {
+      // Starts the exit rather than unmounting; `handleRoomExited` clears the state and the
+      // selection once the animation is done. Dropping the selection here instead would make
+      // the action bar vanish mid-slide.
+      setFullscreenRoom((prev) => (prev ? { ...prev, state: 'closed' } : null));
+    }
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Focus return, in an effect rather than inside `closeRoomFullscreen`: `history.back()` is
+  // async, so at call time the overlay is still mounted and would take the focus straight back.
+  useEffect(() => {
+    if (fullscreenRoom === null && roomOpenerRef.current) {
+      roomOpenerRef.current.focus({ preventScroll: true });
+      roomOpenerRef.current = null;
+    }
+  }, [fullscreenRoom]);
+
+  useEffect(() => {
+    if (!gallerySplashVisible) return;
+    const t = setTimeout(() => {
+      setGallerySplashVisible(false);
+      if (fromDashboard) {
+        navigate(`/dashboard${dashboardSearch}`);
+      } else {
+        navigate(`/properties/${id}`);
+      }
+    }, 2000);
+    return () => clearTimeout(t);
+  }, [gallerySplashVisible, fromDashboard, dashboardSearch, id, navigate]);
+
   if (isLoading || isPlaceholderData) return <PropertyDetailSkeleton />;
 
   if (!property) {
     return (
-      <div className="flex min-h-dvh items-center justify-center p-4">
+      <div className="flex min-h-dvh items-center justify-center p-4 md:min-h-full">
         <p className="text-foreground-subtle">Imóvel não encontrado.</p>
       </div>
     );
@@ -165,6 +230,22 @@ export function GalleryManagement() {
 
   const totalImages = sections.reduce((sum, s) => sum + s.images.length, 0);
 
+  const fullscreenSection = fullscreenRoom
+    ? (sections.find((s) => s.roomId === fullscreenRoom.roomId) ?? null)
+    : null;
+
+  /**
+   * The one list that both the "Excluir (N)" count and the delete/move actions read, so the
+   * number on the button can never disagree with what the button does. The count used to be
+   * computed inside `RoomFullscreen` while the handlers acted on the whole `selectedPhotoIds` —
+   * two numbers that only agreed by convention. Intersecting with the open room also makes
+   * "move these elsewhere" self-clearing: the moved photos leave the section, so the next
+   * render derives an empty selection.
+   */
+  const selectedInRoom = fullscreenSection
+    ? selectedPhotoIds.filter((pid) => fullscreenSection.images.some((img) => img.id === pid))
+    : [];
+
   // Selection handlers
   function togglePhotoSelection(imageId: string) {
     setSelectedPhotoIds((prev) =>
@@ -173,13 +254,13 @@ export function GalleryManagement() {
   }
 
   function exitSelectMode() {
-    setMode('view');
+    setSelecting(false);
     setSelectedPhotoIds([]);
   }
 
   function handleDeleteSelected() {
-    if (selectedPhotoIds.length === 0) return;
-    const idsToRemove = new Set(selectedPhotoIds);
+    if (selectedInRoom.length === 0) return;
+    const idsToRemove = new Set(selectedInRoom);
     setDraftImages((prev) =>
       prev
         .filter((img) => {
@@ -195,8 +276,8 @@ export function GalleryManagement() {
   }
 
   function handleMoveToRoom(targetRoomId: string | null) {
-    if (selectedPhotoIds.length === 0) return;
-    const idsToMove = new Set(selectedPhotoIds);
+    if (selectedInRoom.length === 0) return;
+    const idsToMove = new Set(selectedInRoom);
     setDraftImages((prev) =>
       prev.map((img) => (idsToMove.has(img.id) ? { ...img, roomId: targetRoomId } : img)),
     );
@@ -204,12 +285,14 @@ export function GalleryManagement() {
     exitSelectMode();
   }
 
-  function handleUpload(roomId: string | null, files: FileList | null) {
-    if (!files || files.length === 0) return;
+  /** Returns whether anything was actually added, so the caller only opens the room view on a
+   *  real pick — `accept="image/*"` is advisory and `isImageFile` can filter everything out. */
+  function handleUpload(roomId: string | null, files: FileList | null): boolean {
+    if (!files || files.length === 0) return false;
     // accept="image/*" already scopes the native picker; this only guards
     // against drag-and-drop or a picker that lets non-images through.
     const imageFiles = Array.from(files).filter(isImageFile);
-    if (imageFiles.length === 0) return;
+    if (imageFiles.length === 0) return false;
     const newImages: DraftImage[] = imageFiles.map((file) => ({
       id: crypto.randomUUID(),
       url: URL.createObjectURL(file),
@@ -221,20 +304,29 @@ export function GalleryManagement() {
       file,
     }));
     setDraftImages((prev) => [...prev, ...newImages]);
+    return true;
   }
 
-  function handleDeleteImage(imageId: string) {
-    setDraftImages((prev) =>
-      prev
-        .filter((img) => {
-          if (img.id === imageId && img.isNew) {
-            URL.revokeObjectURL(img.url);
-            return false;
-          }
-          return true;
-        })
-        .map((img) => (img.id === imageId && !img.isNew ? { ...img, deleted: true } : img)),
-    );
+  function captureOpener() {
+    roomOpenerRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }
+
+  function requestUpload(roomId: string | null) {
+    // Today only `RoomFullscreen` calls this, and there the opener was already captured by
+    // `handleManagePhotos` — overwriting it with a tile that is about to unmount would leave
+    // focus nowhere when the room view closes. The guard is what would keep a page-level
+    // upload tile, if one ever comes back, restoring focus correctly.
+    if (fullscreenRoom === null) captureOpener();
+    pendingUploadRoomRef.current = roomId;
+    // Synchronous, deliberately: the picker needs the click's transient user activation, so
+    // nothing may be awaited between the handler and this call.
+    uploadInputRef.current?.click();
+  }
+
+  function handleManagePhotos(roomId: string | null) {
+    captureOpener();
+    openRoomFullscreen(roomId);
   }
 
   function handleAddRoom() {
@@ -299,220 +391,263 @@ export function GalleryManagement() {
     );
   }
 
-  async function handleConfirm() {
-    setConfirming(true);
-    setConfirmError('');
-    try {
-      const patch = buildGalleryPatch(draftRooms, draftImages);
-      await executeGalleryPatch(id!, patch);
-      refreshPropertyQueries(id);
-      navigateAfterFinish();
-    } catch (e) {
-      setConfirmError(getErrorMessage(e));
-      setConfirming(false);
+  function openRoomFullscreen(roomId: string | null) {
+    // One entry per *open*, not per call: "Adicionar fotos" pressed from inside the room view
+    // comes back through here, and a second entry would need two back presses to leave.
+    //
+    // The guard is `!== 'open'`, not `=== null`: reopening while the panel is still animating
+    // out finds `fullscreenRoom` non-null but its history entry already consumed by
+    // `history.back()`, so it does need a fresh push or the next back press would leave the
+    // gallery entirely. Gated on React state rather than `window.history.state?.gallerySection`
+    // because jsdom keeps a single history across a spec file — that flag survives into the
+    // next test.
+    if (fullscreenRoom?.state !== 'open') {
+      window.history.pushState({ gallerySection: true }, '');
+      // A room always opens in view mode — including when it reopens on top of an exit that
+      // hasn't finished clearing the previous session yet.
+      exitSelectMode();
+    }
+    setFullscreenRoom({ roomId, state: 'open' });
+  }
+
+  function closeRoomFullscreen() {
+    setFullscreenRoom((prev) => (prev ? { ...prev, state: 'closed' } : null));
+    if (window.history.state?.gallerySection) {
+      // Consumes the entry pushed by `openRoomFullscreen` — one back-press to leave the room,
+      // not two. The `popstate` it triggers sets the same 'closed' state, harmlessly.
+      window.history.back();
     }
   }
 
-  function navigateAfterFinish() {
-    if (fromDashboard) {
-      navigate('/dashboard');
-    } else if (fromContext === 'post-create') {
-      navigate(`/properties/${id}`, { state: { context: 'post-create', showSplash } });
-    } else {
-      navigate(`/properties/${id}`);
+  /**
+   * Called by the panel once its exit animation finishes — this is what actually unmounts it.
+   * Guarded so reopening mid-exit isn't undone by the animation that was already running.
+   *
+   * The selection is dropped *here* rather than when the close starts. Clearing it up front
+   * unmounted `SelectionActionBar` and swapped the scroller's bottom padding while the panel was
+   * still sliding away, so the content jumped mid-animation. It still never outlives the room
+   * view, which is what matters: an id carried into the next room would let "Excluir (N)" act on
+   * photos the user can no longer see.
+   */
+  function handleRoomExited() {
+    if (fullscreenRoom?.state !== 'closed') return;
+    setFullscreenRoom(null);
+    exitSelectMode();
+  }
+
+  async function handleConfirm() {
+    setConfirmError('');
+    try {
+      // mutateAsync resolves only after onSuccess finishes invalidating, so the next
+      // screen never renders from a cache that predates the upload.
+      await commitGallery.mutateAsync(buildGalleryPatch(draftRooms, draftImages));
+      if (fromContext === 'post-create') {
+        // This leg has its own splash sequence, chained on `property-details.tsx` —
+        // showing `gallerySplashVisible` here too would stack a second one.
+        navigate(`/properties/${id}`, { state: { context: 'post-create', showSplash } });
+      } else {
+        setGallerySplashVisible(true);
+      }
+    } catch (e) {
+      setConfirmError(getErrorMessage(e));
     }
   }
 
   return (
-    <div data-slot="page-gallery-management" className="flex min-h-dvh flex-col pb-24">
-      {/* Header */}
-      <PageContainer
-        withSafeAreaTop
-        className="sticky top-0 z-10 flex items-center gap-3 bg-background py-4"
+    <>
+      <div
+        data-slot="page-gallery-management"
+        /* The room view is a modal surface at every width now. Without this the page behind
+           keeps its whole tab order and accessibility tree under an opaque overlay, so tabbing
+           past the room view's last control lands on invisible buttons. `inert` covers both
+           halves; `aria-hidden` would only cover one. */
+        inert={fullscreenRoom !== null}
+        className="flex min-h-dvh flex-col pb-[calc(env(safe-area-inset-bottom,0px)+96px)] md:min-h-full md:pb-8"
       >
-        <button
-          type="button"
-          onClick={() => {
-            if (mode === 'photo-select') {
-              exitSelectMode();
-            } else if (fromContext === 'post-create') {
-              navigate(`/properties/${id}/edit`, { state: { context: 'post-create' } });
-            } else {
-              navigate(`/dashboard`);
-            }
-          }}
-          aria-label="Voltar"
-          className="flex size-10 items-center justify-center rounded-full text-foreground active:scale-90 transition-transform"
+        {/* Header */}
+        <PageContainer
+          withSafeAreaTop
+          maxWidth="wide"
+          className="sticky top-0 z-10 flex items-center gap-3 bg-background py-4"
         >
-          {mode === 'photo-select' ? <X size={24} /> : <ChevronLeft size={24} />}
-        </button>
-        <div className="flex-1 min-w-0">
-          <h1 className="text-lg font-bold text-foreground truncate">
-            {mode === 'photo-select' ? 'Selecionar fotos' : 'Gerenciar fotos'}
-          </h1>
-          <p className="truncate text-xs text-foreground-subtle">
-            {mode === 'photo-select' && selectedPhotoIds.length > 0
-              ? `${selectedPhotoIds.length} selecionada${selectedPhotoIds.length !== 1 ? 's' : ''}`
-              : ` Cód. ${property.code} · ${PropertyTypeLabel[property.type]} · ${totalImages} foto${totalImages !== 1 ? 's' : ''}`}
-          </p>
-        </div>
-        {mode === 'view' && totalImages > 0 && (
           <button
             type="button"
-            onClick={() => setMode('photo-select')}
-            className="flex items-center gap-1.5 rounded-full bg-action px-4 py-2 text-xs font-medium text-white active:bg-action-hover"
+            onClick={() => {
+              if (fromContext === 'post-create') {
+                navigate(`/properties/${id}/edit`, { state: { context: 'post-create' } });
+              } else {
+                navigate(`/dashboard${dashboardSearch}`);
+              }
+            }}
+            aria-label="Voltar"
+            className="flex size-14 items-center justify-center rounded-full text-foreground transition-transform  bg-border active:scale-90 md:hover:bg-action md:hover:text-primary-foreground"
           >
-            <ImageIcon size={24} />
-            Selecionar
+            <ChevronLeft size={24} />
           </button>
+          <div className="flex-1 min-w-0">
+            {/* Matches the property wizard's console header, which steps up to `2xl` from
+                `md`. Left at a flat `lg` this was the only console page whose title stayed
+                phone-sized on a desktop. */}
+            <h1 className="truncate text-lg font-bold text-foreground md:text-2xl">
+              Editar galeria
+            </h1>
+            <p className="truncate text-xs text-foreground-subtle">
+              {` Cód. ${property.code} · ${PropertyTypeLabel[property.type]} · ${totalImages} foto${totalImages !== 1 ? 's' : ''}`}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 md:gap-3">
+            {/* No "Selecionar" and no "Adicionar fotos" here any more: this page is an index,
+                and every action on a photo — selecting, deleting, moving, uploading — lives
+                inside a room's own screen. Each section's "Gerenciar fotos" is the way in. */}
+            <button
+              type="button"
+              onClick={handleConfirm}
+              disabled={confirming}
+              className="hidden items-center gap-2 rounded-full bg-action px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors disabled:opacity-60 md:flex md:hover:bg-action-hover"
+            >
+              {confirming ? (
+                <Loader2 size={22} className="animate-spin" aria-hidden="true" />
+              ) : (
+                <Check size={22} aria-hidden="true" />
+              )}
+              Concluir alterações
+            </button>
+          </div>
+        </PageContainer>
+
+        {/* Desktop only: below `md` the same message renders inside the action bar, next to the
+            button that produced it. Two copies used to render at once on a phone, which is two
+            `role="alert"`s announcing the same string. */}
+        {confirmError && (
+          <PageContainer maxWidth="wide" className="hidden pb-4 md:block">
+            <p
+              role="alert"
+              className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger"
+            >
+              {confirmError}
+            </p>
+          </PageContainer>
         )}
-      </PageContainer>
 
-      {/* Sections */}
-      <div className="flex flex-col gap-6 px-4" {...swipeSelectProps}>
-        {sections.map((section) => (
-          <RoomSection
-            key={section.roomId ?? 'unassigned'}
-            section={section}
-            mode={mode}
-            selectedPhotoIds={selectedPhotoIds}
-            editingRoomId={editingRoomId}
-            newRoomName={newRoomName}
-            onUpload={handleUpload}
-            onDeleteImage={handleDeleteImage}
-            renameError={renameRoomError}
-            onStartEdit={(roomId, name) => {
-              setEditingRoomId(roomId);
-              setNewRoomName(name);
-              setRenameRoomError('');
-            }}
-            onCancelEdit={() => {
-              setEditingRoomId(null);
-              setRenameRoomError('');
-            }}
-            onRenameRoom={handleRenameRoom}
-            onDeleteRoom={(roomId, name) => setRoomToDelete({ id: roomId, name })}
-          />
-        ))}
+        {/* Sections — one composition at every width. Each room shows a fixed slice of its
+            photos — two rows, closed by "Gerenciar fotos" — and the rest is reached through it. */}
+        <PageContainer maxWidth="wide" className="flex flex-1 flex-col gap-8">
+          {sections.map((section) => (
+            <RoomSection
+              key={sectionKey(section.roomId)}
+              section={section}
+              onManagePhotos={handleManagePhotos}
+              editingRoomId={editingRoomId}
+              newRoomName={newRoomName}
+              renameError={renameRoomError}
+              onStartEdit={(roomId, name) => {
+                setEditingRoomId(roomId);
+                setNewRoomName(name);
+                setRenameRoomError('');
+              }}
+              onNewRoomNameChange={setNewRoomName}
+              onCancelEdit={() => {
+                setEditingRoomId(null);
+                setRenameRoomError('');
+              }}
+              onRenameRoom={handleRenameRoom}
+              onDeleteRoom={(roomId, name) => setRoomToDelete({ id: roomId, name })}
+            />
+          ))}
 
-        {/* Add room */}
-        {addingRoom ? (
-          <div ref={addRoomInputRef} className="flex flex-col gap-1.5 scroll-mb-28">
-            <div className="flex items-center gap-2">
-              <input
-                autoFocus
-                value={addRoomName}
-                onChange={(e) => {
-                  setAddRoomName(e.target.value);
-                  setAddRoomError('');
-                }}
-                onFocus={() => setAddRoomInputFocused(true)}
-                onBlur={() => setAddRoomInputFocused(false)}
-                placeholder="Nome do ambiente"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleAddRoom();
-                  if (e.key === 'Escape') {
-                    setAddingRoom(false);
-                    setAddRoomName('');
-                    setAddRoomError('');
-                  }
-                }}
-                className="flex-1 rounded-xl border border-border bg-surface-raised px-4 py-2.5 text-sm text-foreground outline-none focus:border-action placeholder:text-muted-foreground"
-              />
+          {addingRoom ? (
+            <AddRoomInline
+              name={addRoomName}
+              error={addRoomError}
+              onNameChange={(v) => {
+                setAddRoomName(v);
+                setAddRoomError('');
+              }}
+              onConfirm={handleAddRoom}
+              onCancel={() => {
+                setAddingRoom(false);
+                setAddRoomName('');
+                setAddRoomError('');
+              }}
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setAddingRoom(true)}
+              className="flex items-center gap-2 self-start text-sm font-medium text-action transition-colors md:hover:text-action-hover"
+            >
+              <Plus size={18} />
+              Adicionar ambiente
+            </button>
+          )}
+        </PageContainer>
+
+        {/* Mobile action bar — the "Concluir" at the end of the page. `md:hidden` because the
+            desktop header already carries it. `z-(--z-nav)` (40) keeps it under the room view
+            (50); the route sets `hideMobileNav` so the console's own bar, which is also
+            `fixed bottom-0` and rendered after the page, no longer paints over this one. */}
+        {!fullscreenRoom && (
+          <div className="fixed inset-x-0 bottom-0 z-(--z-nav) bg-background/90 px-4 pt-4 pb-[calc(env(safe-area-inset-bottom,0px)+16px)] backdrop-blur-sm md:hidden">
+            <div className={`flex flex-col gap-2 ${MAX_WIDTH_CENTER.content}`}>
+              {confirmError && (
+                <p
+                  role="alert"
+                  className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger"
+                >
+                  {confirmError}
+                </p>
+              )}
               <button
                 type="button"
-                onClick={handleAddRoom}
-                aria-label="Confirmar novo ambiente"
-                className="flex size-10 items-center justify-center rounded-full bg-action text-white"
+                onClick={handleConfirm}
+                disabled={confirming}
+                className="flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white transition-colors disabled:opacity-60 active:bg-action-hover md:hover:bg-action-hover"
               >
-                <Check size={24} />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setAddingRoom(false);
-                  setAddRoomName('');
-                  setAddRoomError('');
-                }}
-                aria-label="Cancelar novo ambiente"
-                className="flex size-10 items-center justify-center rounded-full bg-border text-foreground"
-              >
-                <X size={24} />
+                {confirming ? (
+                  <Loader2 size={24} className="animate-spin" />
+                ) : fromDashboard ? (
+                  'Salvar alterações'
+                ) : (
+                  'Adicionar fotos e concluir'
+                )}
               </button>
             </div>
-            {addRoomError && <p className="text-sm font-medium text-danger">{addRoomError}</p>}
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setAddingRoom(true)}
-            className="flex h-12 items-center justify-center gap-2 rounded-full border border-dashed border-border text-md font-medium text-foreground-subtle active:bg-surface"
-          >
-            <Plus size={24} />
-            Adicionar ambiente
-          </button>
         )}
       </div>
 
-      {/* Contextual Bottom Bar */}
-      {mode === 'photo-select' ? (
-        <div className="fixed bottom-0 inset-x-0 bg-background/95 p-4 backdrop-blur-md border-t border-border">
-          <div className="flex gap-3">
-            <button
-              type="button"
-              onClick={() => setConfirmDeletePhotosOpen(true)}
-              disabled={selectedPhotoIds.length === 0}
-              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full border border-danger text-danger font-semibold disabled:opacity-40 disabled:cursor-not-allowed active:bg-danger/10"
-            >
-              <Trash2 size={24} />
-              Excluir ({selectedPhotoIds.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowMoveDialog(true)}
-              disabled={selectedPhotoIds.length === 0}
-              className="flex h-14 flex-1 items-center justify-center gap-2 rounded-full bg-action text-white font-semibold disabled:opacity-40 disabled:cursor-not-allowed active:bg-action-hover"
-            >
-              <MoveRight size={24} />
-              Mover
-            </button>
-          </div>
-        </div>
-      ) : !addRoomInputFocused ? (
-        <div className="fixed bottom-0 inset-x-0 flex flex-col gap-2 bg-background/90 p-4 backdrop-blur-sm">
-          {confirmError && (
-            <p className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
-              {confirmError}
-            </p>
-          )}
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={confirming}
-            className="flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white active:bg-action-hover disabled:opacity-60"
-          >
-            {confirming ? (
-              <Loader2 size={24} className="animate-spin" />
-            ) : fromDashboard ? (
-              'Editar galeria'
-            ) : (
-              'Adicionar fotos e concluir'
-            )}
-          </button>
-        </div>
-      ) : null}
+      {/* Outside the inert page root on purpose: `requestUpload` calls `.click()` on this input
+          from a click that originates *inside* the room view, and a browser suppresses the
+          activation behaviour of an inert element — the picker would simply never open. jsdom
+          implements no `inert` at all, so no test would catch that. */}
+      <input
+        ref={uploadInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const roomId = pendingUploadRoomRef.current;
+          const added = handleUpload(roomId, e.target.files);
+          // Without this, picking the same file twice in a row fires no `change` (the value is
+          // identical), so the second "Adicionar fotos" would silently add nothing *and* never
+          // open the room view. The `File` refs are already captured above.
+          e.target.value = '';
+          // Choosing photos is the start of working on a room, not the end of it.
+          if (added) openRoomFullscreen(roomId);
+        }}
+      />
 
-      {/* Move Dialog */}
-      {showMoveDialog && (
-        <MoveDialog
-          sections={sections}
-          onMove={handleMoveToRoom}
-          onClose={() => setShowMoveDialog(false)}
-        />
-      )}
+      {/* Sheet on mobile, centered dialog on desktop — one element, CSS decides. */}
+      <MoveDialog
+        open={showMoveDialog}
+        sections={sections}
+        onMove={handleMoveToRoom}
+        onClose={() => setShowMoveDialog(false)}
+      />
 
       {/* Delete room confirmation */}
-      <ConfirmBottomSheet
+      <ConfirmModal
         open={roomToDelete !== null}
         message={`Você tem certeza que deseja excluir o ambiente "${roomToDelete?.name}"?`}
         onConfirm={() => {
@@ -523,7 +658,7 @@ export function GalleryManagement() {
       />
 
       {/* Delete selected photos confirmation */}
-      <ConfirmBottomSheet
+      <ConfirmModal
         open={confirmDeletePhotosOpen}
         message="Você tem certeza que deseja excluir essas fotos?"
         onConfirm={() => {
@@ -532,225 +667,34 @@ export function GalleryManagement() {
         }}
         onClose={() => setConfirmDeletePhotosOpen(false)}
       />
-    </div>
-  );
-}
 
-// ─── GalleryImage Component ──────────────────────────────────────────────────
-interface GalleryImageProps {
-  image: PropertyImageDto;
-  mode: Mode;
-  isSelected: boolean;
-}
-
-function GalleryImage({ image, mode, isSelected }: GalleryImageProps) {
-  return (
-    <div
-      className="relative aspect-square"
-      data-swipe-select-id={mode === 'photo-select' ? image.id : undefined}
-      style={mode === 'photo-select' ? { touchAction: 'pan-y' } : undefined}
-    >
-      <img
-        src={image.url}
-        alt={image.label ?? ''}
-        className={twMerge(
-          'h-full w-full rounded-xl object-cover transition-all',
-          mode === 'photo-select' && 'cursor-pointer',
-          isSelected && 'ring-4 ring-action ring-offset-2',
-        )}
-      />
-
-      {/* Checkbox for photo-select mode */}
-      {mode === 'photo-select' && (
-        <div className="absolute left-2 top-2 flex size-6 items-center justify-center rounded-full bg-white shadow-md">
-          {isSelected && (
-            <div className="flex size-5 items-center justify-center rounded-full bg-action">
-              <Check size={24} className="text-white" />
-            </div>
-          )}
-        </div>
+      {/* The room manager. "Gerenciar fotos" leads here and a finished upload opens it by
+          itself, so the flow is the same whichever way you arrived. It reuses this page's own
+          selection state and modals — a filtered view onto the same edit, not a parallel one. */}
+      {fullscreenRoom && fullscreenSection && (
+        <RoomFullscreen
+          section={fullscreenSection}
+          state={fullscreenRoom.state}
+          onExited={handleRoomExited}
+          selecting={selecting}
+          selectedIds={selectedInRoom}
+          modalOpen={showMoveDialog || confirmDeletePhotosOpen}
+          onTogglePhoto={togglePhotoSelection}
+          onClose={closeRoomFullscreen}
+          onEnterSelect={() => setSelecting(true)}
+          onExitSelect={exitSelectMode}
+          onUpload={requestUpload}
+          onRequestDeleteSelected={() => setConfirmDeletePhotosOpen(true)}
+          onRequestMoveSelected={() => setShowMoveDialog(true)}
+          swipeProps={swipeSelectProps}
+        />
       )}
-    </div>
-  );
-}
 
-// ─── RoomSection Component ───────────────────────────────────────────────────
-interface RoomSectionProps {
-  section: GallerySection;
-  mode: Mode;
-  selectedPhotoIds: string[];
-  editingRoomId: string | null;
-  newRoomName: string;
-  renameError: string;
-  onUpload: (roomId: string | null, files: FileList | null) => void;
-  onDeleteImage: (id: string) => void;
-  onStartEdit: (roomId: string, name: string) => void;
-  onCancelEdit: () => void;
-  onRenameRoom: (roomId: string) => void;
-  onDeleteRoom: (roomId: string, name: string) => void;
-}
-
-function RoomSection({
-  section,
-  mode,
-  selectedPhotoIds,
-  editingRoomId,
-  newRoomName,
-  renameError,
-  onUpload,
-  onStartEdit,
-  onCancelEdit,
-  onRenameRoom,
-  onDeleteRoom,
-}: RoomSectionProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  return (
-    <div className="flex flex-col gap-3">
-      {/* Section header */}
-      <div className="flex items-center gap-2">
-        {section.roomId && editingRoomId === section.roomId ? (
-          <div className="flex flex-1 flex-col gap-1.5">
-            <div className="flex items-center gap-2">
-              <input
-                autoFocus
-                value={newRoomName}
-                onChange={(e) => onStartEdit(section.roomId!, e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') onRenameRoom(section.roomId!);
-                  if (e.key === 'Escape') onCancelEdit();
-                }}
-                className="flex-1 rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-lg text-foreground outline-none focus:border-action"
-              />
-              <button
-                type="button"
-                onClick={() => onRenameRoom(section.roomId!)}
-                aria-label="Confirmar novo nome do ambiente"
-                className="flex size-10 items-center justify-center rounded-full bg-action text-white"
-              >
-                <Check size={24} />
-              </button>
-              <button
-                type="button"
-                onClick={onCancelEdit}
-                aria-label="Cancelar renomeação do ambiente"
-                className="flex size-10 items-center justify-center rounded-full bg-border text-foreground"
-              >
-                <X size={24} />
-              </button>
-            </div>
-            {renameError && <p className="text-sm font-medium text-danger">{renameError}</p>}
-          </div>
-        ) : (
-          <>
-            <span className="flex-1 text-lg font-semibold text-foreground">
-              {section.name}
-              <span className="ml-1.5 text-xs font-normal text-foreground-subtle">
-                ({section.images.length})
-              </span>
-            </span>
-            {section.roomId && mode === 'view' && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => onStartEdit(section.roomId!, section.name)}
-                  aria-label="Renomear ambiente"
-                  className="flex size-10 items-center justify-center rounded-full text-foreground-subtle active:bg-border"
-                >
-                  <Pencil size={24} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onDeleteRoom(section.roomId!, section.name)}
-                  aria-label="Excluir ambiente"
-                  className="flex size-10 items-center justify-center rounded-full text-foreground-subtle active:bg-border"
-                >
-                  <Trash2 size={24} />
-                </button>
-              </>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Images grid */}
-      <div className="grid grid-cols-3 gap-2">
-        {section.images.map((img) => (
-          <GalleryImage
-            key={img.id}
-            image={img}
-            mode={mode}
-            isSelected={selectedPhotoIds.includes(img.id)}
-          />
-        ))}
-
-        {/* Upload button - only in view mode */}
-        {mode === 'view' && (
-          <>
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="flex aspect-square items-center justify-center rounded-xl border-2 border-dashed border-border bg-surface text-foreground-subtle active:bg-surface-raised"
-            >
-              <Upload size={24} />
-            </button>
-
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={(e) => onUpload(section.roomId, e.target.files)}
-            />
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── MoveDialog Component ────────────────────────────────────────────────────
-interface MoveDialogProps {
-  sections: GallerySection[];
-  onMove: (roomId: string | null) => void;
-  onClose: () => void;
-}
-
-function MoveDialog({ sections, onMove, onClose }: MoveDialogProps) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4"
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl bg-surface-raised p-6 shadow-xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <h3 className="mb-4 text-lg font-semibold text-foreground">Mover para</h3>
-        <div className="flex flex-col gap-2">
-          {sections.map((section) => {
-            const key = section.roomId ?? 'unassigned';
-            return (
-              <button
-                key={key}
-                onClick={() => onMove(section.roomId)}
-                className="flex h-12 items-center justify-between rounded-xl border border-border bg-surface px-4 text-sm font-medium text-foreground active:bg-border"
-              >
-                <span>{section.name}</span>
-                <span className="text-xs text-foreground-subtle">({section.images.length})</span>
-              </button>
-            );
-          })}
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-4 flex h-12 w-full items-center justify-center rounded-xl bg-border text-sm font-semibold text-foreground"
-        >
-          Cancelar
-        </button>
-      </div>
-    </div>
+      <SuccessSplash visible={gallerySplashVisible}>
+        <CheckCircle size={64} className="text-action" />
+        <p className="text-xl font-bold text-foreground">Galeria atualizada!</p>
+        <SplashIdentity property={property} />
+      </SuccessSplash>
+    </>
   );
 }

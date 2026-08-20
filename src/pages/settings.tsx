@@ -1,53 +1,89 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ChevronLeft, Plus, Trash2, Check, CheckCircle, Loader2 } from 'lucide-react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useLogout } from '../hooks/use-auth';
-import { PageContainer } from '../components/ui/page-container';
+import { useLogout, useLogoutAll } from '@/features/auth/use-auth';
+import { PageContainer } from '@/layout/page-container';
+import { BOTTOM_NAV_CLEARANCE } from '@/layout/app-nav';
+import { cn } from '@/shared/cn';
+import { onlyDigits } from '@/shared/digits';
+import { Input } from '@/ui/input';
+import { fetchWhatsappNumbers } from '@/features/settings/whatsapp-service';
+import { fetchSiteSettings } from '@/features/settings/site-settings-service';
+import { settingsKeys } from '@/features/settings/query-keys';
 import {
-  fetchWhatsappNumbers,
-  createWhatsappNumber,
-  deleteWhatsappNumber,
-} from '../services/whatsapp-service';
-import { fetchSiteSettings, updateSiteSettings } from '../services/site-settings-service';
-import { formatPhone, formatPhoneAdaptive } from '../utils/format';
+  useCreateWhatsappNumber,
+  useDeleteWhatsappNumber,
+  useUpdateSiteSettings,
+} from '@/features/settings/use-settings-mutations';
+import { formatPhone, normalizeInstagramHandle } from '@/shared/format';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { SettingsSkeleton } from '../components/ui/skeletons';
-import { SuccessSplash } from '../components/ui/success-splash';
+import { SettingsSkeleton } from '@/features/settings/settings-skeleton';
+import { SuccessSplash } from '@/ui/success-splash';
 import {
   siteSettingsSchema,
   whatsappNumberSchema,
   type SiteSettingsFormValues,
   type WhatsappNumberFormValues,
-} from '../schemas/site-settings.schema';
-import { getErrorMessage } from '../utils/api-error';
+} from '@/features/settings/site-settings.schema';
+import { getErrorMessage } from '@/shared/api/api-error';
+import { ConfirmModal } from '@/ui/confirm-modal';
 
 export function Settings() {
   const navigate = useNavigate();
   const logout = useLogout();
+  const logoutAll = useLogoutAll();
   const queryClient = useQueryClient();
 
   const [saved, setSaved] = useState(false);
-  const [initialized, setInitialized] = useState(false);
+  // A ref, not state: this only guards a one-time `reset()` and is never read during render,
+  // so setting it in the effect bought a second render pass for nothing. The lint rule that
+  // flags it was previously silent here — the compiler-based analysis bailed on the
+  // component while the three writes were hand-rolled try/catch/finally blocks.
+  const initialized = useRef(false);
   const [splashVisible, setSplashVisible] = useState(false);
   const [logoutSplashVisible, setLogoutSplashVisible] = useState(false);
-  const [savingContact, setSavingContact] = useState(false);
-  const [contactError, setContactError] = useState('');
+  const [confirmLogoutAll, setConfirmLogoutAll] = useState(false);
 
-  const [addingNumber, setAddingNumber] = useState(false);
-  const [addNumberError, setAddNumberError] = useState('');
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [deleteError, setDeleteError] = useState('');
+  // Three writes, three mutations. Each used to carry a hand-rolled pending flag and error
+  // string — six `useState`s for what `isPending`, `error` and `variables` already give.
+  const saveContact = useUpdateSiteSettings();
+  const addNumber = useCreateWhatsappNumber();
+  const deleteNumber = useDeleteWhatsappNumber();
+
+  const savingContact = saveContact.isPending;
+  const addingNumber = addNumber.isPending;
+  // Which row is spinning is the mutation's own input, not a second copy of it.
+  const deletingId = deleteNumber.isPending ? deleteNumber.variables : null;
+
+  const contactError = saveContact.error ? getErrorMessage(saveContact.error) : '';
+  const addNumberError = addNumber.error ? getErrorMessage(addNumber.error) : '';
+  const deleteError = deleteNumber.error ? getErrorMessage(deleteNumber.error) : '';
+
+  // Both success flows hold a splash open, then redirect. Owning the timers in
+  // effects (rather than starting them inside the handlers) means unmounting early
+  // cancels them, instead of navigating out from under whatever mounted next.
+  useEffect(() => {
+    if (!splashVisible) return;
+    const timer = setTimeout(() => navigate('/dashboard'), 1500);
+    return () => clearTimeout(timer);
+  }, [splashVisible, navigate]);
+
+  useEffect(() => {
+    if (!logoutSplashVisible) return;
+    const timer = setTimeout(() => navigate('/login', { replace: true }), 900);
+    return () => clearTimeout(timer);
+  }, [logoutSplashVisible, navigate]);
 
   const { data: numbers = [], isLoading } = useQuery({
-    queryKey: ['whatsapp-numbers'],
+    queryKey: settingsKeys.whatsappNumbers(),
     queryFn: fetchWhatsappNumbers,
     retry: false,
   });
 
   const { data: siteSettings, isLoading: loadingSettings } = useQuery({
-    queryKey: ['site-settings'],
+    queryKey: settingsKeys.siteSettings(),
     queryFn: fetchSiteSettings,
     retry: false,
   });
@@ -61,7 +97,7 @@ export function Settings() {
     formState: { errors: contactErrors },
   } = useForm<SiteSettingsFormValues>({
     resolver: zodResolver(siteSettingsSchema),
-    defaultValues: { email: '', phone: '', whatsapp: '', hours: '' },
+    defaultValues: { email: '', instagram: '', whatsapp: '', hours: '' },
   });
 
   const {
@@ -75,68 +111,52 @@ export function Settings() {
   });
 
   useEffect(() => {
-    if (siteSettings && !initialized) {
+    if (siteSettings && !initialized.current) {
       resetContact({
         email: siteSettings.email,
-        phone: siteSettings.phone.replace(/\D/g, '').slice(0, 11),
-        whatsapp: siteSettings.whatsapp.replace(/\D/g, '').slice(0, 11),
+        instagram: normalizeInstagramHandle(siteSettings.instagram),
+        whatsapp: onlyDigits(siteSettings.whatsapp).slice(0, 11),
         hours: siteSettings.hours,
       });
-      setInitialized(true);
+      initialized.current = true;
     }
-  }, [siteSettings, initialized, resetContact]);
+  }, [siteSettings, resetContact]);
 
+  // The three handlers swallow the rejection rather than rethrow: the message is already on
+  // screen through `mutation.error`, and letting it escape an event handler would surface as
+  // an unhandled rejection instead.
   async function onSaveContact(values: SiteSettingsFormValues) {
-    setSavingContact(true);
-    setContactError('');
     try {
-      await updateSiteSettings(values);
-      await queryClient.invalidateQueries({ queryKey: ['site-settings'] });
+      await saveContact.mutateAsync(values);
       setSaved(true);
       setSplashVisible(true);
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
-    } catch (e) {
-      setContactError(getErrorMessage(e));
-    } finally {
-      setSavingContact(false);
+    } catch {
+      /* surfaced by `contactError` */
     }
   }
 
   async function onAddNumber(values: WhatsappNumberFormValues) {
-    setAddingNumber(true);
-    setAddNumberError('');
     try {
-      const created = await createWhatsappNumber({
+      const { created } = await addNumber.mutateAsync({
         number: values.number,
-        isActive: true,
+        isFirst: numbers.length === 0,
       });
+      // Mirror the promoted number into the contact field the operator is looking at, so it
+      // doesn't stay blank until the refetch lands.
       if (numbers.length === 0) {
-        const num = created.number.replace(/\D/g, '').slice(0, 11);
-        setContactValue('whatsapp', num);
-        await updateSiteSettings({ whatsapp: created.number });
-        await queryClient.invalidateQueries({ queryKey: ['site-settings'] });
+        setContactValue('whatsapp', onlyDigits(created.number).slice(0, 11));
       }
-      await queryClient.refetchQueries({ queryKey: ['whatsapp-numbers'] });
       resetNewNumber({ number: '' });
-    } catch (e) {
-      setAddNumberError(getErrorMessage(e));
-    } finally {
-      setAddingNumber(false);
+    } catch {
+      /* surfaced by `addNumberError` */
     }
   }
 
   async function handleDeleteNumber(id: string) {
-    setDeletingId(id);
-    setDeleteError('');
     try {
-      await deleteWhatsappNumber(id);
-      await queryClient.refetchQueries({ queryKey: ['whatsapp-numbers'] });
-    } catch (e) {
-      setDeleteError(getErrorMessage(e));
-    } finally {
-      setDeletingId(null);
+      await deleteNumber.mutateAsync(id);
+    } catch {
+      /* surfaced by `deleteError` */
     }
   }
 
@@ -144,28 +164,44 @@ export function Settings() {
     await logout.mutateAsync();
     queryClient.clear();
     setLogoutSplashVisible(true);
-    setTimeout(() => {
-      navigate('/login', { replace: true });
-    }, 900);
+  }
+
+  // Reaproveita o splash e o efeito de navegação do logout comum: para este
+  // dispositivo o desfecho é idêntico, só o alcance no servidor difere.
+  async function handleLogoutAll() {
+    setConfirmLogoutAll(false);
+    await logoutAll.mutateAsync();
+    queryClient.clear();
+    setLogoutSplashVisible(true);
   }
 
   if (isLoading || loadingSettings) return <SettingsSkeleton />;
 
   return (
-    <div className="flex min-h-dvh flex-col bg-background pb-10">
-      <PageContainer className="sticky top-0 z-10 flex items-center gap-3 bg-background pt-[calc(env(safe-area-inset-top,16px)+12px)] pb-3">
+    <div
+      className={cn(
+        'flex min-h-dvh flex-col bg-background md:min-h-full md:pb-10',
+        BOTTOM_NAV_CLEARANCE,
+      )}
+    >
+      <PageContainer
+        maxWidth="reading"
+        className="sticky top-0 z-10 flex items-center gap-3 bg-background pt-[calc(env(safe-area-inset-top,16px)+12px)] pb-3"
+      >
         <button
           type="button"
           onClick={() => navigate(-1)}
-          className="flex size-11 items-center justify-center rounded-full"
+          className="flex size-12 items-center justify-center rounded-full transition-colors md:hover:bg-action hover:text-white"
           aria-label="Voltar"
         >
           <ChevronLeft size={24} />
         </button>
-        <h1 className="text-lg font-bold text-foreground">Configurações</h1>
+        {/* Steps up from `md` like the dashboard and the gallery — the three console page
+            titles now share one treatment instead of three different sizes. */}
+        <h1 className="text-lg font-bold text-foreground md:text-2xl">Configurações</h1>
       </PageContainer>
 
-      <div className="flex flex-col gap-6 px-6 pt-4">
+      <PageContainer maxWidth="reading" className="flex flex-col gap-6 pt-4">
         {/* WhatsApp numbers (API) */}
         <section>
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -184,7 +220,7 @@ export function Settings() {
                   type="button"
                   onClick={() => handleDeleteNumber(n.id)}
                   disabled={deletingId === n.id}
-                  className="text-danger active:opacity-70 disabled:opacity-60"
+                  className="text-danger transition-opacity active:opacity-70 disabled:opacity-60 md:hover:opacity-70"
                   aria-label="Remover número"
                 >
                   {deletingId === n.id ? (
@@ -207,15 +243,13 @@ export function Settings() {
                   control={newNumberControl}
                   name="number"
                   render={({ field }) => (
-                    <input
+                    <Input
                       inputMode="numeric"
                       placeholder="(11) 99999-9999"
                       value={formatPhone(field.value)}
-                      onChange={(e) =>
-                        field.onChange(e.target.value.replace(/\D/g, '').slice(0, 11))
-                      }
+                      onChange={(e) => field.onChange(onlyDigits(e.target.value).slice(0, 11))}
                       disabled={addingNumber}
-                      className="h-11 flex-1 rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action disabled:opacity-60"
+                      className="h-11 flex-1 px-3"
                     />
                   )}
                 />
@@ -223,7 +257,7 @@ export function Settings() {
                   type="submit"
                   disabled={addingNumber}
                   aria-label="Adicionar número"
-                  className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-action text-white disabled:opacity-60"
+                  className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-action text-white transition-colors disabled:opacity-60 md:hover:bg-action-hover"
                 >
                   {addingNumber ? (
                     <Loader2 size={24} className="animate-spin" />
@@ -260,12 +294,12 @@ export function Settings() {
                 control={contactControl}
                 name="whatsapp"
                 render={({ field }) => (
-                  <input
+                  <Input
                     inputMode="numeric"
                     value={formatPhone(field.value)}
-                    onChange={(e) => field.onChange(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    onChange={(e) => field.onChange(onlyDigits(e.target.value).slice(0, 11))}
                     placeholder="(11) 99999-9999"
-                    className="h-11 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action"
+                    className="h-11 w-full px-3"
                   />
                 )}
               />
@@ -275,63 +309,90 @@ export function Settings() {
                 </p>
               )}
             </div>
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">E-mail</label>
-              <input
-                type="email"
-                placeholder="contato@imobiliaria.com"
-                className="h-11 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action"
-                {...registerContact('email')}
-              />
-              {contactErrors.email && (
-                <p className="mt-1 text-sm font-medium text-danger">
-                  {contactErrors.email.message}
-                </p>
-              )}
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">Telefone</label>
-              <Controller
-                control={contactControl}
-                name="phone"
-                render={({ field }) => (
-                  <input
-                    inputMode="numeric"
-                    value={formatPhoneAdaptive(field.value)}
-                    onChange={(e) => field.onChange(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                    placeholder="(11) 99999-9999"
-                    className="h-11 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action"
-                  />
+
+            {/* E-mail/Instagram: stacked on mobile, side by side once there's room */}
+            <div className="flex flex-col gap-3 md:grid md:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">E-mail</label>
+                <Input
+                  type="email"
+                  placeholder="contato@imobiliaria.com"
+                  className="h-11 w-full px-3"
+                  {...registerContact('email')}
+                />
+                {contactErrors.email && (
+                  <p className="mt-1 text-sm font-medium text-danger">
+                    {contactErrors.email.message}
+                  </p>
                 )}
-              />
-              {contactErrors.phone && (
-                <p className="mt-1 text-sm font-medium text-danger">
-                  {contactErrors.phone.message}
-                </p>
-              )}
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-muted-foreground">Instagram</label>
+                <Controller
+                  control={contactControl}
+                  name="instagram"
+                  render={({ field }) => (
+                    <Input
+                      // Normaliza no onChange pelo mesmo motivo que o WhatsApp roda
+                      // `onlyDigits` ali em cima: o que se guarda é o handle, então colar a
+                      // URL inteira do perfil — que é como o Instagram compartilha — tem de
+                      // funcionar em vez de virar erro de validação.
+                      value={field.value}
+                      onChange={(e) => field.onChange(normalizeInstagramHandle(e.target.value))}
+                      placeholder="suaimobiliaria"
+                      className="h-11 w-full px-3"
+                    />
+                  )}
+                />
+                {contactErrors.instagram && (
+                  <p className="mt-1 text-sm font-medium text-danger">
+                    {contactErrors.instagram.message}
+                  </p>
+                )}
+              </div>
             </div>
+
             <div>
               <label className="mb-1 block text-xs text-muted-foreground">
                 Horário de atendimento
               </label>
-              <input
+              <Input
                 placeholder="Seg–Sex: 9h às 18h"
-                className="h-11 w-full rounded-xl border border-border bg-surface-raised px-3 text-sm outline-none focus:border-action"
+                className="h-11 w-full px-3"
                 {...registerContact('hours')}
               />
             </div>
 
             {contactError && (
-              <p className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
+              <p
+                role="alert"
+                className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger"
+              >
                 {contactError}
               </p>
             )}
+
+            {/*
+              The button swapping its own label to "Salvo" is a visual-only confirmation —
+              a screen reader gets nothing, because changing a button's text isn't an
+              announcement. This polite live region carries the outcome without stealing
+              focus, and it is separate from the button so the button's accessible name
+              stays stable while the message changes.
+            */}
+            <p aria-live="polite" className="sr-only">
+              {savingContact
+                ? 'Salvando dados de contato…'
+                : saved
+                  ? 'Dados de contato salvos.'
+                  : ''}
+            </p>
 
             <div className="pt-2 flex items-center justify-center">
               <button
                 type="submit"
                 disabled={savingContact}
-                className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-action text-sm font-semibold text-white transition-colors active:bg-action-hover disabled:opacity-60"
+                aria-busy={savingContact || undefined}
+                className="flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-action text-sm font-semibold text-white transition-colors active:bg-action-hover disabled:opacity-60 md:hover:bg-action-hover"
               >
                 {savingContact ? (
                   <Loader2 size={24} className="animate-spin" />
@@ -348,17 +409,35 @@ export function Settings() {
         </section>
 
         {/* Logout */}
-        <section>
+        <section className="mb-6 flex flex-col gap-3">
           <button
             type="button"
             onClick={handleLogout}
-            disabled={logout.isPending || logoutSplashVisible}
-            className="flex h-14 w-full items-center justify-center rounded-full border border-danger text-sm font-semibold text-danger active:bg-danger/10 disabled:opacity-60"
+            disabled={logout.isPending || logoutAll.isPending || logoutSplashVisible}
+            className="flex h-14 w-full items-center justify-center rounded-xl border border-danger text-sm font-semibold text-danger transition-colors active:bg-danger/10 disabled:opacity-60 md:hover:bg-danger/10"
           >
-            {logout.isPending ? 'Saindo...' : 'Sair da conta'}
+            {logout.isPending ? 'Saindo...' : 'Sair deste dispositivo'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setConfirmLogoutAll(true)}
+            disabled={logout.isPending || logoutAll.isPending || logoutSplashVisible}
+            className="flex h-14 w-full items-center justify-center rounded-xl border border-danger text-sm font-medium text-danger transition-colors active:bg-danger/10 disabled:opacity-60 md:hover:bg-danger/10"
+          >
+            {logoutAll.isPending ? 'Encerrando sessões...' : 'Sair de todos os dispositivos'}
           </button>
         </section>
-      </div>
+      </PageContainer>
+
+      <ConfirmModal
+        open={confirmLogoutAll}
+        onClose={() => setConfirmLogoutAll(false)}
+        title="Sair de todos os dispositivos"
+        message="Todas as sessões desta conta serão encerradas, inclusive a deste aparelho. Se você estiver logado em outro celular ou computador precisará entrar de novo."
+        confirmLabel="Sim, encerrar todas"
+        onConfirm={handleLogoutAll}
+      />
 
       <SuccessSplash visible={splashVisible}>
         <CheckCircle size={64} className="text-action" />

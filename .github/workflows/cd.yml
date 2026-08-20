@@ -15,10 +15,20 @@ on:
   push:
     branches: [main]
 
+# No `concurrency` on purpose, unlike ci.yml: this workflow exists to verify the exact
+# commit that landed on main — including a merge commit that no CI run ever saw, if main
+# moved between the PR's check and the merge. Cancelling an in-flight run because a newer
+# push arrived would leave that commit unverified, which is the one thing this is for.
+
+# Nothing here writes, and it deploys nothing (see the note above).
+permissions:
+  contents: read
+
 jobs:
   verify:
     name: verify
     runs-on: ubuntu-latest
+    timeout-minutes: 15
 
     steps:
       - uses: actions/checkout@v5

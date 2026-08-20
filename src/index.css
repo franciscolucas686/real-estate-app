@@ -31,15 +31,298 @@
   --color-foreground-subtle: #4a5568;
   --color-muted-foreground: #718096;
 
-  /* Brand */
-  --color-whatsapp: #25d366;
+  /* Status — property lifecycle. Semantic, and deliberately separate from
+     --color-action: these encode state, not interactivity. Before these existed
+     the palette lived as raw Tailwind classes (emerald-500 / amber-400) inside
+     utils/format.ts, outside the theme and invisible to any future dark mode.
+
+     The base values are dark enough to carry white text at 4.5:1 or better, which
+     the badges need: they render at 10px bold, and WCAG only relaxes to 3:1 at
+     18.66px bold. The stock Tailwind steps do not clear that bar — emerald-500 on
+     white is 2.54:1 and amber-600 is 3.19:1 — so these are one to two steps darker
+     on purpose. Measured: success 5.48:1, warning 5.02:1, neutral 7.58:1.
+
+     The `-subtle` variants are the inverse treatment (tinted background, dark text)
+     for status shown inline in text rather than as a solid pill. */
+  --color-success: #047857;
+  --color-success-subtle: #ecfdf5;
+  --color-success-foreground: #ffffff;
+  --color-warning: #b45309;
+  --color-warning-subtle: #fffbeb;
+  --color-warning-foreground: #ffffff;
+  --color-neutral: #475569;
+  --color-neutral-subtle: #f1f5f9;
+  --color-neutral-foreground: #ffffff;
+
+  /* Brand — WhatsApp, darkened from the official #25d366.
+     The brand hex is a light green: 2.0:1 against white, and 1.8:1 against the 10% tint it
+     is actually drawn on in `contact.tsx`, which is the adjacent colour WCAG 1.4.11 measures.
+     This value keeps the hue recognisably WhatsApp while clearing 3:1 on both (3.49:1 and
+     ~3.13:1). The icon is decorative — the word "WhatsApp" sits beside it — so the rule does
+     not strictly bite; a brand token nobody could put on text is a token half-built.
+
+     It was declared here with zero consumers while the one place that draws the mark used a
+     raw `emerald-500`, which is not even the brand hue. */
+  --color-whatsapp: #1a9e4d;
+
+  /* Brand — Instagram. A marca é um gradiente (#833AB4 → #E1306C → #F77737) e um token é uma
+     cor só, então este é o roxo-magenta do meio dele, que é a parte que as pessoas reconhecem
+     como Instagram sem depender do degradê.
+     Medido pela mesma régua do token acima — o ícone é desenhado sobre `bg-instagram/10`, e a
+     cor adjacente que a WCAG 1.4.11 mede é essa tinta, não o card: 5.11:1 contra o branco do
+     `surface-raised` e 4.43:1 contra a tinta (#f9ebf3). Passa 3:1 nos dois com folga, e ao
+     contrário do verde do WhatsApp também passa 4.5:1 contra branco — este daria para pôr em
+     texto, se um dia precisar. */
+  --color-instagram: #c13584;
 
   /* Border / ring */
   --color-border: #e2e8f0;
   --color-ring: #1a7fd4;
 
   --font-sans: system-ui, -apple-system, sans-serif;
+
+  /* The page gutter, as a named token.
+     `PageContainer` is the only source of horizontal page padding, and full-bleed
+     children have to cancel exactly that amount. With the value written as a literal in
+     two places (`px-6` there, `-mx-6` here) they drift the moment one changes — and a
+     mismatch is invisible in review, showing up as a hairline of background beside a
+     photo. Naming it makes the pairing explicit and greppable.
+
+     Fluid across the phone range only — `PageContainer`'s variants override it with
+     `md:px-10 lg:px-12` from `md` up, so the clamp tops out where that takes over.
+     `px-gutter` and `-mx-gutter` read the same token, so the full-bleed cancellation
+     stays exact at every width. */
+  --spacing-gutter: clamp(1.5rem, 1.36rem + 0.6vw, 1.75rem);
+
+  /* ── Type scale ───────────────────────────────────────────────────────────
+     Fluid between a 375px phone and a 1280px desktop, so `text-sm` on a laptop is
+     not the same 14px it is on a phone.
+
+     The scale is redefined here rather than by adding `md:text-*` at call sites,
+     because there are ~195 of those and only ~10 had a breakpoint: the sizes were
+     effectively viewport-fixed, and fixing that one class at a time is the drift
+     this file exists to prevent. Overriding the tokens makes every existing
+     `text-sm` responsive without touching a single component.
+
+     Why `clamp(rem, rem + vw, rem)` and not plain `vw`: a pure viewport unit
+     ignores the reader's default font size and does not survive zoom, which would
+     break WCAG 1.4.4 — the same requirement the zoomable viewport meta protects.
+     With rem at both ends and a rem base in the middle term, text still scales
+     when the root size does.
+
+     The `+ 0.0011 * (100vw - 375px)` style middle terms are just
+     (max - min) / (1280 - 375) expressed in rem per px of viewport.
+
+     Floors are the current mobile values — they were tuned against real devices,
+     so nothing gets *smaller* than it is today. In particular `--text-base` must
+     never floor below 1rem: inputs use it, and iOS auto-zooms any field under
+     16px on focus. */
+
+  /* Badges and nav labels. Deliberately NOT fluid: the status colours were measured
+     for 4.5:1 against 10px bold, and the pills are sized to that. */
+  --text-2xs: 0.625rem;
+  --text-2xs--line-height: 1.2;
+
+  --text-xs: clamp(0.75rem, 0.724rem + 0.111vw, 0.8125rem); /* 12 → 13 */
+  --text-xs--line-height: 1.4;
+  --text-sm: clamp(0.875rem, 0.849rem + 0.111vw, 0.9375rem); /* 14 → 15 */
+  --text-sm--line-height: 1.5;
+  --text-base: clamp(1rem, 0.974rem + 0.111vw, 1.0625rem); /* 16 → 17 */
+  --text-base--line-height: 1.6;
+  --text-lg: clamp(1.125rem, 1.073rem + 0.221vw, 1.25rem); /* 18 → 20 */
+  --text-lg--line-height: 1.5;
+  --text-xl: clamp(1.25rem, 1.146rem + 0.442vw, 1.5rem); /* 20 → 24 */
+  --text-xl--line-height: 1.4;
+  --text-2xl: clamp(1.5rem, 1.345rem + 0.663vw, 1.875rem); /* 24 → 30 */
+  --text-2xl--line-height: 1.3;
+  --text-3xl: clamp(1.875rem, 1.668rem + 0.884vw, 2.375rem); /* 30 → 38 */
+  --text-3xl--line-height: 1.2;
+
+  /* The home hero, and only the home hero (`md:text-5xl`). Keyed to 768 → 1536 rather
+     than the 375 → 1280 the rest of the scale uses, because it never renders below `md`:
+     it lands on exactly today's 48px where it first appears, then keeps growing on the
+     wide screens where a hero has the room. Left at Tailwind's fixed 3rem it would have
+     been the one step in the scale that stopped responding. */
+  --text-5xl: clamp(3rem, 2.25rem + 1.5625vw, 3.75rem); /* 48 → 60 */
+  --text-5xl--line-height: 1.1;
+
+  /* Modal enter/exit, driven by CSS rather than AnimatePresence.
+     Radix's Presence primitive keeps the element mounted while a CSS animation
+     runs against `data-state="closed"`, so the surface can animate out without a
+     JS animation library holding the unmount. That removes a class of bugs where
+     an interrupted exit left the panel mounted with the scroll lock still on.
+
+     Every `-out` ends in `forwards`, and that is not cosmetic. The default fill
+     mode is `none`, so the instant an exit animation finishes the element snaps
+     back to its natural, fully visible state — and the unmount does not happen in
+     that same frame: `animationend` is a continuous event, so React schedules the
+     resulting state update at normal priority instead of flushing it
+     synchronously. The browser paints at least one frame of the surface back at
+     full opacity before it disappears, which reads as a flicker. `forwards` holds
+     the last frame until the unmount lands.
+
+     It also fixes a second, louder flash wherever a scrim and a panel animate out
+     together: the overlay is 140ms and the sheet is 200ms, so with `none` the
+     backdrop popped back to full black for 60ms over a sheet still sliding down.
+     Radix dodges that by giving its Overlay and Content separate Presence
+     instances; a hand-rolled overlay with one `animationend` cannot, and does not
+     have to. Radix pins the same `animationFillMode = 'forwards'` from JS in
+     `react-presence`; here it is in the token, so it holds for both. */
+  --animate-overlay-in: overlay-in 180ms ease-out;
+  --animate-overlay-out: overlay-out 140ms ease-in forwards;
+  --animate-sheet-in: sheet-in 260ms cubic-bezier(0.32, 0.72, 0, 1);
+  --animate-sheet-out: sheet-out 200ms ease-in forwards;
+  --animate-panel-in: panel-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-panel-out: panel-out 140ms ease-in forwards;
+
+  @keyframes overlay-in {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes overlay-out {
+    to {
+      opacity: 0;
+    }
+  }
+  @keyframes sheet-in {
+    from {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes sheet-out {
+    to {
+      transform: translateY(100%);
+    }
+  }
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
+  @keyframes panel-out {
+    to {
+      opacity: 0;
+      transform: scale(0.96);
+    }
+  }
 }
+
+/* ---------------------------------------------------------------------------
+   Z-INDEX LAYERS
+
+   Tailwind v4 has no `--z-*` theme namespace, so these are plain custom
+   properties consumed as `z-(--z-modal)`.
+
+   They exist because the app had accumulated eleven ad hoc values — z-9, z-10,
+   z-20, z-30, z-40, z-50, z-60, z-70, z-100, z-1000, z-9999 — where the large
+   ones were not decisions but escalations: each new overlay outbid the previous
+   one. Six named layers make the stacking order reviewable.
+
+   Rule: needing a new z value means introducing a new layer. That is a
+   discussion, not a literal.
+--------------------------------------------------------------------------- */
+:root {
+  --z-nav: 40; /* top nav and fixed action bars */
+  --z-fixed: 50; /* bottom nav and full-route overlays */
+  --z-overlay: 60; /* scrims behind modal surfaces */
+  --z-modal: 70; /* dialogs and bottom sheets */
+
+  /* Leaflet paints its own controls at z-index 1000 and its panes from 200–700.
+     Anything that must float over a live map has to clear that floor, which is
+     what the old `z-1000` in property-form's location picker was really doing —
+     it read as an arbitrary escalation but was load-bearing. */
+  --z-map-overlay: 1000;
+
+  --z-splash: 1100; /* boot and success splashes — above everything, maps included */
+}
+
+/* ---------------------------------------------------------------------------
+   SITE NAV HEIGHT
+
+   `TopNav` is `md:sticky md:top-0`, so it owns the top band of the viewport on
+   every storefront page. Anything else that sticks has to start below it — and
+   `position: sticky` measures from the viewport, not from the end of the nav, so
+   the offset has to be stated. The contact rail on a property detail was
+   `md:top-6` and spent its life pinned *behind* the nav.
+
+   It is a token rather than a literal because the height is not a round number
+   anyone could guess, and it is not even constant:
+     - below `lg` the nav has no in-flow content at all — the logo is
+       `hidden lg:flex`, the nav items are `absolute`, and `site-shell.tsx` passes
+       no `rightSlot` — so it is exactly the block's own box: 80px.
+     - from `lg` the logo appears at `text-lg`, which is a clamp in the fluid type
+       scale above, so the nav grows with the viewport: ~109.2px at 1024px,
+       reaching 110px at 1280px.
+
+   6.875rem is the *top* of that fluid range, not a rounding of it. Trimming it to
+   6.75rem re-opens the overlap on wide screens, which is the failure this exists
+   to close. `TopNav` consumes this as its height so the value cannot drift from
+   the thing it describes.
+--------------------------------------------------------------------------- */
+:root {
+  --site-nav-height: 5rem;
+}
+
+/* ---------------------------------------------------------------------------
+   PROPERTY DETAIL — MAIN PHOTO CEILING
+
+   The main photo's height is decided by its proportion — `md:aspect-16/9`,
+   `lg:aspect-21/9` — in every realistic window. This is the net underneath
+   that: a window shorter than the ones those ratios were measured against
+   (1280×720, a browser carrying several toolbars, a high zoom level) would push
+   the thumbnail strip off screen again. Under this ceiling the photo flattens
+   instead, which the reader can still act on.
+
+   It takes two values because what sits under the photo changes at `lg`. Stated
+   term by term, so nobody "rounds" either total later:
+
+                                                        md–lg      lg and up
+     - `PageContainer`'s `md:py-8`, top half             2rem          2rem
+     - the breadcrumb line (`text-sm`, line-height 1.5) ~1.4rem       ~1.4rem
+     - `gap-5`, breadcrumb → grid                        1.25rem       1.25rem
+     - `gap-3`, photo → thumbnail strip                    —           0.75rem
+     - the thumbnail strip, `h-20`                         —              5rem
+     - breathing room                                     1rem          1rem
+                                                        ────────      ────────
+                                                         5.65rem      11.4rem
+
+   Breathing room is not padding for the arithmetic's sake — the terms above it
+   are exact. Without it the strip lands 1–2px from the bottom edge on a 1366×650
+   or 1280×560 window, which reads as cut off whether or not it technically is.
+   It costs photo height only where the ceiling already bites.
+
+   Three couplings are live here.
+
+   The nav's band is read as `var(--site-nav-height)` rather than copied, so the
+   ceiling follows that token across `lg` (80px → 110px) on its own — which is
+   why this is redefined in the same media query rather than a second one.
+
+   The last two terms exist only above `lg`, because that is where
+   `property-details.tsx` renders the strip (`hidden lg:grid`). Bring the strip
+   back below `lg` and this band's total is wrong by 5.75rem.
+
+   And the strip's tiles are a fixed `h-20` rather than `aspect-square` precisely
+   so its term can be stated: a square tile's height is the media column's width
+   over six (120–147px across the widths where it renders), so it could only ever
+   have been a worst-case guess. Change one and the other has to move.
+--------------------------------------------------------------------------- */
+:root {
+  --property-photo-max-height: calc(100dvh - var(--site-nav-height) - 5.75rem);
+}
+
+@media (width >= theme(--breakpoint-lg)) {
+  :root {
+    --site-nav-height: 6.875rem;
+    --property-photo-max-height: calc(100dvh - var(--site-nav-height) - 11.5rem);
+  }
+}
+
+/* Values below 40 are intentionally absent. z-10/z-20/z-30 in this codebase are
+   local stacking inside a single component (carousel arrows, slider thumbs,
+   sticky sub-headers), not app-wide layers, and naming them would invent tokens
+   with no cross-component meaning. */
 
 body {
   margin: 0;
@@ -48,4 +331,52 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Desktop affordances — no-op on touch (cursor/:hover/:focus-visible don't
+   apply there), so this is safe baseline coverage for the many hand-rolled
+   `<button>`/`<a>` elements across pages that don't go through the shared
+   Button/Input/Select primitives. */
+button:not(:disabled),
+a,
+[role='button'],
+select {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+/* Edge desenha seu próprio ícone nativo de revelar/limpar senha
+   (::-ms-reveal / ::-ms-clear) assim que o campo tem conteúdo, sobrepondo o
+   toggle Eye/EyeOff próprio da aplicação. Nenhum outro navegador tem isso. */
+input[type='password']::-ms-reveal,
+input[type='password']::-ms-clear {
+  display: none;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* Honour the OS "reduce motion" setting app-wide.
+   The app animates a lot — page transitions, splash, bottom-sheet springs,
+   dialog scale, `active:scale-90`, skeleton pulses — and none of it consulted
+   this preference. Motion-library animations are handled separately by
+   <MotionConfig reducedMotion="user"> in App.tsx; this block covers everything
+   driven by plain CSS.
+
+   Durations are collapsed to 0.01ms rather than 0 so transitionend/animationend
+   listeners still fire and state machines waiting on them don't stall. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

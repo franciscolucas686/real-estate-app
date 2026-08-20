@@ -1,6 +1,9 @@
 import { http, HttpResponse } from 'msw';
+import { BusinessType, PropertyStatus, PropertyType } from '@/shared/api/types';
 import type {
   ApiErrorResponse,
+  PropertyCardDto,
+  PropertyListResponseDto,
   LoginDto,
   SiteSettings,
   UpdateSiteSettingsDto,
@@ -8,7 +11,7 @@ import type {
   CreateWhatsappNumberDto,
   CreatePropertyDto,
   PropertyDetailDto,
-} from '../types/api';
+} from '@/shared/api/types';
 
 const VALID_LOGIN: LoginDto = { email: 'admin@example.com', password: 'secret123' };
 
@@ -16,7 +19,7 @@ let siteSettings: SiteSettings = {
   id: 'settings-1',
   whatsapp: '11999990000',
   email: 'contato@imobiliaria.com',
-  phone: '1122223333',
+  instagram: 'francinegestora',
   hours: 'Seg-Sex: 9h às 18h',
   updatedAt: new Date().toISOString(),
 };
@@ -38,13 +41,54 @@ export function setMockProperty(property: PropertyDetailDto | null) {
   mockProperty = property;
 }
 
+/**
+ * In-memory catalogue backing `GET /api/properties` and `/api/properties/status-counts`.
+ *
+ * Filtering, paging and the status tallies are implemented here rather than stubbed with
+ * a fixed payload, because the behaviour worth testing on the dashboard *is* the
+ * interaction between them — that a status filter narrows the list, that `code` is applied
+ * server-side, and that `total` drives the pagination.
+ */
+let mockProperties: PropertyCardDto[] = [];
+
+export function setMockProperties(properties: PropertyCardDto[]) {
+  mockProperties = properties;
+}
+
+export function makePropertyCard(overrides: Partial<PropertyCardDto> = {}): PropertyCardDto {
+  return {
+    id: 'prop-1',
+    code: '575301',
+    type: PropertyType.HOUSE,
+    businessType: BusinessType.SALE,
+    price: '450000.00',
+    rentPrice: null,
+    city: 'Sorocaba',
+    state: 'SP',
+    neighborhood: 'Campolim',
+    bedrooms: 3,
+    bathrooms: 2,
+    parkingSpaces: 2,
+    suites: null,
+    totalArea: null,
+    builtArea: null,
+    condoFee: null,
+    createdAt: '2026-07-01T00:00:00.000Z',
+    deletedAt: null,
+    previewImages: [],
+    status: PropertyStatus.ACTIVE,
+    ...overrides,
+  };
+}
+
 export function resetMockData() {
   mockProperty = null;
+  mockProperties = [];
   siteSettings = {
     id: 'settings-1',
     whatsapp: '11999990000',
     email: 'contato@imobiliaria.com',
-    phone: '1122223333',
+    instagram: 'francinegestora',
     hours: 'Seg-Sex: 9h às 18h',
     updatedAt: new Date().toISOString(),
   };
@@ -74,7 +118,34 @@ export const handlers = [
     return errorResponse(401, 'E-mail ou senha incorretos.', 'Unauthorized');
   }),
 
+  /**
+   * The default session is "no session", which is what every page spec already assumed —
+   * they assert on what an anonymous visitor sees (`property-details` requires the status
+   * badge to be *absent*). It just wasn't declared: with no handler at all, MSW's
+   * `onUnhandledRequest: 'error'` logged a block per test, ~30 of them on CI, and a log
+   * that noisy is where a real failure hides.
+   *
+   * `protected-route.spec.tsx` overrides this with `server.use` for both the failing and the
+   * slow-succeeding session, and per-test handlers win over these.
+   */
+  /*
+   * 200 com `null`, e não 401, porque é o que a API responde a quem não tem sessão nenhuma —
+   * a rota é auth-aware (`OptionalJwtGuard`). Ela só devolve 401 quando existe cookie de
+   * refresh, ou seja, quando renovar pode de fato resolver; é o que impede que um visitante
+   * anônimo dispare um `POST /auth/refresh` sem ter o que renovar.
+   *
+   * O caminho do 401 continua coberto: `protected-route.spec.tsx` o força com `server.use`,
+   * exercitando a tradução de 401 para `null` que `getMe` faz para o refresh expirado.
+   */
+  http.get('/api/auth/me', () => HttpResponse.json(null)),
+
   http.post('/api/auth/refresh', () => new HttpResponse(null, { status: 401 })),
+
+  http.post('/api/auth/logout', () => new HttpResponse(null, { status: 200 })),
+
+  http.post('/api/auth/logout-all', () =>
+    HttpResponse.json({ message: 'Sessões encerradas em todos os dispositivos', count: 2 }),
+  ),
 
   http.get('/api/site-settings', () => HttpResponse.json(siteSettings)),
 
@@ -133,7 +204,7 @@ export const handlers = [
       gallery: { rooms: [], unassigned: [] },
       details:
         body.house ?? body.apartment ?? body.land ?? body.smallFarm ?? body.countryHouse ?? null,
-      whatsappContact: body.whatsappContact ?? null,
+      whatsappContact: null,
       location:
         body.latitude != null && body.longitude != null
           ? {
@@ -149,6 +220,75 @@ export const handlers = [
       updatedAt: new Date().toISOString(),
     };
     return HttpResponse.json(created, { status: 201 });
+  }),
+
+  // Declarado antes de `/api/properties/:id` pelo mesmo motivo do status-counts: o
+  // segmento dinâmico engoliria 'trash'.
+  http.get('/api/properties/trash', ({ request }) => {
+    const url = new URL(request.url);
+    const skip = Number(url.searchParams.get('skip') ?? 0);
+    const take = Number(url.searchParams.get('take') ?? 20);
+    const deletados = mockProperties.filter((p) => p.deletedAt !== null);
+    const body: PropertyListResponseDto = {
+      data: deletados.slice(skip, skip + take),
+      total: deletados.length,
+      skip,
+      take,
+    };
+    return HttpResponse.json(body);
+  }),
+
+  http.patch('/api/properties/:id/restore', ({ params }) => {
+    mockProperties = mockProperties.map((p) =>
+      p.id === params.id ? { ...p, deletedAt: null } : p,
+    );
+    return HttpResponse.json({ id: params.id });
+  }),
+
+  // Declared before `/api/properties/:id` so `status-counts` isn't swallowed by the
+  // dynamic segment.
+  //
+  // A rota é auth-aware no backend (OptionalJwtGuard): anônimo recebe só a contagem
+  // de ACTIVE — que é o número da home — e autenticado recebe os três. Como a sessão
+  // padrão destes mocks é "sem sessão" (ver o handler de `/api/auth/me`), o default
+  // aqui é a resposta anônima; specs autenticados sobrescrevem com `server.use`.
+  http.get('/api/properties/status-counts', ({ cookies }) => {
+    const counts: Record<PropertyStatus, number> = {
+      [PropertyStatus.ACTIVE]: 0,
+      [PropertyStatus.PENDING]: 0,
+      [PropertyStatus.INACTIVE]: 0,
+    };
+    mockProperties.forEach((property) => {
+      counts[property.status] += 1;
+    });
+
+    if (!cookies.accessToken) {
+      return HttpResponse.json({ [PropertyStatus.ACTIVE]: counts[PropertyStatus.ACTIVE] });
+    }
+
+    return HttpResponse.json(counts);
+  }),
+
+  http.get('/api/properties', ({ request }) => {
+    const url = new URL(request.url);
+    const status = url.searchParams.get('status');
+    const code = url.searchParams.get('code');
+    const skip = Number(url.searchParams.get('skip') ?? 0);
+    const take = Number(url.searchParams.get('take') ?? 10);
+
+    const filtered = mockProperties.filter((property) => {
+      if (status && property.status !== status) return false;
+      if (code && !property.code.includes(code)) return false;
+      return true;
+    });
+
+    const body: PropertyListResponseDto = {
+      data: filtered.slice(skip, skip + take),
+      total: filtered.length,
+      skip,
+      take,
+    };
+    return HttpResponse.json(body);
   }),
 
   http.get('/api/properties/:id', ({ params }) => {

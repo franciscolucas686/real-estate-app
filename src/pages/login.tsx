@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useLogin } from '../hooks/use-auth';
+import { useLogin } from '@/features/auth/use-auth';
 import { Eye, EyeOff, CheckCircle } from 'lucide-react';
-import { loginSchema, type LoginFormValues } from '../schemas/auth.schema';
-import { getErrorMessage } from '../utils/api-error';
-import { SuccessSplash } from '../components/ui/success-splash';
+import { loginSchema, type LoginFormValues } from '@/features/auth/auth.schema';
+import { getErrorMessage } from '@/shared/api/api-error';
+import { SuccessSplash } from '@/ui/success-splash';
+import { Input } from '@/ui/input';
 
 export function Login() {
   const navigate = useNavigate();
@@ -22,24 +23,59 @@ export function Login() {
     defaultValues: { email: '', password: '' },
   });
 
+  // A reading beat for the confirmation, nothing more. It used to double as the wait for
+  // the session refetch — a guess that 900ms was enough for `/auth/me` to come back, which
+  // a desktop on a warm backend always won and a phone did not. The wait now lives in
+  // `useLogin`, which keeps the mutation pending until `['me']` has refetched, so by the
+  // time this timer starts the session is already known and the dashboard mounts with it.
+  //
+  // Owning the timer in an effect (rather than starting it inside the submit handler)
+  // means unmounting early — back button, session expiry — cancels it, instead of
+  // navigating out from under whatever mounted next.
+  useEffect(() => {
+    if (!splashVisible) return;
+    const timer = setTimeout(() => navigate('/dashboard', { replace: true }), 900);
+    return () => clearTimeout(timer);
+  }, [splashVisible, navigate]);
+
   async function onSubmit(values: LoginFormValues) {
     try {
+      // Resolves only once the session query has settled — see `useLogin`.
       await login.mutateAsync(values);
       setSplashVisible(true);
-      setTimeout(() => {
-        navigate('/dashboard', { replace: true });
-      }, 900);
     } catch {
       // error handled below via login.error
     }
   }
 
   return (
-    <div className="relative flex min-h-dvh max-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-4">
-      <div className="w-full max-w-sm mb-16">
+    // The bottom padding is the mobile nav's own height — 78px (pt-2 + a 54px item + pb-4)
+    // plus the safe-area inset — so `justify-center` centres inside what is actually
+    // visible. The screen is `overflow-hidden` with no scroll, so anything the fixed bar
+    // covers is unreachable, not merely hidden: the submit button would be untappable.
+    <div className="relative flex min-h-dvh max-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-4 pb-[calc(env(safe-area-inset-bottom,0px)+78px)] md:min-h-0 md:max-h-none md:flex-1 md:pb-0">
+      {/* Pulls the card off dead centre. Only above `md`, where there is no bottom bar to
+          balance it against — below, the nav already carries that visual weight. */}
+      <div className="w-full max-w-sm md:mb-16">
         {/* Logo */}
         <div className="mb-10 flex justify-center">
-          <img src="/logo.png" alt="Logo" className="h-20 object-contain" />
+          {/* Mesma escada da splash (`ui/splash-screen.tsx`), com o `sizes` deste slot: a
+              logo é quadrada e `h-20` são 80px, então nem em DPR 3 (240px) isto passa do
+              degrau de 384 — a tela de login nunca baixa o arquivo grande.
+
+              O degrau de 128 existe para os brand marks das navs (`BrandMark` em
+              `layout/app-nav.tsx`) e entra aqui de carona: ele serve **só o DPR 1**, onde 80px
+              pedem 80px e o 128 é o primeiro candidato que cobre — 9KB no lugar de 50. De DPR 2
+              para cima, 160px já não cabem em 128 e a escolha volta a ser o 384, que é o motivo
+              de o `src` de fallback continuar sendo ele. A splash não ganha um degrau desses: o
+              slot dela é de 288px, que nem em DPR 1 o 128 alcança. */}
+          <img
+            src="/icons/logo-384.webp"
+            srcSet="/icons/logo-128.webp 128w, /icons/logo-384.webp 384w, /icons/logo-576.webp 576w, /icons/logo-1024.webp 1024w"
+            sizes="80px"
+            alt="Logo"
+            className="h-20 object-contain"
+          />
         </div>
 
         <h1 className="mb-8 text-center text-2xl font-bold text-foreground">
@@ -48,15 +84,15 @@ export function Login() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="email" className="text-md font-medium text-foreground">
+            <label htmlFor="email" className="text-sm font-medium text-foreground md:text-base">
               E-mail
             </label>
-            <input
+            <Input
               id="email"
               type="email"
               autoComplete="email"
               placeholder="seu@email.com"
-              className="h-16 rounded-xl border border-border bg-surface-raised px-4 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-action"
+              className="h-16"
               {...register('email')}
             />
             {errors.email && (
@@ -65,22 +101,22 @@ export function Login() {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label htmlFor="password" className="text-md font-medium text-foreground">
+            <label htmlFor="password" className="text-sm font-medium text-foreground md:text-base">
               Senha
             </label>
             <div className="relative">
-              <input
+              <Input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
                 autoComplete="current-password"
                 placeholder="••••••"
-                className="h-16 w-full rounded-xl border border-border bg-surface-raised px-4 pr-12 text-sm text-foreground placeholder:text-muted-foreground outline-none focus:border-action"
+                className="h-16 w-full pr-12"
                 {...register('password')}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-4 p-2 ml-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                className="absolute right-4 p-2 ml-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors md:hover:text-foreground"
                 aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
               >
                 {showPassword ? <EyeOff size={28} /> : <Eye size={28} />}
@@ -92,7 +128,10 @@ export function Login() {
           </div>
 
           {login.isError && (
-            <p className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger">
+            <p
+              role="alert"
+              className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger"
+            >
               {getErrorMessage(login.error)}
             </p>
           )}
@@ -100,7 +139,7 @@ export function Login() {
           <button
             type="submit"
             disabled={login.isPending || splashVisible}
-            className="mt-2 flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white transition-colors active:bg-action-hover disabled:opacity-60"
+            className="mt-2 flex h-14 w-full items-center justify-center rounded-full bg-action text-base font-semibold text-white transition-colors active:bg-action-hover disabled:opacity-60 md:hover:bg-action-hover"
           >
             {login.isPending ? 'Entrando...' : 'Entrar'}
           </button>
