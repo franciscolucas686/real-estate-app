@@ -128,17 +128,21 @@ export default defineConfig(({ mode }) => {
     ],
     server: {
       host: true,
-      // The port is a contract, not a preference: the ngrok tunnel below dials a
-      // fixed localhost:5173, so it cannot follow the server elsewhere. Without
-      // strictPort, Vite silently walks to the next free port when a stale
-      // `npm run dev` still holds 5173 — it prints the new URL and everything
-      // looks fine locally, while the tunnel keeps answering ERR_NGROK_8012
-      // ("connection refused") to whoever was sent the link. Failing to boot is
-      // the cheaper error. Same reason `allowedHosts` names the domain outright:
-      // the port and the host are one pair, and changing either means changing both.
+      // The port is a contract, not a preference: a tunnel (ngrok and friends)
+      // dials a fixed localhost:5173, so it cannot follow the server elsewhere.
+      // Without strictPort, Vite silently walks to the next free port when a
+      // stale `npm run dev` still holds 5173 — it prints the new URL and
+      // everything looks fine locally, while the tunnel keeps answering
+      // ERR_NGROK_8012 ("connection refused") to whoever was sent the link.
+      // Failing to boot is the cheaper error.
       port: 5173,
       strictPort: true,
-      allowedHosts: ['exuvial-transfusable-nidia.ngrok-free.dev'],
+      // The tunnel's public hostname, when there is one. It used to be a personal
+      // ngrok domain hardcoded here, which meant the repository carried one
+      // machine's setup and nobody else's value could work without editing a
+      // tracked file. Vite rejects an unknown Host header outright, so a tunnel
+      // without this set answers "Blocked request" and looks like a tunnel fault.
+      ...(env.VITE_DEV_ALLOWED_HOST ? { allowedHosts: [env.VITE_DEV_ALLOWED_HOST] } : {}),
       proxy: {
         '/api': {
           target: backendUrl,
