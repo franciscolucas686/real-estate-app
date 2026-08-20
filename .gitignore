@@ -18,6 +18,10 @@ coverage
 .env.development
 .env.test
 
+# Ferramentas locais de assistente (settings.local.json e afins). Fica fora do repo
+# em qualquer máquina — antes só o ignore global desta aqui o cobria.
+.claude/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
