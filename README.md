@@ -212,6 +212,10 @@ cp .env.example .env.development
 primeiro**, ou a home carrega vazia e parece defeito. O README de lá tem o passo a passo
 (`docker compose up -d` para Postgres + MinIO, migration, seed).
 
+**Entre na área do corretor com `admin@imobiliaria.com` / `Admin@123`** — é o usuário que o seed
+da API cria. Sem logar você vê só a vitrine pública; atrás do login estão o dashboard, o cadastro
+guiado em 3 passos, a galeria por ambiente e a lixeira.
+
 Só quer ver o código se comportando, sem infraestrutura? `npm test` roda os 272 testes com
 MSW interceptando a rede — nenhum servidor envolvido.
 
