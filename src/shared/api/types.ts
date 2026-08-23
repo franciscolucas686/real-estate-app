@@ -183,6 +183,12 @@ export type PropertyDetailsDto =
   | CountryHouseDetailsDto
   | null;
 
+export interface PropertyOwnerDto {
+  name: string;
+  /** Somente dígitos, sem DDI — mesma forma que `SiteSettingsDto.whatsapp`. */
+  phone: string;
+}
+
 export interface PropertyDetailDto {
   id: string;
   code: string;
@@ -207,6 +213,17 @@ export interface PropertyDetailDto {
   gallery: GalleryDto;
   details: PropertyDetailsDto;
   whatsappContact: string | null;
+  /**
+   * Contato privado do proprietário, ou `null`.
+   *
+   * O `null` funde dois casos de propósito, e o backend é quem decide: visitante anônimo
+   * (o campo **não é serializado** — não é escondido no cliente) e imóvel anterior à
+   * migração que criou as colunas. Ver `ownerContactFor` no `api-real-estate`.
+   *
+   * Aninhado na saída e plano na entrada (`ownerName`/`ownerPhone` em `CreatePropertyDto`):
+   * a entrada espelha coluna, a saída espelha a fronteira de acesso.
+   */
+  owner: PropertyOwnerDto | null;
   location: PropertyLocationDto | null;
   userId: string;
   createdAt: string;
@@ -279,6 +296,10 @@ export interface CreatePropertyDto {
   city: string;
   state: string;
   description: string;
+  /** Obrigatório: todo imóvel tem dono. Ver `PropertyDetailDto.owner` para a saída. */
+  ownerName: string;
+  /** Obrigatório, somente dígitos e sem DDI. `@Matches(/^\d{8,15}$/)` no backend. */
+  ownerPhone: string;
   totalArea?: number;
   builtArea?: number;
   bedrooms?: number;

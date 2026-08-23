@@ -44,6 +44,7 @@ const EXISTING: PropertyDetailDto = {
   gallery: { rooms: [], unassigned: [] },
   details: { zoning: 'RESIDENTIAL', topography: 'FLAT' } as PropertyDetailDto['details'],
   whatsappContact: null,
+  owner: { name: 'Maria Silva', phone: '11987654321' },
   location: null,
   userId: 'user-1',
   createdAt: '2026-07-18T00:00:00.000Z',
@@ -51,11 +52,21 @@ const EXISTING: PropertyDetailDto = {
 };
 
 /** Passos 1 e 2 de um LAND/SALE válido, que é o caminho mais curto até o passo 3. */
+/**
+ * Os dados do proprietário são obrigatórios e vivem no fim da etapa 1, então todo teste que
+ * precisa **passar** dela tem de preenchê-los — inclusive os que investigam outra regra.
+ */
+async function fillOwner(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByPlaceholderText('Ex: Maria Silva'), 'Maria Silva');
+  await user.type(screen.getByPlaceholderText('Ex: (15) 99999-9999'), '11987654321');
+}
+
 async function fillLandThroughStep2(user: ReturnType<typeof userEvent.setup>) {
   await user.selectOptions(screen.getByLabelText('Tipo de imóvel *'), 'LAND');
   await user.click(screen.getByRole('button', { name: 'Venda' }));
   await user.click(screen.getByRole('button', { name: 'Venda direta' }));
   await user.type(screen.getByPlaceholderText('Ex: R$ 450.000'), '450000');
+  await fillOwner(user);
   await user.click(screen.getByRole('button', { name: 'Continuar' }));
 
   await user.type(await screen.findByPlaceholderText('Ex: Sorocaba'), 'Sorocaba');
@@ -83,6 +94,7 @@ describe('PropertyForm — step 1 validation blocks navigation', () => {
     await user.selectOptions(screen.getByLabelText('Tipo de imóvel *'), 'LAND');
     await user.click(screen.getByRole('button', { name: 'Venda' }));
     await user.type(screen.getByPlaceholderText('Ex: R$ 450.000'), '450000');
+    await fillOwner(user);
     await user.click(screen.getByRole('button', { name: 'Continuar' }));
 
     expect(
@@ -100,6 +112,7 @@ describe("PropertyForm — LAND hides fields that don't apply to a lot", () => {
     await user.click(screen.getByRole('button', { name: 'Venda' }));
     await user.click(screen.getByRole('button', { name: 'Venda direta' }));
     await user.type(screen.getByPlaceholderText('Ex: R$ 450.000'), '450000');
+    await fillOwner(user);
     await user.click(screen.getByRole('button', { name: 'Continuar' }));
 
     await user.type(await screen.findByPlaceholderText('Ex: Sorocaba'), 'Sorocaba');
@@ -124,6 +137,7 @@ describe("PropertyForm — LAND hides fields that don't apply to a lot", () => {
     await user.click(screen.getByRole('button', { name: 'Venda' }));
     await user.click(screen.getByRole('button', { name: 'Venda direta' }));
     await user.type(screen.getByPlaceholderText('Ex: R$ 450.000'), '450000');
+    await fillOwner(user);
     await user.click(screen.getByRole('button', { name: 'Continuar' }));
 
     // Step 2
@@ -201,6 +215,7 @@ describe('PropertyForm — regras condicionais chegam à tela', () => {
     await user.click(screen.getByRole('button', { name: 'Venda' }));
     await user.click(screen.getByRole('button', { name: 'Venda direta' }));
     await user.type(screen.getByPlaceholderText('Ex: R$ 450.000'), '450000');
+    await fillOwner(user);
     await user.click(screen.getByRole('button', { name: 'Continuar' }));
 
     await user.type(await screen.findByPlaceholderText('Ex: Sorocaba'), 'Sorocaba');
@@ -228,6 +243,7 @@ describe('PropertyForm — regras condicionais chegam à tela', () => {
     await user.click(screen.getByRole('button', { name: 'Venda' }));
     await user.click(screen.getByRole('button', { name: 'Venda direta' }));
     await user.type(screen.getByPlaceholderText('Ex: R$ 450.000'), '450000');
+    await fillOwner(user);
     await user.click(screen.getByRole('button', { name: 'Continuar' }));
 
     await user.type(await screen.findByPlaceholderText('Ex: Sorocaba'), 'Sorocaba');
@@ -267,6 +283,10 @@ describe('PropertyForm — modo edição', () => {
     // O preço só existe quando o negócio é venda, então vê-lo preenchido já prova que o
     // `businessType` hidratou. O botão "Venda" não expõe estado — ver a nota no relatório.
     expect(screen.getByRole('button', { name: 'Venda direta' })).toBeInTheDocument();
+    // O proprietário hidrata do `owner` aninhado da resposta, e o telefone volta formatado
+    // — o formulário guarda dígitos e exibe máscara, como o campo da imobiliária em settings.
+    expect(screen.getByDisplayValue('Maria Silva')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('(11) 98765-4321')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Continuar' }));
     expect(await screen.findByDisplayValue('Sorocaba')).toBeInTheDocument();
@@ -348,7 +368,62 @@ describe('PropertyForm — modo edição', () => {
       // O que está preenchido continua indo com valor.
       price: '450000.00',
       totalArea: 500,
+      // Obrigatórios, então nunca viajam como null — não são campos "esvaziáveis".
+      ownerName: 'Maria Silva',
+      ownerPhone: '11987654321',
     });
+  });
+
+  /**
+   * Um imóvel anterior à migração chega com `owner: null`, e é o formulário que faz o
+   * backfill: sem os dois campos preenchidos a etapa 1 não avança, então não há como salvar
+   * uma edição que deixe o imóvel sem dono.
+   */
+  it('um imóvel sem proprietário não passa da etapa 1 até ser preenchido', async () => {
+    const user = userEvent.setup();
+    setMockProperty({ ...EXISTING, owner: null });
+    renderEditPropertyForm();
+
+    await screen.findByDisplayValue('R$ 450.000');
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    expect(await screen.findByText('Informe o nome do proprietário.')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('Sorocaba')).not.toBeInTheDocument();
+
+    await fillOwner(user);
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+    expect(await screen.findByDisplayValue('Sorocaba')).toBeInTheDocument();
+  });
+});
+
+describe('PropertyForm — payload de criação', () => {
+  it('leva o proprietário no corpo do POST', async () => {
+    const user = userEvent.setup();
+
+    let posted: Record<string, unknown> | null = null;
+    server.use(
+      http.post('/api/properties', async ({ request }) => {
+        posted = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...EXISTING, id: 'prop-novo' }, { status: 201 });
+      }),
+    );
+
+    renderNewPropertyForm();
+    await fillLandThroughStep2(user);
+
+    await user.type(await screen.findByLabelText('Área total (m²) *'), '500');
+    await user.selectOptions(screen.getByLabelText('Zoneamento *'), 'RESIDENTIAL');
+    await user.selectOptions(screen.getByLabelText('Topografia *'), 'FLAT');
+    await user.type(
+      screen.getByPlaceholderText('Descreva o imóvel...'),
+      'Terreno plano em ótima localização, pronto para construir.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Criar e ir para Galeria' }));
+
+    await waitFor(() => expect(posted).not.toBeNull());
+    // Planos no corpo (espelham coluna), aninhados na resposta (espelham a fronteira de
+    // acesso) — a assimetria é a do backend, e é deliberada.
+    expect(posted).toMatchObject({ ownerName: 'Maria Silva', ownerPhone: '11987654321' });
   });
 });
 
@@ -398,6 +473,7 @@ describe('PropertyForm — full happy path (LAND / SALE)', () => {
     await user.click(screen.getByRole('button', { name: 'Venda' }));
     await user.click(screen.getByRole('button', { name: 'Venda direta' }));
     await user.type(screen.getByPlaceholderText('Ex: R$ 450.000'), '450000');
+    await fillOwner(user);
     await user.click(screen.getByRole('button', { name: 'Continuar' }));
 
     // Step 2

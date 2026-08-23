@@ -50,6 +50,9 @@ export function useProperty(id: string) {
           details: null,
           location: null,
           whatsappContact: null,
+          // Como `whatsappContact`: o card da listagem não carrega o dado, e é por isso que
+          // `property-details.tsx` trata `isPlaceholderData` como "ainda carregando".
+          owner: null,
           userId: '',
           createdAt: '',
           updatedAt: '',

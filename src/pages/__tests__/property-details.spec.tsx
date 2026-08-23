@@ -37,7 +37,12 @@ const PROPERTY: PropertyDetailDto = {
   parkingSpaces: 2,
   gallery: { rooms: [], unassigned: [] },
   details: null,
+  // Preenchido nas duas identidades de propósito: o backend é quem recorta o campo
+  // (pinado em `test/properties-list.e2e-spec.ts` do api-real-estate), e o MSW não
+  // reproduz esse recorte. O que estes specs medem é a outra metade — que a página não
+  // desenha o bloco para quem não está logado.
   whatsappContact: '11999990000',
+  owner: { name: 'Maria Silva', phone: '15988887777' },
   location: null,
   userId: 'user-1',
   createdAt: '2026-07-18T00:00:00.000Z',
@@ -543,6 +548,74 @@ describe('PropertyDetails', () => {
       render();
 
       expect(await screen.findAllByRole('button', { name: 'Compartilhar' })).not.toHaveLength(0);
+    });
+  });
+  describe('dados do proprietário', () => {
+    /**
+     * A proteção real é do backend: `GET /properties/:id` não serializa `owner` para chamada
+     * anônima (pinado em `test/properties-list.e2e-spec.ts`, no api-real-estate). O MSW não
+     * reproduz esse recorte — a fixture devolve o proprietário nas duas identidades de
+     * propósito —, então o que se afirma daqui é a outra metade: a página não desenha o bloco
+     * para quem não tem sessão, mesmo com o dado em mãos.
+     */
+    function authenticate() {
+      server.use(
+        http.get('/api/auth/me', () =>
+          HttpResponse.json({ id: 'user-1', email: 'operador@test.local', name: 'Operador' }),
+        ),
+      );
+    }
+
+    it('o visitante anônimo não vê o bloco', async () => {
+      render();
+
+      await screen.findByRole('heading', { level: 1, name: 'Casa' });
+      expect(screen.queryByText('Dados do proprietário')).not.toBeInTheDocument();
+      expect(screen.queryByText('Maria Silva')).not.toBeInTheDocument();
+    });
+
+    it('o operador vê o bloco nas duas posições — rail no desktop, fluxo no mobile', async () => {
+      authenticate();
+      render();
+
+      // Duas cópias no DOM, como o CTA do WhatsApp: quem decide qual aparece é o CSS.
+      expect(await screen.findAllByText('Dados do proprietário')).toHaveLength(2);
+    });
+
+    it('o botão leva ao WhatsApp do proprietário, não ao da imobiliária', async () => {
+      authenticate();
+      render();
+
+      const links = await screen.findAllByRole('link', {
+        name: /Falar no WhatsApp com Maria Silva/,
+      });
+      expect(links).toHaveLength(2);
+      links.forEach((link) => {
+        // 55 + o número do proprietário. O `whatsappContact` da fixture é outro (11999990000),
+        // e confundir os dois é ligar para a pessoa errada.
+        expect(link).toHaveAttribute('href', expect.stringContaining('wa.me/5515988887777'));
+        expect(link).not.toHaveAttribute('href', expect.stringContaining('11999990000'));
+      });
+    });
+
+    it('o número aparece escrito, formatado, dentro do botão', async () => {
+      authenticate();
+      render();
+
+      const [link] = await screen.findAllByRole('link', {
+        name: /Falar no WhatsApp com Maria Silva/,
+      });
+      expect(link).toHaveTextContent('(15) 98888-7777');
+    });
+
+    it('um imóvel sem proprietário oferece o caminho para preenchê-lo', async () => {
+      authenticate();
+      setMockProperty({ ...PROPERTY, owner: null });
+      render();
+
+      expect(await screen.findAllByText(/Proprietário não informado/)).toHaveLength(2);
+      const [fix] = screen.getAllByRole('link', { name: 'Adicionar no formulário' });
+      expect(fix).toHaveAttribute('href', '/properties/prop-1/edit');
     });
   });
 });

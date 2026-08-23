@@ -1,9 +1,10 @@
+import { Lock } from 'lucide-react';
 import { Field, Input, Select } from '@/features/properties/components/form/form-controls';
 import type { FormState, Setter } from '@/features/properties/components/form/form-state';
 import { onlyDigits } from '@/shared/digits';
 import { PropertyType, BusinessType, SaleType } from '@/shared/api/types';
 import { PropertyTypeLabel, BusinessTypeLabel, SaleTypeLabel } from '@/shared/format';
-import { formatPrice } from '@/shared/format';
+import { formatPhone, formatPrice } from '@/shared/format';
 import { cn } from '@/shared/cn';
 
 export function Step1({
@@ -138,12 +139,57 @@ export function Step1({
           placeholder="Ex: R$ 800"
           value={formatPrice(form.condoFee)}
           onChange={(v) => set('condoFee', onlyDigits(v))}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') onSubmit();
-          }}
-          enterKeyHint="go"
         />
       </Field>
+
+      {/* Proprietário.
+          Fica na etapa 1 e não na 2 (localização) nem na 3 (características) porque não é
+          nem uma coisa nem outra: é a moldura comercial do anúncio — o que se vende, por
+          quanto, e por conta de quem —, que é o que esta etapa já reúne. E é a etapa mais
+          curta, então dois campos obrigatórios a mais custam menos aqui do que na lista de
+          specs condicionais da etapa 3.
+
+          O aviso de privacidade é parte do campo, não decoração: sem ele o operador não tem
+          como saber que este telefone não vai para a vitrine — e a diferença entre este
+          número e o da imobiliária é justamente essa. */}
+      <div className="flex flex-col gap-4 border-t border-border pt-5">
+        <div className="flex items-start gap-2">
+          <Lock size={14} className="mt-0.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-foreground">Proprietário</span>
+            <span className="text-xs text-muted-foreground">
+              Visível apenas para a equipe — não aparece para visitantes do site.
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-5 md:grid md:grid-cols-2 md:gap-4">
+          <Field label="Nome do proprietário *">
+            <Input
+              placeholder="Ex: Maria Silva"
+              value={form.ownerName}
+              onChange={(v) => set('ownerName', v)}
+            />
+          </Field>
+
+          {/* Mesmo par que `pages/settings.tsx` usa no WhatsApp da imobiliária: exibe
+              formatado, guarda só dígitos. É o formato que o backend exige e o que
+              `buildOwnerWhatsAppUrl` espera. */}
+          <Field label="WhatsApp do proprietário *">
+            <Input
+              type="text"
+              inputMode="numeric"
+              placeholder="Ex: (15) 99999-9999"
+              value={formatPhone(form.ownerPhone)}
+              onChange={(v) => set('ownerPhone', onlyDigits(v).slice(0, 11))}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') onSubmit();
+              }}
+              enterKeyHint="go"
+            />
+          </Field>
+        </div>
+      </div>
 
       <span className="text-xs text-muted-foreground">
         * Campos marcados com asterisco são obrigatórios.

@@ -47,6 +47,8 @@ const INITIAL: FormState = {
   rentPrice: '',
   condoFee: '',
   description: '',
+  ownerName: '',
+  ownerPhone: '',
   city: '',
   state: '',
   neighborhood: '',
@@ -92,6 +94,10 @@ function buildPayload(f: FormState): CreatePropertyDto {
     city: f.city.trim(),
     state: f.state.trim().toUpperCase(),
     description: f.description,
+    // Obrigatórios, então entram incondicionalmente — e por isso também não precisam de
+    // `null` explícito em `buildUpdatePayload`: não há como esvaziá-los pelo formulário.
+    ownerName: f.ownerName.trim(),
+    ownerPhone: f.ownerPhone,
     ...(f.businessType === BusinessType.SALE && { price: f.price }),
     ...(f.businessType === BusinessType.SALE &&
       f.saleTypes.length > 0 && { saleTypes: f.saleTypes }),
@@ -190,6 +196,10 @@ function propertyToFormState(p: PropertyDetailDto): FormState {
     rentPrice: p.rentPrice ?? '',
     condoFee: p.condoFee ?? '',
     description: p.description,
+    // `owner` é null num imóvel anterior à migração que criou as colunas — e aí o schema
+    // exige que o operador preencha antes de salvar. É esse o mecanismo de backfill.
+    ownerName: p.owner?.name ?? '',
+    ownerPhone: p.owner?.phone ?? '',
     city: p.city,
     state: p.state,
     neighborhood: p.neighborhood,

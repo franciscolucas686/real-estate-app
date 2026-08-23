@@ -46,6 +46,15 @@ export const propertyFormSchema = z
     rentPrice: optionalDecimalString('Valor do aluguel'),
     condoFee: optionalDecimalString('Valor do condomínio'),
     description: z.string().min(10, 'A descrição deve ter pelo menos 10 caracteres.'),
+    // Dados do proprietário — obrigatórios (todo imóvel tem dono), mas **sem constraint aqui**:
+    // as duas regras vivem no `superRefine` lá embaixo. Não é estilo, é ordem de mensagem.
+    // O Zod emite os problemas da *forma* antes dos do refinamento, e `firstStepError` mostra
+    // o primeiro que pertence à etapa. Com `.min(2)` declarado aqui, um formulário vazio
+    // abriria dizendo "Informe o nome do proprietário" em vez de "Selecione o tipo do imóvel"
+    // — a última instrução no lugar da primeira. No refinamento eles caem depois de tipo,
+    // negócio e preço, que é a ordem em que os campos aparecem na tela.
+    ownerName: z.string(),
+    ownerPhone: z.string(),
 
     // Step 2
     city: z.string().min(2, 'Informe a cidade.'),
@@ -244,6 +253,24 @@ export const propertyFormSchema = z
         message: 'Selecione a fonte de água.',
       });
     }
+
+    // Proprietário. A régua do telefone é a que o backend aplica em
+    // `CreatePropertyDto.ownerPhone`, que por sua vez é a de `CreateWhatsappNumberDto.number`;
+    // `site-settings.schema.ts` (`phoneDigits`) é a terceira cópia do mesmo formato.
+    if (f.ownerName.trim().length < 2) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['ownerName'],
+        message: 'Informe o nome do proprietário.',
+      });
+    }
+    if (!/^\d{8,15}$/.test(f.ownerPhone)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['ownerPhone'],
+        message: 'Informe o WhatsApp do proprietário (entre 8 e 15 dígitos).',
+      });
+    }
   });
 
 export type PropertyFormValues = z.infer<typeof propertyFormSchema>;
@@ -254,7 +281,16 @@ export type PropertyFormValues = z.infer<typeof propertyFormSchema>;
 // doesn't support partial validation with cross-field superRefine rules —
 // trigger() just scopes which fields get their error state shown).
 export const STEP_FIELDS: Record<1 | 2 | 3, (keyof PropertyFormValues)[]> = {
-  1: ['type', 'businessType', 'saleTypes', 'price', 'rentPrice', 'condoFee'],
+  1: [
+    'type',
+    'businessType',
+    'saleTypes',
+    'price',
+    'rentPrice',
+    'condoFee',
+    'ownerName',
+    'ownerPhone',
+  ],
   2: ['city', 'state', 'neighborhood'],
   3: [
     'bedrooms',
