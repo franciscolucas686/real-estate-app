@@ -17,12 +17,7 @@ import {
   type DraftImage,
 } from '@/features/gallery/gallery-draft';
 import type { PropertyImageDto } from '@/shared/api/types';
-import {
-  galleryRoomSchema,
-  isImageFile,
-  meetsMinimumWidth,
-  MIN_UPLOAD_WIDTH,
-} from '@/features/gallery/gallery-room.schema';
+import { galleryRoomSchema, isImageFile } from '@/features/gallery/gallery-room.schema';
 import { getErrorMessage } from '@/shared/api/api-error';
 import type { GallerySection } from '@/features/gallery/gallery-section';
 import { AddRoomInline } from '@/features/gallery/components/add-room-inline';
@@ -75,7 +70,6 @@ export function GalleryManagement() {
   const [addRoomError, setAddRoomError] = useState('');
   const [showMoveDialog, setShowMoveDialog] = useState(false);
   const [confirmError, setConfirmError] = useState('');
-  const [uploadError, setUploadError] = useState('');
   const commitGallery = useCommitGalleryPatch(id!);
   const confirming = commitGallery.isPending;
   const [roomToDelete, setRoomToDelete] = useState<{ id: string; name: string } | null>(null);
@@ -291,28 +285,18 @@ export function GalleryManagement() {
     exitSelectMode();
   }
 
-  /** Returns whether anything was actually added, so the caller only opens the room view on a
-   *  real pick — `accept="image/*"` is advisory, and `isImageFile`/`meetsMinimumWidth` can
-   *  filter everything out. */
-  async function handleUpload(roomId: string | null, files: FileList | null): Promise<boolean> {
-    if (!files || files.length === 0) return false;
+  /** Takes `File[]`, never the input's `FileList`: `input.value = ''` empties that very object
+   *  in place, so a caller that resets before this runs would hand over an empty list — which is
+   *  exactly how uploading broke once. Returns whether anything was actually added, so the caller
+   *  only opens the room view on a real pick — `accept="image/*"` is advisory and `isImageFile`
+   *  can filter everything out. */
+  function handleUpload(roomId: string | null, files: File[]): boolean {
     // accept="image/*" already scopes the native picker; this only guards
     // against drag-and-drop or a picker that lets non-images through.
-    const imageFiles = Array.from(files).filter(isImageFile);
+    const imageFiles = files.filter(isImageFile);
     if (imageFiles.length === 0) return false;
 
-    // Checado aqui, antes de virar DraftImage: uma foto pequena demais só se manifesta como
-    // corte/borrão no card, tarde demais pra corrigir — ver `meetsMinimumWidth`.
-    const meetsMinimum = await Promise.all(imageFiles.map(meetsMinimumWidth));
-    const acceptedFiles = imageFiles.filter((_, i) => meetsMinimum[i]);
-    setUploadError(
-      acceptedFiles.length < imageFiles.length
-        ? `Alguma foto está com resolução muito baixa (mínimo de ${MIN_UPLOAD_WIDTH}px de largura) e não foi adicionada.`
-        : '',
-    );
-    if (acceptedFiles.length === 0) return false;
-
-    const newImages: DraftImage[] = acceptedFiles.map((file) => ({
+    const newImages: DraftImage[] = imageFiles.map((file) => ({
       id: crypto.randomUUID(),
       url: URL.createObjectURL(file),
       label: null,
@@ -426,8 +410,6 @@ export function GalleryManagement() {
       // hasn't finished clearing the previous session yet.
       exitSelectMode();
     }
-    // A rejection de uma sala não deve sobreviver pra próxima que se abre.
-    setUploadError('');
     setFullscreenRoom({ roomId, state: 'open' });
   }
 
@@ -647,15 +629,17 @@ export function GalleryManagement() {
         accept="image/*"
         multiple
         className="hidden"
-        onChange={async (e) => {
+        onChange={(e) => {
           const roomId = pendingUploadRoomRef.current;
-          const files = e.target.files;
+          // `Array.from` copies the `File` refs out *now*. `e.target.files` is the input's own
+          // `FileList`, and the reset below empties that same object — holding the reference
+          // across the reset hands `handleUpload` an empty list and nothing is ever added.
+          const picked = Array.from(e.target.files ?? []);
           // Without this, picking the same file twice in a row fires no `change` (the value is
           // identical), so the second "Adicionar fotos" would silently add nothing *and* never
-          // open the room view. Read before the `await` below, since resetting first and
-          // capturing `files` into a local keeps this safe either way.
+          // open the room view.
           e.target.value = '';
-          const added = await handleUpload(roomId, files);
+          const added = handleUpload(roomId, picked);
           // Choosing photos is the start of working on a room, not the end of it.
           if (added) openRoomFullscreen(roomId);
         }}
@@ -707,7 +691,6 @@ export function GalleryManagement() {
           onEnterSelect={() => setSelecting(true)}
           onExitSelect={exitSelectMode}
           onUpload={requestUpload}
-          uploadError={uploadError}
           onRequestDeleteSelected={() => setConfirmDeletePhotosOpen(true)}
           onRequestMoveSelected={() => setShowMoveDialog(true)}
           swipeProps={swipeSelectProps}
