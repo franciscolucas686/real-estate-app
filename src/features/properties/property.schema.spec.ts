@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { propertyFormSchema, type PropertyFormValues } from '@/features/properties/property.schema';
+import {
+  propertyFormSchema,
+  stepOfField,
+  type PropertyFormValues,
+} from '@/features/properties/property.schema';
 
 // Every field must be present (it's the form's flat state, not a partial
 // DTO) — this is the neutral baseline every test starts from and overrides.
@@ -352,5 +356,45 @@ describe('proprietário', () => {
       const paths = r.error.issues.map((i) => String(i.path[0]));
       expect(paths.indexOf('type')).toBeLessThan(paths.indexOf('ownerName'));
     }
+  });
+});
+
+describe('stepOfField', () => {
+  it('devolve a etapa dona de cada campo', () => {
+    expect(stepOfField('businessType')).toBe(1);
+    expect(stepOfField('ownerPhone')).toBe(1);
+    expect(stepOfField('neighborhood')).toBe(2);
+    expect(stepOfField('description')).toBe(3);
+  });
+
+  it('devolve undefined para campo que não pertence a etapa nenhuma', () => {
+    // Escolhidas no mapa e nunca reprovadas pelo schema.
+    expect(stepOfField('latitude')).toBeUndefined();
+    expect(stepOfField('inventado')).toBeUndefined();
+  });
+});
+
+/**
+ * `buildPayload` envia cidade e bairro aparados, e `toPlaceCase` (o onChange do campo) não apara.
+ * Validar o valor cru deixava `" a"` passar aqui com dois caracteres e chegar ao backend como
+ * `"a"`, recusado pelo `@MinLength(2)` do `CreatePropertyDto` — um 400 que o cliente tinha como
+ * evitar, exibido como erro genérico de validação.
+ */
+describe('cidade e bairro são medidos aparados, como o backend os recebe', () => {
+  it('recusa dois caracteres que viram um depois do trim', () => {
+    expect(propertyFormSchema.safeParse({ ...base(), city: ' a' }).success).toBe(false);
+    expect(propertyFormSchema.safeParse({ ...base(), neighborhood: 'a ' }).success).toBe(false);
+  });
+
+  it('aceita um nome válido com espaço em volta', () => {
+    expect(propertyFormSchema.safeParse({ ...base(), city: ' Sorocaba ' }).success).toBe(true);
+    expect(propertyFormSchema.safeParse({ ...base(), neighborhood: ' Centro ' }).success).toBe(
+      true,
+    );
+  });
+
+  it('continua recusando o campo vazio', () => {
+    expect(propertyFormSchema.safeParse({ ...base(), city: '' }).success).toBe(false);
+    expect(propertyFormSchema.safeParse({ ...base(), neighborhood: '   ' }).success).toBe(false);
   });
 });

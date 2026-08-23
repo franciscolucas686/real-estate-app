@@ -500,3 +500,54 @@ describe('PropertyForm — full happy path (LAND / SALE)', () => {
     });
   });
 });
+
+/**
+ * A sequência que travava o formulário: escolher Venda, marcar modalidades, mudar de ideia e
+ * ir para Aluguel.
+ *
+ * `saleTypes` ficava no estado enquanto os chips sumiam da tela (eles só renderizam sob
+ * "Venda"), e o schema tem uma regra contra isso — então a etapa 1 barrava, citando um campo
+ * que o operador não conseguia mais ver nem editar. A única saída era voltar para "Venda",
+ * desmarcar tudo e escolher "Aluguel" de novo, sem nenhuma pista de que era isso que faltava.
+ */
+describe('PropertyForm — trocar Venda por Aluguel', () => {
+  async function chooseSaleThenRent(user: ReturnType<typeof userEvent.setup>) {
+    await user.selectOptions(screen.getByLabelText('Tipo de imóvel *'), 'LAND');
+    await user.click(screen.getByRole('button', { name: 'Venda' }));
+    await user.click(screen.getByRole('button', { name: 'Venda direta' }));
+    await user.click(screen.getByRole('button', { name: 'Financiamento' }));
+    await user.type(screen.getByPlaceholderText('Ex: R$ 450.000'), '450000');
+    await user.click(screen.getByRole('button', { name: 'Aluguel' }));
+  }
+
+  it('a etapa 1 avança em vez de travar numa regra sobre um campo invisível', async () => {
+    const user = userEvent.setup();
+    renderNewPropertyForm();
+
+    await chooseSaleThenRent(user);
+    // Os chips saíram da tela junto com o modo Venda — é isso que tornava o erro insolúvel.
+    expect(screen.queryByRole('button', { name: 'Venda direta' })).not.toBeInTheDocument();
+
+    await user.type(screen.getByPlaceholderText('Ex: R$ 2.500'), '2500');
+    await fillOwner(user);
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    expect(await screen.findByPlaceholderText('Ex: Sorocaba')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('voltar para Venda pede a modalidade de novo — a seleção antiga não sobrevive', async () => {
+    const user = userEvent.setup();
+    renderNewPropertyForm();
+
+    await chooseSaleThenRent(user);
+    await user.click(screen.getByRole('button', { name: 'Venda' }));
+    await fillOwner(user);
+    await user.click(screen.getByRole('button', { name: 'Continuar' }));
+
+    // Se a seleção tivesse sobrevivido à ida ao Aluguel, esta etapa passaria direto.
+    expect(
+      await screen.findByText('Selecione ao menos uma modalidade de venda.'),
+    ).toBeInTheDocument();
+  });
+});

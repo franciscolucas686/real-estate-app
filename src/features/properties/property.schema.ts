@@ -57,12 +57,22 @@ export const propertyFormSchema = z
     ownerPhone: z.string(),
 
     // Step 2
-    city: z.string().min(2, 'Informe a cidade.'),
+    //
+    // `city` e `neighborhood` são checados **aparados**, no `superRefine` — e isso é o que os
+    // mantém de acordo com o backend. `buildPayload` envia `.trim()`, e `toPlaceCase` (o
+    // `onChange` do campo) não apara espaço: com `.min(2)` sobre o valor cru, `" a"` passava
+    // aqui com dois caracteres e chegava lá como `"a"`, que o `@MinLength(2)` do
+    // `CreatePropertyDto` recusa. Resultado: um 400 que o cliente tinha como evitar, exibido
+    // como erro genérico de validação.
+    //
+    // Sem `.trim()` no schema, pelo motivo que `site-settings.schema.ts` documenta: o resolver
+    // do react-hook-form espera que os tipos de entrada e saída não divirjam.
+    city: z.string(),
     state: z
       .string()
       .length(2, 'Estado deve ter 2 letras (ex: SP).')
       .regex(/^[A-Z]{2}$/, 'Estado deve ter 2 letras maiúsculas (ex: SP).'),
-    neighborhood: z.string().min(2, 'Informe o bairro.'),
+    neighborhood: z.string(),
 
     // Step 3 — general specs
     bedrooms: optionalDigitsString('Quartos'),
@@ -254,6 +264,13 @@ export const propertyFormSchema = z
       });
     }
 
+    if (f.city.trim().length < 2) {
+      ctx.addIssue({ code: 'custom', path: ['city'], message: 'Informe a cidade.' });
+    }
+    if (f.neighborhood.trim().length < 2) {
+      ctx.addIssue({ code: 'custom', path: ['neighborhood'], message: 'Informe o bairro.' });
+    }
+
     // Proprietário. A régua do telefone é a que o backend aplica em
     // `CreatePropertyDto.ownerPhone`, que por sua vez é a de `CreateWhatsappNumberDto.number`;
     // `site-settings.schema.ts` (`phoneDigits`) é a terceira cópia do mesmo formato.
@@ -321,3 +338,22 @@ export const STEP_FIELDS: Record<1 | 2 | 3, (keyof PropertyFormValues)[]> = {
     'description',
   ],
 };
+
+/**
+ * A etapa dona de um campo — a inversa de `STEP_FIELDS`, derivada dele para não haver duas
+ * listas a manter em acordo.
+ *
+ * Existe porque o formulário só sabia perguntar o contrário ("quais campos são desta etapa?"),
+ * e com isso um problema numa etapa anterior descoberto no envio da etapa 3 não tinha para onde
+ * apontar: virava uma frase genérica sem nome de campo nenhum. Ver o `onInvalid` de
+ * `property-form.tsx`.
+ *
+ * `undefined` para `latitude`/`longitude`, que não pertencem a etapa nenhuma — são escolhidas no
+ * mapa e o schema nunca as reprova.
+ */
+export function stepOfField(field: string): 1 | 2 | 3 | undefined {
+  for (const step of [1, 2, 3] as const) {
+    if ((STEP_FIELDS[step] as string[]).includes(field)) return step;
+  }
+  return undefined;
+}
