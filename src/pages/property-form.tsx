@@ -30,6 +30,7 @@ import type { CreatePropertyDto, PropertyDetailDto, UpdatePropertyDto } from '@/
 import {
   propertyFormSchema,
   STEP_FIELDS,
+  stepOfField,
   type PropertyFormValues,
 } from '@/features/properties/property.schema';
 import { getErrorMessage } from '@/shared/api/api-error';
@@ -377,6 +378,21 @@ function PropertyFormInner({
     if (key === 'type' && value === PropertyType.APARTMENT) {
       setValue('builtArea', '');
     }
+
+    // Aluguel não tem modalidade de venda, e a limpeza aqui é o que impede um beco sem saída,
+    // não só sujeira no payload: os chips de modalidade só renderizam sob "Venda"
+    // (`step-1.tsx`), então uma seleção herdada some da tela enquanto continua no formulário —
+    // e o schema a rejeita ("Propriedades de aluguel não podem ter modalidade de venda"). O
+    // operador ficava preso numa regra sobre um campo que não conseguia mais ver nem editar,
+    // com a única saída sendo voltar para "Venda", desmarcar tudo e escolher "Aluguel" de novo.
+    //
+    // `price`/`rentPrice` deliberadamente NÃO são limpos: `buildPayload` já omite o do outro
+    // negócio e `buildUpdatePayload` manda `null` explícito, então não sobra valor escondido —
+    // e mantê-los deixa alternar entre os dois sem redigitar. A diferença é que só `saleTypes`
+    // tem uma regra que o rejeita.
+    if (key === 'businessType' && value === BusinessType.RENT) {
+      setValue('saleTypes', []);
+    }
   }
 
   function handleMapConfirm(
@@ -395,6 +411,10 @@ function PropertyFormInner({
     setMapOpen(false);
   }
 
+  // Rótulo de cada etapa. Fica aqui, e não junto do JSX, porque o `onInvalid` de
+  // `submitStep3` também o consome para dizer em qual etapa está o campo reprovado.
+  const stepLabels = ['Informações básicas', 'Localização', 'Características'];
+
   // Runs the full schema synchronously (no react-hook-form async trigger()
   // involved, so there's no risk of reading a stale formState snapshot) and
   // picks the first issue among the fields that belong to the given step.
@@ -404,6 +424,24 @@ function PropertyFormInner({
     const stepFields = new Set<string>(STEP_FIELDS[step]);
     const issue = result.error.issues.find((i) => stepFields.has(String(i.path[0])));
     return issue?.message;
+  }
+
+  /**
+   * O primeiro problema de **qualquer** etapa, com a etapa a que ele pertence.
+   *
+   * Serve ao envio da etapa 3, onde `firstStepError(3)` pode não achar nada e mesmo assim o
+   * schema ter reprovado — o campo culpado está numa etapa anterior, fora da tela. Antes disso
+   * sobrava uma frase genérica que não nomeava nada, sobre um campo que o operador não estava
+   * vendo e, no caso da modalidade de venda, não conseguiria ver nem indo até lá.
+   */
+  function firstErrorAnyStep(): { step: 1 | 2 | 3; message: string } | undefined {
+    const result = propertyFormSchema.safeParse(getValues());
+    if (result.success) return undefined;
+    for (const issue of result.error.issues) {
+      const owner = stepOfField(String(issue.path[0]));
+      if (owner) return { step: owner, message: issue.message };
+    }
+    return undefined;
   }
 
   function handleNext() {
@@ -456,13 +494,38 @@ function PropertyFormInner({
         }
       },
       () => {
-        setError(firstStepError(3) ?? 'Verifique os campos preenchidos.');
+        // Um problema da própria etapa 3 fala por si — o campo está na tela.
+        const ownStep = firstStepError(3);
+        if (ownStep) {
+          setError(ownStep);
+          setSubmitCount((c) => c + 1);
+          return;
+        }
+
+        // Fora dela, a mensagem sozinha não resolve: ela descreve um campo que não está
+        // visível. Nomear a etapa e **levar** o operador até lá é o que a torna acionável.
+        //
+        // Hoje `handleNext` valida cada etapa na saída, então este ramo não tem caminho pela
+        // UI — é rede, não fluxo. Ele existe porque a alternativa que estava aqui era uma
+        // frase que não nomeava nada, e porque a primeira regra que cruzar etapas (uma da 3
+        // que invalide um campo da 1) cai exatamente aqui. Se um dia ganhar caminho, ganha
+        // teste junto.
+        const elsewhere = firstErrorAnyStep();
+        if (elsewhere) {
+          setError(`${stepLabels[elsewhere.step - 1]}: ${elsewhere.message}`);
+          setStep(elsewhere.step);
+          setSubmitCount((c) => c + 1);
+          return;
+        }
+
+        // Último recurso: o schema passou e o resolver ainda assim reprovou. Não deveria
+        // acontecer; se acontecer, é bug e não dado do operador.
+        setError('Verifique os campos preenchidos.');
         setSubmitCount((c) => c + 1);
       },
     )();
   }
 
-  const stepLabels = ['Informações básicas', 'Localização', 'Características'];
   const submitLabel = saving
     ? 'Salvando...'
     : step === 3

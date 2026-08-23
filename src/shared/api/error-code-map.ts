@@ -39,6 +39,17 @@ export const ERROR_CODE_MESSAGES: Record<string, string> = {
 
   TOO_MANY_REQUESTS: 'Muitas requisições em pouco tempo. Aguarde um minuto e tente de novo.',
 
-  VALIDATION_ERROR: 'Verifique os campos destacados e tente novamente.',
+  // `VALIDATION_ERROR` está fora deste mapa **de propósito**, e não por esquecimento.
+  //
+  // É o code que o ValidationPipe global do backend carimba, e o corpo dele traz um array com
+  // uma mensagem por campo inválido ("Bairro deve ter no mínimo 2 caracteres"). Mapear o code
+  // fazia `getErrorMessage` resolvê-lo primeiro e **descartar** justamente a parte específica,
+  // trocando-a por uma frase fixa. Ausente do mapa, ele cai no passthrough do `message` — que
+  // aqui é sempre mais informativo do que qualquer texto que se escreva neste arquivo.
+  //
+  // A frase antiga ("Verifique os campos destacados e tente novamente") ainda prometia algo que
+  // o app não faz: nenhum formulário deste projeto destaca campo — a superfície de erro é um
+  // banner agregado. Se um dia passar a destacar, o lugar de dizer isso é o formulário, não uma
+  // tabela de mensagens que não sabe em que tela está.
   INTERNAL_ERROR: 'Ocorreu um erro inesperado. Tente novamente em instantes.',
 };
