@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildInstagramUrl, normalizeInstagramHandle } from '@/shared/format';
+import {
+  buildInstagramUrl,
+  buildOwnerWhatsAppUrl,
+  buildWhatsAppUrl,
+  normalizeInstagramHandle,
+} from '@/shared/format';
 
 /**
  * O que se guarda é o handle, não a URL — mesma decisão que faz o WhatsApp guardar só dígitos.
@@ -55,5 +60,36 @@ describe('buildInstagramUrl', () => {
     expect(buildInstagramUrl('https://www.instagram.com/francinegestora/')).toBe(
       'https://instagram.com/francinegestora',
     );
+  });
+});
+
+/**
+ * Os dois links de WhatsApp da página de detalhes apontam para pessoas diferentes e falam em
+ * vozes diferentes. Confundi-los não é erro de texto: é a imobiliária mandando "tenho
+ * interesse no imóvel" para o dono do imóvel.
+ */
+describe('links de WhatsApp', () => {
+  it('o do visitante fala na voz de quem procura', () => {
+    const url = buildWhatsAppUrl('11999990000', '0001');
+    expect(url).toContain('wa.me/5511999990000');
+    expect(decodeURIComponent(url)).toContain('Tenho interesse no imóvel de código 0001');
+  });
+
+  it('o do proprietário fala na voz da imobiliária', () => {
+    const url = buildOwnerWhatsAppUrl('15988887777', '0001');
+    expect(url).toContain('wa.me/5515988887777');
+    const message = decodeURIComponent(url);
+    expect(message).toContain('Francine Gestora Imobiliária');
+    expect(message).toContain('o seu imóvel de código 0001');
+    expect(message).not.toContain('Tenho interesse');
+  });
+
+  it('os dois aceitam número já formatado — o `onlyDigits` é rede para dado antigo', () => {
+    expect(buildOwnerWhatsAppUrl('(15) 98888-7777')).toContain('wa.me/5515988887777');
+    expect(buildWhatsAppUrl('(11) 99999-0000')).toContain('wa.me/5511999990000');
+  });
+
+  it('sem código do imóvel, a mensagem continua fazendo sentido', () => {
+    expect(decodeURIComponent(buildOwnerWhatsAppUrl('15988887777'))).toContain('o seu imóvel.');
   });
 });

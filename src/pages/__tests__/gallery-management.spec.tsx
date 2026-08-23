@@ -29,6 +29,7 @@ const PROPERTY: PropertyDetailDto = {
   gallery: { rooms: [], unassigned: [] },
   details: { zoning: 'RESIDENTIAL', topography: 'FLAT' },
   whatsappContact: null,
+  owner: null,
   location: null,
   userId: 'user-1',
   createdAt: new Date().toISOString(),

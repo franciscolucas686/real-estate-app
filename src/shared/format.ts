@@ -103,12 +103,42 @@ export function formatPhone(raw: string): string {
   return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
 }
 
+/**
+ * O `wa.me` de um número guardado como dígitos.
+ *
+ * O `55` é fixo: todo número deste sistema é brasileiro e é guardado sem DDI — vale tanto
+ * para o pool da imobiliária (`WhatsappNumber.number`) quanto para o do proprietário
+ * (`Property.ownerPhone`). O `onlyDigits` por dentro é defesa contra valor gravado antes de
+ * a regra existir, pelo mesmo motivo que `buildInstagramUrl` re-normaliza.
+ */
+function waLink(contact: string, message: string): string {
+  return `https://wa.me/55${onlyDigits(contact)}?text=${encodeURIComponent(message)}`;
+}
+
+/** O contato **público**: o visitante falando com a imobiliária. */
 export function buildWhatsAppUrl(contact: string, propertyCode?: string): string {
-  const number = `55${onlyDigits(contact)}`;
-  const message = propertyCode
-    ? `Olá! Tenho interesse no imóvel de código ${propertyCode}.`
-    : 'Olá! Tenho interesse em um imóvel.';
-  return `https://wa.me/${number}?text=${encodeURIComponent(message)}`;
+  return waLink(
+    contact,
+    propertyCode
+      ? `Olá! Tenho interesse no imóvel de código ${propertyCode}.`
+      : 'Olá! Tenho interesse em um imóvel.',
+  );
+}
+
+/**
+ * O contato **privado**: a imobiliária falando com o dono do imóvel.
+ *
+ * Existe separado porque a mensagem de `buildWhatsAppUrl` está na voz do visitante ("Tenho
+ * interesse…") — mandá-la ao proprietário inverteria quem procura quem. É a mesma diferença
+ * que os dois botões da página de detalhes desenham: um é a vitrine, o outro é a operação.
+ */
+export function buildOwnerWhatsAppUrl(phone: string, propertyCode?: string): string {
+  return waLink(
+    phone,
+    propertyCode
+      ? `Olá! Sou da Francine Gestora Imobiliária e gostaria de falar sobre o seu imóvel de código ${propertyCode}.`
+      : 'Olá! Sou da Francine Gestora Imobiliária e gostaria de falar sobre o seu imóvel.',
+  );
 }
 
 /**

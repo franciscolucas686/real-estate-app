@@ -31,6 +31,7 @@ import {
 } from '@/shared/api/types';
 import { Badge } from '@/features/properties/components/badge';
 import { DetailBreadcrumb } from '@/features/properties/components/detail-breadcrumb';
+import { PropertyOwnerCard } from '@/features/properties/components/property-owner-card';
 import { PropertySpecGrid } from '@/features/properties/components/property-spec-grid';
 import { QuickSpecs } from '@/features/properties/components/quick-specs';
 import { SplashIdentity } from '@/features/properties/components/splash-identity';
@@ -468,6 +469,21 @@ export function PropertyDetails() {
                 Compartilhar imóvel
               </button>
             )}
+
+            {/* O bloco do proprietário fecha o rail, abaixo do CTA público e do compartilhar —
+                é operação, não vitrine, então vem depois do que a página quer que aconteça.
+                Renderizado em dois lugares por breakpoint, como o próprio CTA e o botão de
+                compartilhar já são neste arquivo: no mobile o rail é um bloco empilhado que
+                vem *antes* do CTA, e pôr o proprietário aqui empurraria o CTA público para
+                baixo. A cópia `md:hidden` está logo depois dele, na coluna de conteúdo. */}
+            {isAuthenticated && (
+              <PropertyOwnerCard
+                owner={property.owner}
+                propertyId={property.id}
+                propertyCode={property.code}
+                className="hidden md:flex"
+              />
+            )}
           </aside>
 
           {/* ── Content ───────────────────────────────────────────────────── */}
@@ -488,6 +504,16 @@ export function PropertyDetails() {
                   Conversar conosco agora
                 </a>
               </div>
+            )}
+
+            {/* A metade mobile do bloco acima — ver o comentário no rail. */}
+            {isAuthenticated && (
+              <PropertyOwnerCard
+                owner={property.owner}
+                propertyId={property.id}
+                propertyCode={property.code}
+                className="md:hidden"
+              />
             )}
 
             <PropertySpecGrid property={property} />

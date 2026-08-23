@@ -201,6 +201,7 @@ export const handlers = [
       bathrooms: body.bathrooms ?? null,
       suites: body.suites ?? null,
       parkingSpaces: body.parkingSpaces ?? null,
+      owner: { name: body.ownerName, phone: body.ownerPhone },
       gallery: { rooms: [], unassigned: [] },
       details:
         body.house ?? body.apartment ?? body.land ?? body.smallFarm ?? body.countryHouse ?? null,

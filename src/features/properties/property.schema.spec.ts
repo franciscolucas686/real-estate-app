@@ -11,6 +11,8 @@ function base(): PropertyFormValues {
     price: '100000',
     rentPrice: '',
     condoFee: '',
+    ownerName: 'Maria Silva',
+    ownerPhone: '11987654321',
     description: 'Terreno plano em ótima localização, pronto para construir.',
     city: 'Sorocaba',
     state: 'SP',
@@ -300,5 +302,55 @@ describe('propertyFormSchema — field-level shape', () => {
     const values = base();
     values.price = 'abc';
     expect(errorPaths(values)).toContain('price');
+  });
+});
+
+describe('proprietário', () => {
+  it('exige o nome', () => {
+    const r = propertyFormSchema.safeParse({ ...base(), ownerName: '' });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      expect(r.error.issues.some((i) => i.path[0] === 'ownerName')).toBe(true);
+    }
+  });
+
+  it('não aceita um nome que é só espaço', () => {
+    expect(propertyFormSchema.safeParse({ ...base(), ownerName: '   ' }).success).toBe(false);
+  });
+
+  it('exige o WhatsApp', () => {
+    expect(propertyFormSchema.safeParse({ ...base(), ownerPhone: '' }).success).toBe(false);
+  });
+
+  it('recusa telefone com menos de 8 dígitos', () => {
+    expect(propertyFormSchema.safeParse({ ...base(), ownerPhone: '1198765' }).success).toBe(false);
+  });
+
+  it('recusa telefone já formatado — o campo guarda só dígitos', () => {
+    expect(propertyFormSchema.safeParse({ ...base(), ownerPhone: '(11) 98765-4321' }).success).toBe(
+      false,
+    );
+  });
+
+  it('aceita 8 a 15 dígitos, que é a régua do backend', () => {
+    expect(propertyFormSchema.safeParse({ ...base(), ownerPhone: '12345678' }).success).toBe(true);
+    expect(propertyFormSchema.safeParse({ ...base(), ownerPhone: '11987654321' }).success).toBe(
+      true,
+    );
+  });
+
+  /**
+   * A ordem das mensagens é comportamento, não detalhe: `firstStepError` mostra a primeira
+   * questão da etapa, e um formulário vazio precisa começar dizendo "escolha o tipo" — não
+   * "informe o proprietário", que é o último campo da tela. É por isso que as duas regras
+   * moram no `superRefine` em vez de virem como constraint na forma.
+   */
+  it('num formulário vazio, o erro do tipo vem antes do erro do proprietário', () => {
+    const r = propertyFormSchema.safeParse({ ...base(), type: '', ownerName: '', ownerPhone: '' });
+    expect(r.success).toBe(false);
+    if (!r.success) {
+      const paths = r.error.issues.map((i) => String(i.path[0]));
+      expect(paths.indexOf('type')).toBeLessThan(paths.indexOf('ownerName'));
+    }
   });
 });
