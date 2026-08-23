@@ -26,8 +26,6 @@ interface RoomFullscreenProps {
   onEnterSelect: () => void;
   onExitSelect: () => void;
   onUpload: (roomId: string | null) => void;
-  /** Set when the last pick had a photo below `MIN_UPLOAD_WIDTH` — empty string shows nothing. */
-  uploadError: string;
   onRequestDeleteSelected: () => void;
   onRequestMoveSelected: () => void;
   swipeProps: SwipeToSelectContainerProps;
@@ -64,7 +62,6 @@ export function RoomFullscreen({
   onEnterSelect,
   onExitSelect,
   onUpload,
-  uploadError,
   onRequestDeleteSelected,
   onRequestMoveSelected,
   swipeProps,
@@ -187,17 +184,6 @@ export function RoomFullscreen({
             </button>
           )}
         </PageContainer>
-
-        {uploadError && (
-          <PageContainer maxWidth="wide" className="pt-3">
-            <p
-              role="alert"
-              className="rounded-xl bg-danger/10 px-4 py-3 text-sm font-medium text-danger"
-            >
-              {uploadError}
-            </p>
-          </PageContainer>
-        )}
 
         <PageContainer
           maxWidth="wide"
