@@ -8,7 +8,7 @@ import { PageContainer } from '@/layout/page-container';
 import { Button } from '@/ui/button';
 import { Pagination } from '@/ui/pagination';
 import { formatPrice } from '@/shared/format';
-import { imageUrl } from '@/shared/image-url';
+import { CARD_ASPECT_RATIOS, imageUrl } from '@/shared/image-url';
 import type { PropertyCardDto } from '@/shared/api/types';
 
 /** Espelha os 30 dias do `PropertyCleanupService` do backend. */
@@ -50,7 +50,7 @@ function TrashRow({
     <li className="flex items-center gap-3 rounded-xl border border-border p-3">
       {preview ? (
         <img
-          src={imageUrl(preview.url, 'thumb')}
+          src={imageUrl(preview.url, 'thumb', CARD_ASPECT_RATIOS.square)}
           alt=""
           className="size-16 shrink-0 rounded-lg object-cover"
         />

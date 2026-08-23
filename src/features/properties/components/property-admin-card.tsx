@@ -5,7 +5,7 @@ import { Pencil, Images, MoreVertical, PowerOff, Power, Trash2 } from 'lucide-re
 import type { PropertyCardDto } from '@/shared/api/types';
 import { BusinessType, PropertyStatus } from '@/shared/api/types';
 import { formatMainPrice, PropertyTypeLabel, BusinessTypeLabel } from '@/shared/format';
-import { imageUrl } from '@/shared/image-url';
+import { CARD_ASPECT_RATIOS, imageUrl } from '@/shared/image-url';
 import { StatusBadge } from '@/features/properties/components/status-badge';
 import { Modal } from '@/ui/modal';
 import { ConfirmModalContent } from '@/ui/confirm-modal';
@@ -168,11 +168,13 @@ export function PropertyAdminCard({
       >
         {/* Clickable area: thumbnail through price */}
         <div className="cursor-pointer" onClick={() => navigate(`/properties/${property.id}`)}>
-          {/* Thumbnail */}
-          <div className="relative h-36">
+          {/* Thumbnail. aspect-16/10 (não h-36) trava a proporção da caixa em qualquer
+              largura de coluna — antes, a altura fixa fazia o recorte mudar sozinho
+              conforme o grid ganhava ou perdia colunas por breakpoint. */}
+          <div className="relative aspect-16/10">
             {firstImage ? (
               <img
-                src={imageUrl(firstImage.url, 'thumb')}
+                src={imageUrl(firstImage.url, 'thumb', CARD_ASPECT_RATIOS.wide)}
                 alt={PropertyTypeLabel[property.type]}
                 loading="lazy"
                 className="h-full w-full object-cover"

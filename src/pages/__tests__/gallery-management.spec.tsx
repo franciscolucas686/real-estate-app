@@ -191,26 +191,83 @@ describe('GalleryManagement — seleção de fotos acessível', () => {
   });
 
   it('adicionar fotos é só do gerenciador, e mostra novas junto das antigas', async () => {
-    const user = userEvent.setup();
-    renderWithPhotos();
+    // `handleUpload` agora lê a resolução real do arquivo via `new Image()` antes de
+    // aceitá-lo (`meetsMinimumWidth`), e o jsdom não decodifica imagem nenhuma — nem
+    // `onload` nem `onerror` disparam sozinhos. Mesmo stub que `property-details.spec.tsx`
+    // usa para o próprio `new Image()` da página, com `naturalWidth` acima do mínimo para
+    // simular uma foto de resolução válida, que é o que este teste quer exercitar.
+    const RealImage = window.Image;
+    window.Image = class {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      naturalWidth = 1920;
+      set src(_url: string) {
+        this.onload?.();
+      }
+    } as unknown as typeof Image;
 
-    // A página não tem mais por onde subir foto: as seções empilhadas são um índice, e o
-    // upload mora no ambiente, ao lado de selecionar/excluir/mover.
-    expect(screen.queryByRole('button', { name: /Adicionar fotos/ })).not.toBeInTheDocument();
+    try {
+      const user = userEvent.setup();
+      renderWithPhotos();
 
-    const room = await openRoomManager(user);
-    // Pelo botão de verdade, para exercitar `requestUpload` — é ele que aponta o input
-    // compartilhado para este ambiente antes de abrir o seletor.
-    await user.click(room.getByRole('button', { name: 'Adicionar fotos' }));
-    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
-    await user.upload(input, new File(['x'], 'nova.jpg', { type: 'image/jpeg' }));
+      // A página não tem mais por onde subir foto: as seções empilhadas são um índice, e o
+      // upload mora no ambiente, ao lado de selecionar/excluir/mover.
+      expect(screen.queryByRole('button', { name: /Adicionar fotos/ })).not.toBeInTheDocument();
 
-    // Novas *e* antigas: o gerenciador é o ambiente inteiro, não só o que acabou de entrar.
-    await waitFor(() => expect(room.getByAltText('Foto 3')).toBeInTheDocument());
-    expect(room.getByAltText('Frente')).toBeInTheDocument();
-    // Sem isto, reescolher o mesmo arquivo não dispararia `change` de novo — o segundo
-    // "Adicionar fotos" não adicionaria nada.
-    expect(input.value).toBe('');
+      const room = await openRoomManager(user);
+      // Pelo botão de verdade, para exercitar `requestUpload` — é ele que aponta o input
+      // compartilhado para este ambiente antes de abrir o seletor.
+      await user.click(room.getByRole('button', { name: 'Adicionar fotos' }));
+      const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+      await user.upload(input, new File(['x'], 'nova.jpg', { type: 'image/jpeg' }));
+
+      // Novas *e* antigas: o gerenciador é o ambiente inteiro, não só o que acabou de entrar.
+      await waitFor(() => expect(room.getByAltText('Foto 3')).toBeInTheDocument());
+      expect(room.getByAltText('Frente')).toBeInTheDocument();
+      // Sem isto, reescolher o mesmo arquivo não dispararia `change` de novo — o segundo
+      // "Adicionar fotos" não adicionaria nada.
+      expect(input.value).toBe('');
+    } finally {
+      window.Image = RealImage;
+    }
+  });
+
+  it('foto abaixo da resolução mínima é rejeitada com aviso, sem travar o upload das demais', async () => {
+    const RealImage = window.Image;
+    // Cada instância lê seu próprio `naturalWidth` do nome do arquivo, simulando uma foto
+    // de baixa resolução ao lado de uma válida na mesma seleção.
+    window.Image = class {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      naturalWidth = 0;
+      private _src = '';
+      set src(url: string) {
+        this._src = url;
+        this.onload?.();
+      }
+      get src() {
+        return this._src;
+      }
+    } as unknown as typeof Image;
+
+    try {
+      const user = userEvent.setup();
+      renderWithPhotos();
+
+      const room = await openRoomManager(user);
+      await user.click(room.getByRole('button', { name: 'Adicionar fotos' }));
+      const input = document.querySelector<HTMLInputElement>('input[type="file"]')!;
+      await user.upload(input, new File(['x'], 'pequena.jpg', { type: 'image/jpeg' }));
+
+      // `naturalWidth = 0` no stub reproduz uma foto abaixo do mínimo: nenhuma foto nova
+      // entra, e o gerenciador segue aberto (não precisa reabrir) mostrando o aviso.
+      await waitFor(() =>
+        expect(room.getByRole('alert')).toHaveTextContent(/resolução muito baixa/),
+      );
+      expect(room.queryByAltText('Foto 3')).not.toBeInTheDocument();
+    } finally {
+      window.Image = RealImage;
+    }
   });
 
   it('clicar fora fecha o ambiente em vez de sair da galeria', async () => {

@@ -56,4 +56,21 @@ describe('imageUrl', () => {
       'https://fotos.exemplo.com/cdn-cgi/image/width=800,quality=80,format=auto/prop-1/abc.jpg?v=2',
     );
   });
+
+  it('com aspectRatio, pede recorte por saliência na própria borda', async () => {
+    const { imageUrl, CARD_ASPECT_RATIOS } = await load(true);
+
+    expect(imageUrl(ORIGINAL, 'thumb', CARD_ASPECT_RATIOS.wide)).toBe(
+      'https://fotos.exemplo.com/cdn-cgi/image/width=800,height=500,fit=cover,gravity=auto,quality=80,format=auto/prop-1/abc.jpg',
+    );
+    expect(imageUrl(ORIGINAL, 'thumb', CARD_ASPECT_RATIOS.square)).toBe(
+      'https://fotos.exemplo.com/cdn-cgi/image/width=800,height=800,fit=cover,gravity=auto,quality=80,format=auto/prop-1/abc.jpg',
+    );
+  });
+
+  it('sem aspectRatio continua sem height/fit/gravity, mesmo ligado', async () => {
+    const { imageUrl } = await load(true);
+
+    expect(imageUrl(ORIGINAL, 'card')).not.toContain('gravity');
+  });
 });

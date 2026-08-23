@@ -5,7 +5,7 @@ import { Skeleton, SkeletonGroup } from '@/ui/skeleton';
 /**
  * Property-shaped loading states. These live in the feature, not in `ui/`, because
  * their whole job is to mirror a specific layout — `PropertyAdminCardSkeleton` is
- * only correct as long as `PropertyAdminCard` has a 36px-tall thumbnail and three
+ * only correct as long as `PropertyAdminCard` has an aspect-16/10 thumbnail and three
  * round action buttons. Keeping them beside the components they imitate is what
  * makes drift visible in review.
  */
@@ -94,7 +94,7 @@ export function PropertyAdminCardSkeleton({ className }: { className?: string })
         className,
       )}
     >
-      <Skeleton className="h-36 w-full rounded-none" />
+      <Skeleton className="aspect-16/10 w-full rounded-none" />
       <div className="flex flex-col gap-2 p-3">
         <Skeleton className="h-4 w-24" />
         <Skeleton className="h-5 w-36" />

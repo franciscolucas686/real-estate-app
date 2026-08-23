@@ -42,18 +42,41 @@ export const IMAGE_WIDTHS = {
 export type ImageWidth = keyof typeof IMAGE_WIDTHS;
 
 /**
+ * Proporções dos cards que pedem recorte na borda (ver `aspectRatio` abaixo). Têm que
+ * bater com o `aspect-*`/`size-*` do container CSS do card correspondente
+ * (`property-card.tsx`, `property-admin-card.tsx`, `trash.tsx`) — se um mudar sem o
+ * outro, a Cloudflare recorta numa proporção e o `object-cover` do navegador recorta de
+ * novo numa outra.
+ */
+export const CARD_ASPECT_RATIOS = {
+  wide: 16 / 10,
+  square: 1,
+} as const;
+
+/**
  * URL da foto na largura pedida. Omitir `width` devolve o original — é o que o
  * visualizador em tela cheia quer, e o default seguro para qualquer call site novo.
  *
  * `format=auto` deixa a Cloudflare servir WebP/AVIF para quem aceita, o que costuma
  * valer mais que o próprio redimensionamento em foto de imóvel.
+ *
+ * `aspectRatio` é opt-in. Sem ele, a Cloudflare só reduz a largura mantendo a proporção
+ * original da foto — quem recorta pra caber na caixa do card é o `object-cover` do
+ * navegador, sempre a partir do centro. Com ele, o recorte acontece na própria borda via
+ * `fit=cover,gravity=auto`: a Cloudflare escolhe a região mais saliente da foto em vez do
+ * centro cego, então uma fachada fotografada fora de posição (ou em pé, vertical) não
+ * perde o telhado ou a base só porque o centro geométrico caiu numa parede lisa.
  */
-export function imageUrl(url: string, width?: ImageWidth): string {
+export function imageUrl(url: string, width?: ImageWidth, aspectRatio?: number): string {
   if (!ENABLED || !width) return url;
 
   try {
     const parsed = new URL(url);
-    const options = `width=${IMAGE_WIDTHS[width]},quality=80,format=auto`;
+    const targetWidth = IMAGE_WIDTHS[width];
+    const crop = aspectRatio
+      ? `,height=${Math.round(targetWidth / aspectRatio)},fit=cover,gravity=auto`
+      : '';
+    const options = `width=${targetWidth}${crop},quality=80,format=auto`;
     return `${parsed.origin}/cdn-cgi/image/${options}${parsed.pathname}${parsed.search}`;
   } catch {
     // URL relativa ou malformada: devolve intacta em vez de quebrar a imagem.
