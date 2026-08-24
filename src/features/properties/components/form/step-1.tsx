@@ -4,7 +4,7 @@ import type { FormState, Setter } from '@/features/properties/components/form/fo
 import { onlyDigits } from '@/shared/digits';
 import { PropertyType, BusinessType, SaleType } from '@/shared/api/types';
 import { PropertyTypeLabel, BusinessTypeLabel, SaleTypeLabel } from '@/shared/format';
-import { formatPhone, formatPrice } from '@/shared/format';
+import { formatPhone, formatPrice, toPlaceCase } from '@/shared/format';
 import { cn } from '@/shared/cn';
 
 export function Step1({
@@ -164,11 +164,15 @@ export function Step1({
         </div>
 
         <div className="flex flex-col gap-5 md:grid md:grid-cols-2 md:gap-4">
+          {/* `toPlaceCase` apesar do "Place" no nome: o corpo dela é title case genérico com
+              os conectivos do português (de, da, dos, e…) preservados em minúscula a partir da
+              segunda palavra — que é exatamente a convenção de nome de pessoa aqui ("Maria dos
+              Santos"). Mesma normalização que Cidade e Bairro já fazem no `onChange`. */}
           <Field label="Nome do proprietário *">
             <Input
               placeholder="Ex: Maria Silva"
               value={form.ownerName}
-              onChange={(v) => set('ownerName', v)}
+              onChange={(v) => set('ownerName', toPlaceCase(v))}
             />
           </Field>
 
