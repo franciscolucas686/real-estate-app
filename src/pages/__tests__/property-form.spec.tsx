@@ -56,17 +56,17 @@ const EXISTING: PropertyDetailDto = {
  * Os dados do proprietário são obrigatórios e vivem no fim da etapa 1, então todo teste que
  * precisa **passar** dela tem de preenchê-los — inclusive os que investigam outra regra.
  */
-async function fillOwner(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByPlaceholderText('Ex: Maria Silva'), 'Maria Silva');
+async function fillOwner(user: ReturnType<typeof userEvent.setup>, name = 'Maria Silva') {
+  await user.type(screen.getByPlaceholderText('Ex: Maria Silva'), name);
   await user.type(screen.getByPlaceholderText('Ex: (15) 99999-9999'), '11987654321');
 }
 
-async function fillLandThroughStep2(user: ReturnType<typeof userEvent.setup>) {
+async function fillLandThroughStep2(user: ReturnType<typeof userEvent.setup>, ownerName?: string) {
   await user.selectOptions(screen.getByLabelText('Tipo de imóvel *'), 'LAND');
   await user.click(screen.getByRole('button', { name: 'Venda' }));
   await user.click(screen.getByRole('button', { name: 'Venda direta' }));
   await user.type(screen.getByPlaceholderText('Ex: R$ 450.000'), '450000');
-  await fillOwner(user);
+  await fillOwner(user, ownerName);
   await user.click(screen.getByRole('button', { name: 'Continuar' }));
 
   await user.type(await screen.findByPlaceholderText('Ex: Sorocaba'), 'Sorocaba');
@@ -424,6 +424,39 @@ describe('PropertyForm — payload de criação', () => {
     // Planos no corpo (espelham coluna), aninhados na resposta (espelham a fronteira de
     // acesso) — a assimetria é a do backend, e é deliberada.
     expect(posted).toMatchObject({ ownerName: 'Maria Silva', ownerPhone: '11987654321' });
+  });
+
+  /**
+   * Nome de pessoa é normalizado no `onChange`, como Cidade e Bairro já são — o operador
+   * digita com pressa e o que chega ao banco (e ao bloco do proprietário na página de
+   * detalhes) precisa parecer um nome. O conectivo em minúscula é o caso que decide se
+   * `toPlaceCase` serve aqui: "Maria da Silva", não "Maria Da Silva".
+   */
+  it('capitaliza o nome do proprietário, preservando o conectivo', async () => {
+    const user = userEvent.setup();
+
+    let posted: Record<string, unknown> | null = null;
+    server.use(
+      http.post('/api/properties', async ({ request }) => {
+        posted = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json({ ...EXISTING, id: 'prop-novo' }, { status: 201 });
+      }),
+    );
+
+    renderNewPropertyForm();
+    await fillLandThroughStep2(user, 'maria da silva');
+
+    await user.type(await screen.findByLabelText('Área total (m²) *'), '500');
+    await user.selectOptions(screen.getByLabelText('Zoneamento *'), 'RESIDENTIAL');
+    await user.selectOptions(screen.getByLabelText('Topografia *'), 'FLAT');
+    await user.type(
+      screen.getByPlaceholderText('Descreva o imóvel...'),
+      'Terreno plano em ótima localização, pronto para construir.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Criar e ir para Galeria' }));
+
+    await waitFor(() => expect(posted).not.toBeNull());
+    expect(posted).toMatchObject({ ownerName: 'Maria da Silva' });
   });
 });
 

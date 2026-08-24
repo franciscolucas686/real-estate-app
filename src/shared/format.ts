@@ -212,6 +212,19 @@ const PLACE_STOP_WORDS = new Set([
   'nos',
 ]);
 
+/**
+ * Title case com os conectivos do português preservados em minúscula a partir da segunda
+ * palavra — "Mirante dos Óvnis", "Maria da Silva".
+ *
+ * O nome diz "Place" porque nasceu para Cidade e Bairro (`step-2.tsx`), mas o corpo é
+ * genérico e a lista de conectivos é a mesma convenção que **nome de pessoa** pede em
+ * português: por isso ela também normaliza o nome do proprietário (`step-1.tsx`). O nome
+ * ficou por não valer a churn de renomear um helper compartilhado por motivo cosmético.
+ *
+ * Preserva o comprimento caractere a caractere, e é isso que a torna segura num `onChange`
+ * de campo controlado: o caret não se desloca. `NumericInput` faz o oposto (reescreve o nó
+ * do DOM) e por isso precisa restaurar a seleção à mão.
+ */
 export function toPlaceCase(value: string): string {
   return value
     .split(' ')

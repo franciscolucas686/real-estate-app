@@ -4,6 +4,7 @@ import {
   buildOwnerWhatsAppUrl,
   buildWhatsAppUrl,
   normalizeInstagramHandle,
+  toPlaceCase,
 } from '@/shared/format';
 
 /**
@@ -91,5 +92,42 @@ describe('links de WhatsApp', () => {
 
   it('sem código do imóvel, a mensagem continua fazendo sentido', () => {
     expect(decodeURIComponent(buildOwnerWhatsAppUrl('15988887777'))).toContain('o seu imóvel.');
+  });
+});
+
+/**
+ * Governa três campos pelo `onChange` — Cidade e Bairro (`step-2.tsx`) e o nome do
+ * proprietário (`step-1.tsx`) — e não tinha nenhum teste. Os casos abaixo são os que
+ * decidem se ela serve para nome de pessoa, que é o uso mais recente.
+ */
+describe('toPlaceCase', () => {
+  it('sobe a inicial de cada palavra', () => {
+    expect(toPlaceCase('maria silva')).toBe('Maria Silva');
+  });
+
+  it('mantém o conectivo em minúscula a partir da segunda palavra', () => {
+    expect(toPlaceCase('maria da silva')).toBe('Maria da Silva');
+    expect(toPlaceCase('joão dos santos')).toBe('João dos Santos');
+  });
+
+  it('capitaliza o conectivo quando ele abre o nome', () => {
+    // A regra é posicional, e para nome de pessoa é o comportamento certo: quem se chama
+    // "Dos Santos" não vira "dos Santos".
+    expect(toPlaceCase('dos santos')).toBe('Dos Santos');
+  });
+
+  it('baixa o resto da palavra, então caps lock não passa', () => {
+    expect(toPlaceCase('JOÃO')).toBe('João');
+    expect(toPlaceCase('MARIA DA SILVA')).toBe('Maria da Silva');
+  });
+
+  it('preserva o comprimento, inclusive espaços — é o que não desloca o caret', () => {
+    // Digitar "maria " e continuar não pode reposicionar o cursor nem comer o espaço.
+    expect(toPlaceCase('maria ')).toBe('Maria ');
+    expect(toPlaceCase('maria  silva')).toHaveLength('maria  silva'.length);
+  });
+
+  it('devolve string vazia intacta', () => {
+    expect(toPlaceCase('')).toBe('');
   });
 });
