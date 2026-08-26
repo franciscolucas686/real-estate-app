@@ -22,6 +22,7 @@ import { getErrorMessage } from '@/shared/api/api-error';
 import type { GallerySection } from '@/features/gallery/gallery-section';
 import { AddRoomInline } from '@/features/gallery/components/add-room-inline';
 import { MoveDialog } from '@/features/gallery/components/move-dialog';
+import { PhotoActionsSheet } from '@/features/gallery/components/photo-actions-sheet';
 import { RoomFullscreen } from '@/features/gallery/components/room-fullscreen';
 import { RoomSection } from '@/features/gallery/components/room-section';
 
@@ -31,7 +32,7 @@ function sectionKey(roomId: string | null): string {
 }
 
 function toImageDto(img: DraftImage): PropertyImageDto {
-  return { id: img.id, url: img.url, label: img.label, order: 0 };
+  return { id: img.id, url: img.url, label: img.label, order: 0, isMain: img.isMain };
 }
 
 export function GalleryManagement() {
@@ -74,6 +75,8 @@ export function GalleryManagement() {
   const confirming = commitGallery.isPending;
   const [roomToDelete, setRoomToDelete] = useState<{ id: string; name: string } | null>(null);
   const [confirmDeletePhotosOpen, setConfirmDeletePhotosOpen] = useState(false);
+  /** A foto cuja folha de ações está aberta — `null` quando não há nenhuma. */
+  const [photoActionsId, setPhotoActionsId] = useState<string | null>(null);
   // Success splash for a plain gallery edit (not the post-create wizard, which already
   // chains into its own splash on `property-details.tsx` and must not get a second one).
   const [gallerySplashVisible, setGallerySplashVisible] = useState(false);
@@ -142,6 +145,8 @@ export function GalleryManagement() {
         label: img.label,
         roomId: null,
         originalRoomId: null,
+        isMain: img.isMain,
+        originalIsMain: img.isMain,
         isNew: false,
         deleted: false,
       }));
@@ -152,6 +157,8 @@ export function GalleryManagement() {
           label: img.label,
           roomId: r.id,
           originalRoomId: r.id,
+          isMain: img.isMain,
+          originalIsMain: img.isMain,
           isNew: false,
           deleted: false,
         })),
@@ -275,6 +282,22 @@ export function GalleryManagement() {
     exitSelectMode();
   }
 
+  /**
+   * Alterna a foto principal no rascunho: marcar uma desmarca as demais, e marcar a que já
+   * era principal devolve o imóvel ao estado sem principal — o mesmo dos imóveis anteriores
+   * a esta feature, que todas as telas já sabem tratar.
+   *
+   * Nada vai para a API aqui. Como todo o resto desta tela, a escolha vive no rascunho até
+   * o "Salvar alterações", e é isso que a faz funcionar igual na criação de um imóvel, onde
+   * a foto escolhida pode nem existir no servidor ainda.
+   */
+  function handleToggleMain(imageId: string) {
+    setDraftImages((prev) =>
+      prev.map((img) => ({ ...img, isMain: img.id === imageId && !img.isMain })),
+    );
+    setPhotoActionsId(null);
+  }
+
   function handleMoveToRoom(targetRoomId: string | null) {
     if (selectedInRoom.length === 0) return;
     const idsToMove = new Set(selectedInRoom);
@@ -302,6 +325,10 @@ export function GalleryManagement() {
       label: null,
       roomId,
       originalRoomId: roomId,
+      // Foto nova nunca nasce principal: quem escolhe é o operador. A escolha pode recair
+      // sobre ela ainda neste rascunho — `executeGalleryPatch` resolve o id real depois.
+      isMain: false,
+      originalIsMain: false,
       isNew: true,
       deleted: false,
       file,
@@ -685,8 +712,10 @@ export function GalleryManagement() {
           onExited={handleRoomExited}
           selecting={selecting}
           selectedIds={selectedInRoom}
-          modalOpen={showMoveDialog || confirmDeletePhotosOpen}
+          modalOpen={showMoveDialog || confirmDeletePhotosOpen || photoActionsId !== null}
           onTogglePhoto={togglePhotoSelection}
+          onToggleMain={handleToggleMain}
+          onRequestPhotoActions={setPhotoActionsId}
           onClose={closeRoomFullscreen}
           onEnterSelect={() => setSelecting(true)}
           onExitSelect={exitSelectMode}
@@ -696,6 +725,15 @@ export function GalleryManagement() {
           swipeProps={swipeSelectProps}
         />
       )}
+
+      {/* Fora do `fullscreenRoom &&` acima: o Radix precisa da folha montada para animar a saída
+          dela, e desmontar junto com o overlay cortaria a animação pela metade. */}
+      <PhotoActionsSheet
+        open={photoActionsId !== null}
+        isMain={draftImages.some((img) => img.id === photoActionsId && img.isMain)}
+        onToggleMain={() => photoActionsId && handleToggleMain(photoActionsId)}
+        onClose={() => setPhotoActionsId(null)}
+      />
 
       <SuccessSplash visible={gallerySplashVisible}>
         <CheckCircle size={64} className="text-action" />

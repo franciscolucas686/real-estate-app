@@ -4,6 +4,7 @@ import userEvent, { type UserEvent } from '@testing-library/user-event';
 import { GalleryManagement } from '@/pages/gallery-management';
 import { renderWithProviders } from '@/test/render';
 import { setMockProperty } from '@/mocks/handlers';
+import { server } from '@/mocks/server';
 import type { PropertyDetailDto } from '@/shared/api/types';
 
 const PROPERTY: PropertyDetailDto = {
@@ -85,8 +86,14 @@ describe('GalleryManagement — seleção de fotos acessível', () => {
     gallery: {
       rooms: [],
       unassigned: [
-        { id: 'img-1', url: 'https://example.test/1.jpg', label: 'Frente', order: 0 },
-        { id: 'img-2', url: 'https://example.test/2.jpg', label: null, order: 1 },
+        {
+          id: 'img-1',
+          url: 'https://example.test/1.jpg',
+          label: 'Frente',
+          order: 0,
+          isMain: false,
+        },
+        { id: 'img-2', url: 'https://example.test/2.jpg', label: null, order: 1, isMain: false },
       ],
     },
   };
@@ -288,5 +295,64 @@ describe('GalleryManagement — seleção de fotos acessível', () => {
     const again = await openRoomManager(user);
     await user.click(await again.findByRole('button', { name: 'Selecionar fotos' }));
     expect(screen.getByRole('button', { name: /Excluir \(0\)/ })).toBeDisabled();
+  });
+
+  /*
+   * A foto principal. O overlay de hover é o caminho de desktop e é o que o jsdom consegue
+   * acionar — o toque longo depende de um temporizador de ponteiro real, e está coberto em
+   * `shared/hooks/use-long-press.spec.ts`. O que importa aqui é o outro lado: a escolha é
+   * rascunho até o salvar, como todo o resto desta tela.
+   */
+  describe('foto principal', () => {
+    const definir = (n: number) => `Definir Foto ${n} como foto principal`;
+    const remover = (n: number) => `Remover Foto ${n} como foto principal`;
+
+    it('marcar uma foto desmarca a anterior', async () => {
+      const user = userEvent.setup();
+      renderWithPhotos();
+      const room = await openRoomManager(user);
+
+      await user.click(await room.findByRole('button', { name: definir(1) }));
+      expect(await room.findByRole('button', { name: remover(1) })).toBeInTheDocument();
+
+      await user.click(await room.findByRole('button', { name: definir(2) }));
+      expect(await room.findByRole('button', { name: remover(2) })).toBeInTheDocument();
+      // A exclusividade: uma principal por imóvel, também no rascunho.
+      expect(room.getByRole('button', { name: definir(1) })).toBeInTheDocument();
+    });
+
+    it('clicar de novo na principal remove a marcação', async () => {
+      const user = userEvent.setup();
+      renderWithPhotos();
+      const room = await openRoomManager(user);
+
+      await user.click(await room.findByRole('button', { name: definir(1) }));
+      await user.click(await room.findByRole('button', { name: remover(1) }));
+
+      expect(await room.findByRole('button', { name: definir(1) })).toBeInTheDocument();
+      expect(room.queryByRole('button', { name: remover(1) })).not.toBeInTheDocument();
+    });
+
+    // A tela inteira é um rascunho: nada de escolher a capa e a requisição sair sozinha.
+    it('a escolha só chega à API no salvar', async () => {
+      const user = userEvent.setup();
+      const chamadas: string[] = [];
+      server.events.on('request:start', ({ request }) => {
+        if (request.method !== 'GET')
+          chamadas.push(`${request.method} ${new URL(request.url).pathname}`);
+      });
+
+      renderWithPhotos();
+      const room = await openRoomManager(user);
+      await user.click(await room.findByRole('button', { name: definir(2) }));
+
+      expect(chamadas).toEqual([]);
+
+      await user.click(screen.getByRole('button', { name: /alterações/i }));
+
+      await waitFor(() =>
+        expect(chamadas).toContain('PATCH /api/properties/prop-1/images/img-2/main'),
+      );
+    });
   });
 });

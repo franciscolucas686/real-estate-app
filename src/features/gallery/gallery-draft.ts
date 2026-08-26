@@ -19,6 +19,16 @@ export interface DraftImage {
   label: string | null;
   roomId: string | null;
   originalRoomId: string | null;
+  /**
+   * A foto principal do imóvel, no rascunho. Segue o mesmo par que `roomId`/`originalRoomId`:
+   * o valor corrente e o que veio do servidor, que é o que permite saber se o operador
+   * mexeu nisso nesta sessão de edição.
+   *
+   * A exclusividade (uma principal por imóvel) é mantida por quem escreve o rascunho:
+   * marcar uma foto desmarca as outras. O backend garante o mesmo na transação dele.
+   */
+  isMain: boolean;
+  originalIsMain: boolean;
   isNew: boolean;
   deleted: boolean;
   file?: File;
@@ -30,7 +40,19 @@ export interface GalleryPatch {
   roomsToDelete: string[];
   imagesToMove: { imageId: string; roomId: string | null }[];
   imagesToDelete: string[];
-  imagesToUpload: { roomId: string | null; file: File }[];
+  /**
+   * `draftId` acompanha o arquivo porque uma foto ainda não enviada existe só como id local
+   * (`crypto.randomUUID()`), e ela pode ser justamente a escolhida como principal. Quem
+   * traduz um id desses para o id real é `executeGalleryPatch`, com a resposta do upload.
+   */
+  imagesToUpload: { draftId: string; roomId: string | null; file: File }[];
+  /**
+   * A troca de foto principal, quando houve uma. Um campo só para as duas direções —
+   * `isMain: true` define, `false` remove — porque o `DELETE` da API também precisa saber
+   * **qual** foto desmarcar, e `mainImageId: string | null` não teria id para mandar na
+   * remoção. Ausente quando o operador não mexeu nisso.
+   */
+  mainImage?: { imageId: string; isMain: boolean };
 }
 
 export function buildGalleryPatch(
@@ -76,7 +98,25 @@ export function buildGalleryPatch(
     .filter(
       (img): img is DraftImage & { file: File } => img.isNew && !img.deleted && Boolean(img.file),
     )
-    .map((img) => ({ roomId: img.roomId, file: img.file }));
+    .map((img) => ({ draftId: img.id, roomId: img.roomId, file: img.file }));
+
+  /*
+   * A foto principal só entra no patch quando a escolha mudou — sem isso, todo salvamento
+   * mandaria uma requisição a mais para reafirmar o que já estava lá.
+   *
+   * O caso que exige cuidado é a remoção: se a principal foi **excluída** neste mesmo
+   * rascunho, não há o que desmarcar. A linha some do banco levando a marcação junto, e
+   * mandar o `DELETE .../main` depois seria uma chamada contra um id que não existe mais.
+   */
+  const nextMain = draftImages.find((img) => img.isMain && !img.deleted);
+  const previousMain = draftImages.find((img) => img.originalIsMain);
+
+  let mainImage: GalleryPatch['mainImage'];
+  if (nextMain && nextMain.id !== previousMain?.id) {
+    mainImage = { imageId: nextMain.id, isMain: true };
+  } else if (!nextMain && previousMain && !previousMain.deleted) {
+    mainImage = { imageId: previousMain.id, isMain: false };
+  }
 
   return {
     roomsToCreate,
@@ -85,5 +125,6 @@ export function buildGalleryPatch(
     imagesToMove,
     imagesToDelete,
     imagesToUpload,
+    ...(mainImage && { mainImage }),
   };
 }

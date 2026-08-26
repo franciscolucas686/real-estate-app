@@ -22,6 +22,10 @@ interface RoomFullscreenProps {
   /** A Radix modal is open on top. Escape belongs to it then, not to this surface. */
   modalOpen: boolean;
   onTogglePhoto: (imageId: string) => void;
+  /** Alterna a foto principal do imóvel — o overlay de hover de cada foto. */
+  onToggleMain: (imageId: string) => void;
+  /** Abre a folha de ações de uma foto; é o toque longo que chama. */
+  onRequestPhotoActions: (imageId: string) => void;
   onClose: () => void;
   onEnterSelect: () => void;
   onExitSelect: () => void;
@@ -58,6 +62,8 @@ export function RoomFullscreen({
   selectedIds,
   modalOpen,
   onTogglePhoto,
+  onToggleMain,
+  onRequestPhotoActions,
   onClose,
   onEnterSelect,
   onExitSelect,
@@ -206,6 +212,8 @@ export function RoomFullscreen({
                 selecting={selecting}
                 isSelected={selectedIds.includes(img.id)}
                 onToggle={onTogglePhoto}
+                onToggleMain={onToggleMain}
+                onRequestActions={onRequestPhotoActions}
               />
             ))}
             {/* No room suffix on the name here: there is exactly one ambiente in scope, and it

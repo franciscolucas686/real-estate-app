@@ -49,7 +49,21 @@ function flattenGallery(property: PropertyDetailDto): PropertyImageDto[] {
     [...r.images].sort((a, b) => a.order - b.order).map((img) => ({ ...img, roomName: r.name })),
   );
   const unassigned = [...(property.gallery.unassigned ?? [])].sort((a, b) => a.order - b.order);
-  return [...roomImages, ...unassigned];
+  const images = [...roomImages, ...unassigned];
+
+  /*
+   * A foto principal abre a página, como abre o card. Um hoist só aqui basta porque tudo o que
+   * esta tela mostra de foto — o carrossel, a tira de miniaturas, o mosaico do celular, o
+   * visualizador em tela cheia e a capa pré-carregada — deriva desta mesma lista.
+   *
+   * Sem principal, a ordem é a de sempre (ambientes primeiro, soltas depois): é o estado de todo
+   * imóvel anterior a esta feature, e ele não pode mudar de aparência por causa dela.
+   */
+  const mainIndex = images.findIndex((img) => img.isMain);
+  if (mainIndex <= 0) return images;
+
+  const [main] = images.splice(mainIndex, 1);
+  return [main, ...images];
 }
 
 function hasCoords(

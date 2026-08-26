@@ -1,6 +1,7 @@
-import { Check } from 'lucide-react';
+import { Check, Star } from 'lucide-react';
 import { cn } from '@/shared/cn';
 import { imageUrl } from '@/shared/image-url';
+import { useLongPress } from '@/shared/hooks/use-long-press';
 import type { PropertyImageDto } from '@/shared/api/types';
 
 interface GalleryImageProps {
@@ -19,6 +20,16 @@ interface GalleryImageProps {
   selecting?: boolean;
   isSelected?: boolean;
   onToggle?: (imageId: string) => void;
+  /**
+   * Alterna a foto principal do imóvel. Presente só onde a galeria é editável — é ela que
+   * liga tanto o overlay de desktop quanto a ação da folha aberta pelo toque longo.
+   */
+  onToggleMain?: (imageId: string) => void;
+  /**
+   * Abre a folha de ações desta foto. Chamada pelo toque longo, que é o caminho do celular:
+   * lá não há hover para revelar o overlay.
+   */
+  onRequestActions?: (imageId: string) => void;
   /** Responsive visibility classes from the parent grid (`photoTileVisibility`). */
   className?: string;
 }
@@ -44,8 +55,36 @@ export function GalleryImage({
   selecting = false,
   isSelected = false,
   onToggle,
+  onToggleMain,
+  onRequestActions,
   className,
 }: GalleryImageProps) {
+  // Desligado em modo de seleção: ali o toque pertence ao checkbox, e abrir uma folha no meio
+  // de uma seleção múltipla seria uma segunda coisa acontecendo no mesmo gesto.
+  const longPressProps = useLongPress({
+    enabled: !selecting && Boolean(onRequestActions),
+    onLongPress: () => onRequestActions?.(image.id),
+  });
+
+  /*
+   * A estrela fica no canto **direito**: o esquerdo é da bolha de seleção, e as duas aparecem
+   * juntas quando se seleciona fotos num imóvel que já tem principal.
+   *
+   * Persistente de propósito, sem depender de hover — é a identificação visual de qual foto é
+   * a capa, e ela precisa estar legível numa varredura da grade inteira.
+   */
+  const mainBadge = image.isMain && (
+    <span
+      // Sobre fotografia, os literais `bg-black/…` e `text-white` são a exceção sancionada à
+      // regra dos tokens: nenhuma cor de tema sobrevive a um fundo arbitrário.
+      className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-full bg-black/60 text-white shadow-md"
+      title="Foto principal"
+    >
+      <Star size={14} fill="currentColor" aria-hidden="true" />
+      <span className="sr-only">Foto principal</span>
+    </span>
+  );
+
   const figure = (
     <>
       <img
@@ -68,11 +107,47 @@ export function GalleryImage({
           )}
         </span>
       )}
+      {mainBadge}
     </>
   );
 
   if (!selecting) {
-    return <div className={cn('relative aspect-square', className)}>{figure}</div>;
+    return (
+      <div className={cn('group relative aspect-square', className)} {...longPressProps}>
+        {figure}
+        {onToggleMain && (
+          /*
+           * Só a partir de `md`. Abaixo disso não há hover que o revele, e o caminho do
+           * celular é o toque longo — deixá-lo montado e invisível daria um botão que
+           * responde a um toque que ninguém vê.
+           *
+           * `group-focus-within` acompanha o `group-hover` pelo mesmo motivo que nas setas do
+           * carrossel: sem ele o botão existe para o teclado mas nunca aparece.
+           */
+          <button
+            type="button"
+            onClick={() => onToggleMain(image.id)}
+            aria-label={
+              image.isMain
+                ? `Remover Foto ${position} como foto principal`
+                : `Definir Foto ${position} como foto principal`
+            }
+            title={image.isMain ? 'Remover como foto principal' : 'Definir como foto principal'}
+            className={cn(
+              'absolute inset-x-1 bottom-1 hidden items-center justify-center gap-1.5 rounded-lg',
+              'bg-black/60 px-2 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity',
+              'md:flex md:group-hover:opacity-100 md:group-focus-within:opacity-100',
+              'focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+            )}
+          >
+            <Star size={14} fill={image.isMain ? 'currentColor' : 'none'} aria-hidden="true" />
+            <span className="truncate">
+              {image.isMain ? 'Foto principal' : 'Definir como principal'}
+            </span>
+          </button>
+        )}
+      </div>
+    );
   }
 
   return (
