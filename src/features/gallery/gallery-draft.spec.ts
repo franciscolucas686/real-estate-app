@@ -19,6 +19,8 @@ function image(overrides: Partial<DraftImage> = {}): DraftImage {
     label: null,
     roomId: null,
     originalRoomId: null,
+    isMain: false,
+    originalIsMain: false,
     isNew: false,
     deleted: false,
     ...overrides,
@@ -85,5 +87,88 @@ describe('buildGalleryPatch', () => {
     );
 
     expect(patch.roomsToRename).toEqual([{ roomId: 'r1', name: 'Sala de estar' }]);
+  });
+
+  describe('foto principal', () => {
+    it('não entra no patch quando a escolha não mudou', () => {
+      const patch = buildGalleryPatch(
+        [],
+        [
+          image({ id: 'img-1', isMain: true, originalIsMain: true }),
+          image({ id: 'img-2', isMain: false, originalIsMain: false }),
+        ],
+      );
+
+      expect(patch.mainImage).toBeUndefined();
+    });
+
+    it('escolher outra foto manda a nova, não a antiga', () => {
+      const patch = buildGalleryPatch(
+        [],
+        [
+          image({ id: 'img-1', isMain: false, originalIsMain: true }),
+          image({ id: 'img-2', isMain: true, originalIsMain: false }),
+        ],
+      );
+
+      expect(patch.mainImage).toEqual({ imageId: 'img-2', isMain: true });
+    });
+
+    it('a primeira escolha de um imóvel que não tinha principal', () => {
+      const patch = buildGalleryPatch([], [image({ id: 'img-1', isMain: true })]);
+
+      expect(patch.mainImage).toEqual({ imageId: 'img-1', isMain: true });
+    });
+
+    it('remover a principal manda a remoção, com o id dela', () => {
+      const patch = buildGalleryPatch(
+        [],
+        [image({ id: 'img-1', isMain: false, originalIsMain: true })],
+      );
+
+      expect(patch.mainImage).toEqual({ imageId: 'img-1', isMain: false });
+    });
+
+    // A linha some do banco levando a marcação junto; o `DELETE .../main` depois disso seria
+    // uma chamada contra um id que não existe mais.
+    it('excluir a foto principal não gera também uma remoção de principal', () => {
+      const patch = buildGalleryPatch(
+        [],
+        [image({ id: 'img-1', isMain: false, originalIsMain: true, deleted: true })],
+      );
+
+      expect(patch.mainImage).toBeUndefined();
+      expect(patch.imagesToDelete).toEqual(['img-1']);
+    });
+
+    it('escolher uma foto ainda não enviada manda o id local, junto do upload', () => {
+      const file = new File([], 'nova.jpg');
+      const patch = buildGalleryPatch(
+        [],
+        [image({ id: 'temp-1', isNew: true, isMain: true, file })],
+      );
+
+      expect(patch.mainImage).toEqual({ imageId: 'temp-1', isMain: true });
+      expect(patch.imagesToUpload).toEqual([{ draftId: 'temp-1', roomId: null, file }]);
+    });
+
+    // Marcar uma foto e desistir dela no mesmo rascunho não pode deixar um id fantasma no
+    // patch — e, se não havia principal antes, também não há remoção a mandar.
+    it('marcar e excluir a mesma foto nova não deixa nada no patch', () => {
+      const patch = buildGalleryPatch(
+        [],
+        [
+          image({
+            id: 'temp-1',
+            isNew: true,
+            isMain: true,
+            deleted: true,
+            file: new File([], 'a.jpg'),
+          }),
+        ],
+      );
+
+      expect(patch.mainImage).toBeUndefined();
+    });
   });
 });

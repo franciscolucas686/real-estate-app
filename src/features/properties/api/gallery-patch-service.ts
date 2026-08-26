@@ -4,6 +4,8 @@ import {
   deleteRoom,
   bulkDeletePropertyImages,
   reorderPropertyImages,
+  setMainPropertyImage,
+  unsetMainPropertyImage,
   uploadPropertyImages,
 } from '@/features/properties/api/property-service';
 import type { GalleryPatch } from '@/features/gallery/gallery-draft';
@@ -40,7 +42,8 @@ function resolveRoomId(roomId: string | null, idMap: Map<string, string>): strin
 
 // Executes a GalleryPatch against the API, in the order required to keep the backend
 // consistent: create/rename rooms, move photos out of rooms that are about to be
-// deleted, delete rooms, delete the removed photos, then upload the new ones.
+// deleted, delete rooms, delete the removed photos, upload the new ones, and finally
+// mark the main photo.
 //
 // Deleting a room does not delete its photos — the FK is `onDelete: SetNull`, so they
 // come back as "Sem ambiente" (see `buildGalleryPatch`). That is why the delete step
@@ -79,16 +82,41 @@ export async function executeGalleryPatch(propertyId: string, patch: GalleryPatc
     await bulkDeletePropertyImages(propertyId, patch.imagesToDelete);
   }
 
-  const uploadGroups = new Map<string | null, File[]>();
+  const uploadGroups = new Map<string | null, { draftId: string; file: File }[]>();
   for (const item of patch.imagesToUpload) {
     const resolvedRoomId = resolveRoomId(item.roomId, idMap);
     const list = uploadGroups.get(resolvedRoomId) ?? [];
-    list.push(item.file);
+    list.push({ draftId: item.draftId, file: item.file });
     uploadGroups.set(resolvedRoomId, list);
   }
-  for (const [roomId, files] of uploadGroups) {
-    for (const batch of chunk(files, UPLOAD_BATCH_SIZE)) {
-      await uploadPropertyImages(propertyId, batch, roomId ?? undefined);
+
+  // Id local da foto → id que o banco deu. Vale só para o que subiu nesta chamada; uma foto
+  // que já existia é o próprio id nos dois lados.
+  const imageIdMap = new Map<string, string>();
+
+  for (const [roomId, items] of uploadGroups) {
+    for (const batch of chunk(items, UPLOAD_BATCH_SIZE)) {
+      const uploaded = await uploadPropertyImages(
+        propertyId,
+        batch.map((item) => item.file),
+        roomId ?? undefined,
+      );
+      // Correspondência posicional: o backend devolve as imagens na ordem dos arquivos
+      // enviados (um `createMany` só, com `order` sequencial). É o que dá o id real de uma
+      // foto que o rascunho ainda conhecia por um id local.
+      batch.forEach((item, index) => {
+        const created = uploaded.images[index];
+        if (created) imageIdMap.set(item.draftId, created.id);
+      });
     }
+  }
+
+  // Por último de propósito: a foto escolhida pode ser uma que acabou de ser criada no laço
+  // acima, e antes disso o id dela não existe no servidor.
+  if (patch.mainImage) {
+    const imageId = imageIdMap.get(patch.mainImage.imageId) ?? patch.mainImage.imageId;
+    await (patch.mainImage.isMain
+      ? setMainPropertyImage(propertyId, imageId)
+      : unsetMainPropertyImage(propertyId, imageId));
   }
 }

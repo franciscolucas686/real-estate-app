@@ -113,6 +113,15 @@ export interface PropertyImageDto {
   url: string;
   label: string | null;
   order: number;
+  /**
+   * A foto principal do imóvel — a que abre o carrossel dos cards, o da página de detalhes,
+   * e a capa do link compartilhado.
+   *
+   * No máximo uma foto do imóvel tem `true`, e **nenhuma ter é um estado válido**: é o de
+   * todo imóvel cadastrado antes desta feature. Quem lê nunca deve exigir que exista — sem
+   * principal, cada tela escolhe a primeira foto pela regra de sempre.
+   */
+  isMain: boolean;
   roomName?: string;
 }
 

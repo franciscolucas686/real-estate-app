@@ -304,4 +304,14 @@ export const handlers = [
       { status: 201 },
     );
   }),
+
+  // As duas rotas de foto principal. Devolvem a galeria do imóvel, como a API faz; o que os
+  // testes olham é que a chamada aconteceu e com qual foto.
+  http.patch('/api/properties/:propertyId/images/:imageId/main', () =>
+    HttpResponse.json(mockProperty?.gallery.unassigned ?? []),
+  ),
+
+  http.delete('/api/properties/:propertyId/images/:imageId/main', () =>
+    HttpResponse.json(mockProperty?.gallery.unassigned ?? []),
+  ),
 ];

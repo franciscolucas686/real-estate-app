@@ -4,6 +4,7 @@ import type {
   CreateRoomDto,
   FilterPropertyDto,
   PropertyDetailDto,
+  PropertyImageDto,
   PropertyListResponseDto,
   PropertyStatus,
   ReorderImagesDto,
@@ -94,10 +95,17 @@ export async function uploadPropertyImages(propertyId: string, images: File[], r
   images.forEach((image) => formData.append('images', image));
   if (roomId) formData.append('roomId', roomId);
 
-  return apiFetch<{ images: unknown[]; total: number }>(`/properties/${propertyId}/images`, {
-    method: 'POST',
-    body: formData,
-  });
+  // As imagens voltam **na ordem dos arquivos enviados** — o backend comprime o lote inteiro
+  // e faz um `createMany` só, com `order` sequencial a partir do fim da galeria. É essa
+  // correspondência posicional que deixa `executeGalleryPatch` descobrir o id real de uma
+  // foto que o rascunho ainda conhecia por um id local.
+  return apiFetch<{ images: PropertyImageDto[]; total: number }>(
+    `/properties/${propertyId}/images`,
+    {
+      method: 'POST',
+      body: formData,
+    },
+  );
 }
 
 export async function bulkDeletePropertyImages(propertyId: string, imageIds: string[]) {
@@ -111,6 +119,27 @@ export async function reorderPropertyImages(propertyId: string, payload: Reorder
   return apiFetch<void>(`/properties/${propertyId}/images/reorder`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Define a foto principal do imóvel: a primeira do carrossel dos cards, a primeira da página
+ * de detalhes, e a capa do link compartilhado. Só existe uma por imóvel — o backend rebaixa
+ * a anterior na mesma transação.
+ */
+export async function setMainPropertyImage(propertyId: string, imageId: string) {
+  return apiFetch<PropertyImageDto[]>(`/properties/${propertyId}/images/${imageId}/main`, {
+    method: 'PATCH',
+  });
+}
+
+/**
+ * Devolve o imóvel ao estado sem foto principal, em que cada tela volta a escolher a primeira
+ * foto pela regra de sempre. Idempotente: numa foto que não é a principal, não faz nada.
+ */
+export async function unsetMainPropertyImage(propertyId: string, imageId: string) {
+  return apiFetch<PropertyImageDto[]>(`/properties/${propertyId}/images/${imageId}/main`, {
+    method: 'DELETE',
   });
 }
 

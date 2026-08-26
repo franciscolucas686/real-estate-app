@@ -45,6 +45,9 @@ export function useProperty(id: string) {
               url: img.url,
               label: null,
               order: index,
+              // O card não carrega a marcação — ele já vem com a principal na posição 0, que é
+              // tudo o que este placeholder precisa preservar até a resposta real chegar.
+              isMain: false,
             })),
           },
           details: null,

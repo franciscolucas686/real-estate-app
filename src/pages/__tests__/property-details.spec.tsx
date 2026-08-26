@@ -70,6 +70,7 @@ const WITH_PHOTOS: PropertyDetailDto = {
           url: `https://example.test/${i}.jpg`,
           label: null,
           order: i,
+          isMain: false,
         })),
       },
     ],
@@ -224,6 +225,41 @@ describe('PropertyDetails', () => {
 
     afterEach(() => {
       window.Image = RealImage;
+    });
+
+    /*
+     * O hoist de `flattenGallery`. Todas as superfícies de foto desta página derivam da mesma
+     * lista, então checar a primeira imagem renderizada cobre carrossel, tira, mosaico e a capa
+     * pré-carregada de uma vez.
+     */
+    it('sem principal, a ordem é a de sempre', async () => {
+      render();
+      await screen.findByRole('heading', { level: 1, name: 'Casa' });
+
+      const [primeira] = screen.getAllByRole('img');
+      expect(primeira).toHaveAttribute('src', expect.stringContaining('/0.jpg'));
+    });
+
+    it('a foto principal abre a página, mesmo estando no fim do ambiente', async () => {
+      const room = WITH_PHOTOS.gallery.rooms[0];
+      setMockProperty({
+        ...WITH_PHOTOS,
+        gallery: {
+          ...WITH_PHOTOS.gallery,
+          rooms: [
+            {
+              ...room,
+              images: room.images.map((img, i) => ({ ...img, isMain: i === 5 })),
+            },
+          ],
+        },
+      });
+
+      render();
+      await screen.findByRole('heading', { level: 1, name: 'Casa' });
+
+      const [primeira] = screen.getAllByRole('img');
+      expect(primeira).toHaveAttribute('src', expect.stringContaining('/5.jpg'));
     });
 
     it('a foto principal abre o viewer, não o mosaico', async () => {

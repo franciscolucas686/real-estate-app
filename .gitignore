@@ -13,6 +13,10 @@ dist-ssr
 coverage
 *.local
 
+# Cache do pré-bundling do Vite. Aparece na raiz quando o dev server sobe antes
+# de `node_modules` existir, e é sempre regerado — nunca entra no repositório.
+.vite
+
 # Env files with local/dev secrets — never commit. .env.production only
 # holds a public URL and .env.example is a template, so both are tracked.
 .env.development
