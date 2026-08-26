@@ -1,7 +1,6 @@
 import { Check, Star } from 'lucide-react';
 import { cn } from '@/shared/cn';
 import { imageUrl } from '@/shared/image-url';
-import { useLongPress } from '@/shared/hooks/use-long-press';
 import type { PropertyImageDto } from '@/shared/api/types';
 
 interface GalleryImageProps {
@@ -21,13 +20,13 @@ interface GalleryImageProps {
   isSelected?: boolean;
   onToggle?: (imageId: string) => void;
   /**
-   * Alterna a foto principal do imóvel. Presente só onde a galeria é editável — é ela que
-   * liga tanto o overlay de desktop quanto a ação da folha aberta pelo toque longo.
+   * Alterna a foto principal do imóvel. Presente só onde a galeria é editável, e é ela que o
+   * overlay de desktop chama — no celular quem chama é a folha, com a mesma função.
    */
   onToggleMain?: (imageId: string) => void;
   /**
-   * Abre a folha de ações desta foto. Chamada pelo toque longo, que é o caminho do celular:
-   * lá não há hover para revelar o overlay.
+   * Abre a folha de ações desta foto. É o caminho do celular, onde não há hover para revelar
+   * o overlay: um toque na foto basta.
    */
   onRequestActions?: (imageId: string) => void;
   /** Responsive visibility classes from the parent grid (`photoTileVisibility`). */
@@ -59,13 +58,6 @@ export function GalleryImage({
   onRequestActions,
   className,
 }: GalleryImageProps) {
-  // Desligado em modo de seleção: ali o toque pertence ao checkbox, e abrir uma folha no meio
-  // de uma seleção múltipla seria uma segunda coisa acontecendo no mesmo gesto.
-  const longPressProps = useLongPress({
-    enabled: !selecting && Boolean(onRequestActions),
-    onLongPress: () => onRequestActions?.(image.id),
-  });
-
   /*
    * A estrela fica no canto **direito**: o esquerdo é da bolha de seleção, e as duas aparecem
    * juntas quando se seleciona fotos num imóvel que já tem principal.
@@ -113,16 +105,37 @@ export function GalleryImage({
 
   if (!selecting) {
     return (
-      <div className={cn('group relative aspect-square', className)} {...longPressProps}>
+      <div className={cn('group relative aspect-square', className)}>
         {figure}
+        {onRequestActions && (
+          /*
+           * O caminho do celular: um toque abre a folha de ações. Era um toque longo de 2s, que
+           * disputava o gesto com o menu nativo de imagem do sistema (salvar, copiar,
+           * compartilhar) e por isso nunca teve controle confiável sobre ele.
+           *
+           * Superfície própria, `md:hidden`, em vez de um `onClick` no tile: acima de `md` o
+           * clique na foto tem outro destino (o overlay abaixo alterna a principal direto, sem
+           * folha), e este app decide isso por CSS, não por `useIsDesktop`. Mesmo padrão, do
+           * lado oposto, de `media-open-viewer` em `property-media-carousel.tsx`.
+           */
+          <button
+            type="button"
+            aria-label={`Ações da foto ${position}`}
+            onClick={() => onRequestActions(image.id)}
+            className="absolute inset-0 cursor-pointer rounded-xl md:hidden"
+          />
+        )}
         {onToggleMain && (
           /*
-           * Só a partir de `md`. Abaixo disso não há hover que o revele, e o caminho do
-           * celular é o toque longo — deixá-lo montado e invisível daria um botão que
-           * responde a um toque que ninguém vê.
+           * Só a partir de `md`: abaixo disso não há hover que o revele, e quem responde ao
+           * toque é a superfície acima.
            *
-           * `group-focus-within` acompanha o `group-hover` pelo mesmo motivo que nas setas do
-           * carrossel: sem ele o botão existe para o teclado mas nunca aparece.
+           * **Sem `group-focus-within`.** Ele acompanhava o `group-hover`, como nas setas do
+           * carrossel, e era o que prendia o overlay: depois de um clique de mouse o botão
+           * retém o foco, então `:focus-within` seguia verdadeiro e a foto ficava com o overlay
+           * revelado até o foco sair — somando-se ao overlay da foto sob o cursor. O
+           * `focus-visible` do próprio botão é o que preserva o teclado, e ele faz a distinção
+           * que o `focus-within` não faz: casa com foco por teclado, não com foco por clique.
            */
           <button
             type="button"
@@ -136,7 +149,7 @@ export function GalleryImage({
             className={cn(
               'absolute inset-x-1 bottom-1 hidden items-center justify-center gap-1.5 rounded-lg',
               'bg-black/60 px-2 py-1.5 text-xs font-medium text-white opacity-0 transition-opacity',
-              'md:flex md:group-hover:opacity-100 md:group-focus-within:opacity-100',
+              'md:flex md:group-hover:opacity-100',
               'focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
             )}
           >

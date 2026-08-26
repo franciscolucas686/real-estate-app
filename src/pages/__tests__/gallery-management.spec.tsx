@@ -298,14 +298,17 @@ describe('GalleryManagement — seleção de fotos acessível', () => {
   });
 
   /*
-   * A foto principal. O overlay de hover é o caminho de desktop e é o que o jsdom consegue
-   * acionar — o toque longo depende de um temporizador de ponteiro real, e está coberto em
-   * `shared/hooks/use-long-press.spec.ts`. O que importa aqui é o outro lado: a escolha é
-   * rascunho até o salvar, como todo o resto desta tela.
+   * A foto principal. São duas superfícies mutuamente exclusivas por breakpoint — o overlay de
+   * hover no desktop, um toque na foto no celular —, e o jsdom não aplica CSS, então as duas
+   * existem aqui e cada teste escolhe a sua pelo nome acessível.
+   *
+   * O que o jsdom **não** alcança é o defeito que motivou a última mudança do overlay: ele é
+   * `:hover` e `:focus` sob CSS de verdade. Está no roteiro manual.
    */
   describe('foto principal', () => {
     const definir = (n: number) => `Definir Foto ${n} como foto principal`;
     const remover = (n: number) => `Remover Foto ${n} como foto principal`;
+    const acoes = (n: number) => `Ações da foto ${n}`;
 
     it('marcar uma foto desmarca a anterior', async () => {
       const user = userEvent.setup();
@@ -331,6 +334,69 @@ describe('GalleryManagement — seleção de fotos acessível', () => {
 
       expect(await room.findByRole('button', { name: definir(1) })).toBeInTheDocument();
       expect(room.queryByRole('button', { name: remover(1) })).not.toBeInTheDocument();
+    });
+
+    it('um toque na foto abre a folha, e a ação dela marca a principal', async () => {
+      const user = userEvent.setup();
+      renderWithPhotos();
+      const room = await openRoomManager(user);
+
+      await user.click(await room.findByRole('button', { name: acoes(2) }));
+
+      const folha = within(await screen.findByRole('dialog', { name: 'Foto' }));
+      await user.click(await folha.findByRole('button', { name: /Definir como foto principal/ }));
+
+      // A folha fecha e a foto passa a ser a principal — a mesma escolha que o overlay de
+      // desktop faz, pelo outro caminho.
+      await waitFor(() =>
+        expect(screen.queryByRole('dialog', { name: 'Foto' })).not.toBeInTheDocument(),
+      );
+      expect(await room.findByRole('button', { name: remover(2) })).toBeInTheDocument();
+    });
+
+    it('a folha reflete o estado: numa foto que já é a principal, oferece remover', async () => {
+      const user = userEvent.setup();
+      renderWithPhotos();
+      const room = await openRoomManager(user);
+
+      await user.click(await room.findByRole('button', { name: definir(1) }));
+      await user.click(await room.findByRole('button', { name: acoes(1) }));
+
+      const folha = within(await screen.findByRole('dialog', { name: 'Foto' }));
+      expect(
+        await folha.findByRole('button', { name: /Remover como foto principal/ }),
+      ).toBeInTheDocument();
+    });
+
+    // O conflito que a troca do gesto poderia ter criado: em modo de seleção o toque pertence
+    // ao checkbox, e a folha não pode roubá-lo.
+    it('em modo de seleção o tile não oferece a superfície de ações', async () => {
+      const user = userEvent.setup();
+      renderWithPhotos();
+      const room = await openRoomManager(user);
+      await user.click(await room.findByRole('button', { name: 'Selecionar fotos' }));
+
+      expect(room.queryByRole('button', { name: acoes(1) })).not.toBeInTheDocument();
+
+      // E o toque continua selecionando.
+      await user.click((await screen.findAllByRole('checkbox'))[0]);
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: /Excluir \(1\)/ })).toBeEnabled(),
+      );
+    });
+
+    // As duas superfícies nunca podem aparecer juntas: uma é o caminho do toque, a outra o do
+    // ponteiro, e quem escolhe é o CSS — não há `useIsDesktop` neste app.
+    it('as superfícies de toque e de hover são exclusivas por breakpoint', async () => {
+      const user = userEvent.setup();
+      renderWithPhotos();
+      const room = await openRoomManager(user);
+
+      expect(await room.findByRole('button', { name: acoes(1) })).toHaveClass('md:hidden');
+
+      const overlay = room.getByRole('button', { name: definir(1) });
+      expect(overlay).toHaveClass('hidden');
+      expect(overlay).toHaveClass('md:flex');
     });
 
     // A tela inteira é um rascunho: nada de escolher a capa e a requisição sair sozinha.
