@@ -54,10 +54,33 @@ export default defineConfig(({ mode }) => {
         // todo mundo — dos quais cada aparelho usaria um só.
         workbox: {
           runtimeCaching: [
+            //
+            // **O sufixo do `cacheName` é obrigatório e sobe a cada troca de logo.** `CacheFirst`
+            // sem `maxAgeSeconds`, sobre nomes de arquivo fixos: `logo-128.webp` é asset de
+            // `public/`, então o Vite não o hasheia, e o service worker nunca chega a perguntar à
+            // rede se já tem o arquivo. Sem renomear o cache, quem já abriu o site continuaria
+            // vendo a logo anterior por tempo indefinido — a troca chegaria só em visitante novo.
+            // Um `cacheName` novo é um armazenamento novo, então a primeira requisição vai à rede.
+            // O cache antigo fica órfão até o navegador limpar; são 12 arquivos pequenos.
             {
               urlPattern: ({ url }) => url.pathname.startsWith('/icons/'),
               handler: 'CacheFirst',
-              options: { cacheName: 'brand-icons', expiration: { maxEntries: 12 } },
+              options: { cacheName: 'brand-icons-v2', expiration: { maxEntries: 12 } },
+            },
+            // Mesmo raciocínio da regra acima, aplicado à arte do hero da home
+            // (`pages/home.tsx`): `CacheFirst` de runtime em vez de jogar `webp` no
+            // `globPatterns`. Precachear somaria 543KB ao custo de instalação de **todo**
+            // aparelho — inclusive o celular, que nunca desenha esta imagem, porque ela só
+            // existe acima de `lg`. No runtime paga só quem pediu, e a partir da segunda visita
+            // o hero sobrevive offline em vez de cair na chapa de fundo.
+            //
+            // Cache separado do dos ícones de propósito: são ciclos de vida diferentes — os
+            // ícones saem de `npm run icons`, esta arte não — e um `maxEntries` compartilhado
+            // faria a wallpaper competir por despejo com a logo do boot.
+            {
+              urlPattern: ({ url }) => url.pathname.startsWith('/images/'),
+              handler: 'CacheFirst',
+              options: { cacheName: 'static-images', expiration: { maxEntries: 8 } },
             },
           ],
         },
