@@ -59,6 +59,21 @@ export default defineConfig(({ mode }) => {
               handler: 'CacheFirst',
               options: { cacheName: 'brand-icons', expiration: { maxEntries: 12 } },
             },
+            // Mesmo raciocínio da regra acima, aplicado à arte do hero da home
+            // (`pages/home.tsx`): `CacheFirst` de runtime em vez de jogar `webp` no
+            // `globPatterns`. Precachear somaria 543KB ao custo de instalação de **todo**
+            // aparelho — inclusive o celular, que nunca desenha esta imagem, porque ela só
+            // existe acima de `lg`. No runtime paga só quem pediu, e a partir da segunda visita
+            // o hero sobrevive offline em vez de cair na chapa de fundo.
+            //
+            // Cache separado do dos ícones de propósito: são ciclos de vida diferentes — os
+            // ícones saem de `npm run icons`, esta arte não — e um `maxEntries` compartilhado
+            // faria a wallpaper competir por despejo com a logo do boot.
+            {
+              urlPattern: ({ url }) => url.pathname.startsWith('/images/'),
+              handler: 'CacheFirst',
+              options: { cacheName: 'static-images', expiration: { maxEntries: 8 } },
+            },
           ],
         },
         manifest: {

@@ -23,6 +23,29 @@
          auto-zooming when focusing an input, which is really a font-size problem —
          iOS only zooms for fields under 16px — so the inputs are 16px instead. -->
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- O hero do desktop (`src/pages/home.tsx`) é o elemento LCP de `/` acima de `lg`, e ele é
+         um `background-image`: sem esta linha o navegador só descobre que precisa desses 543KB
+         depois de baixar o bundle, parsear o CSS e calcular o layout. O preload scanner lê o
+         `<head>` antes de tudo isso e faz o download em paralelo.
+
+         O `media` não é enfeite — é o que mantém a promessa de bytes que a escolha de background
+         em vez de `<img>` fez: abaixo de 1024px a media query não casa, o preload não dispara, e
+         o celular continua não pagando por uma arte que não vê. Precisa acompanhar o `lg:` do
+         hero em `home.tsx`; os dois separados viram um download fantasma no tablet.
+
+         A URL tem que ser byte a byte a mesma que o CSS pede. Asset de `public/` não é hasheado
+         pelo Vite, então ela é estável — mas renomear o arquivo sem mexer aqui não dá 404: dá
+         dois downloads, um deles descartado, exatamente o oposto do que esta tag existe para
+         fazer. `fetchpriority="high"` porque a prioridade padrão de imagem é `Low` até o layout
+         provar que ela está no viewport inicial, e aqui já se sabe que está. -->
+    <link
+      rel="preload"
+      as="image"
+      type="image/webp"
+      href="/images/wallpaper_desktop.webp"
+      media="(min-width: 1024px)"
+      fetchpriority="high"
+    />
     <!-- Não declare `rel="manifest"` aqui. O vite-plugin-pwa injeta o dele no fim do
          `<head>`, e o manifest é declarado uma vez só, em `vite.config.ts` — ver o comentário
          no bloco `VitePWA`. Dois `<link rel="manifest">` fazem o navegador usar o primeiro e

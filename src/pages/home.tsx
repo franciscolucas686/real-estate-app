@@ -47,74 +47,84 @@ export function Home() {
       data-slot="page-home"
       className={cn('flex flex-col bg-background md:pb-0', BOTTOM_NAV_CLEARANCE)}
     >
-      <PageContainer
-        withSafeAreaTop
-        maxWidth="content"
-        className="flex flex-col gap-6 py-10 md:py-16"
-      >
-        <div className="flex flex-col gap-4">
-          <h1 className="text-3xl font-bold leading-tight text-foreground text-balance md:text-5xl">
-            O imóvel certo em Sorocaba e região
-          </h1>
-          <p className="max-w-prose text-base text-foreground-subtle md:text-lg">
-            Casas, apartamentos, terrenos e chácaras verificados um a um. Busque pelo que importa
-            para você e fale direto com quem conhece o bairro.
-          </p>
+      <div className="lg:relative">
+        <div aria-hidden="true" className="relative hidden overflow-hidden bg-[#081828] lg:block">
+          <div className="absolute -inset-16 bg-[url('/images/wallpaper_desktop.webp')] bg-[size:100%_100%] blur-2xl" />
+          <div className="relative mx-auto aspect-[1600/666] w-full max-w-[1600px] bg-[url('/images/wallpaper_desktop.webp')] bg-cover bg-center" />
         </div>
-
-        <form
-          onSubmit={handleSubmit}
-          // The row turns on at `lg`, not `md`. Its rigid parts — two 176px selects, a
-          // ~127px button and the gaps — need 503px before the city field gets anything,
-          // and at 768 there is not that much: the button hung 25px off the right edge and
-          // the page scrolled sideways. 1024 leaves the city field ~409px.
-          className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-raised p-4 shadow-sm lg:flex-row lg:items-end lg:gap-2"
+        <PageContainer
+          withSafeAreaTop
+          maxWidth="content"
+          className="flex flex-col gap-6 pt-10 md:pt-16 lg:absolute lg:inset-x-0 lg:top-[calc(100%*330/630)] lg:py-0"
         >
-          <label className="flex flex-1 flex-col gap-1.5">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Onde
-            </span>
-            <Input
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="Cidade ou bairro"
-            />
-          </label>
+          <div className="flex flex-col gap-4 lg:sr-only">
+            <h1 className="text-3xl font-bold leading-tight text-foreground text-balance md:text-5xl">
+              O imóvel certo em Sorocaba e região
+            </h1>
+            <p className="max-w-prose text-base text-foreground-subtle md:text-lg">
+              Casas, apartamentos, terrenos e chácaras verificados um a um. Busque pelo que importa
+              para você e fale direto com quem conhece o bairro.
+            </p>
+          </div>
 
-          <label className="flex flex-col gap-1.5 lg:w-48">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Negócio
-            </span>
-            <Select value={businessType} onChange={(e) => setBusinessType(e.target.value)}>
-              <option value="">Comprar ou alugar</option>
-              <option value={BusinessType.SALE}>Comprar</option>
-              <option value={BusinessType.RENT}>Alugar</option>
-            </Select>
-          </label>
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col gap-3 rounded-2xl border border-border bg-surface-raised p-4 shadow-sm lg:flex-row lg:items-end lg:gap-2 lg:shadow-lg"
+          >
+            <label className="flex flex-1 flex-col gap-1.5">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Onde
+              </span>
+              <Input
+                value={city}
+                onChange={(e) => setCity(e.target.value)}
+                placeholder="Cidade ou bairro"
+              />
+            </label>
 
-          <label className="flex flex-col gap-1.5 lg:w-44">
-            <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              Tipo
-            </span>
-            <Select value={type} onChange={(e) => setType(e.target.value)}>
-              <option value="">Todos os tipos</option>
-              {Object.values(PropertyType).map((value) => (
-                <option key={value} value={value}>
-                  {PropertyTypeLabel[value]}
-                </option>
-              ))}
-            </Select>
-          </label>
+            <label className="flex flex-col gap-1.5 lg:w-48">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Negócio
+              </span>
+              <Select value={businessType} onChange={(e) => setBusinessType(e.target.value)}>
+                <option value="">Comprar ou alugar</option>
+                <option value={BusinessType.SALE}>Comprar</option>
+                <option value={BusinessType.RENT}>Alugar</option>
+              </Select>
+            </label>
 
-          <Button type="submit" size="md" className="lg:w-auto">
-            <SearchIcon size={18} aria-hidden="true" />
-            Buscar
-          </Button>
-        </form>
+            <label className="flex flex-col gap-1.5 lg:w-44">
+              <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Tipo
+              </span>
+              <Select value={type} onChange={(e) => setType(e.target.value)}>
+                <option value="">Todos os tipos</option>
+                {Object.values(PropertyType).map((value) => (
+                  <option key={value} value={value}>
+                    {PropertyTypeLabel[value]}
+                  </option>
+                ))}
+              </Select>
+            </label>
 
-        <ActiveCount />
-      </PageContainer>
+            <Button type="submit" size="md" className="lg:w-auto">
+              <SearchIcon size={18} aria-hidden="true" />
+              Buscar
+            </Button>
+          </form>
+          <ActiveCount />
+        </PageContainer>
+      </div>
 
+      {/* Fora da sobreposição, de propósito. O formulário tem altura fixa e a arte escala com a
+          janela, então tudo que viesse depois dele dentro do palco passearia pela imagem
+          conforme a largura — em 1024px esta linha cairia sobre a faixa navy, cinza sobre azul
+          escuro. Aqui ela fica sempre no fundo da página, depois da arte.
+
+          Os espaçamentos reproduzem exatamente o que havia antes num container só: o `pt-6` é
+          o antigo `gap-6`, e o `pb-10 md:pb-16` é a metade de baixo do antigo `py`. `empty:hidden`
+          porque `ActiveCount` devolve `null` enquanto a contagem não chega — sem isso sobraria
+          um bloco de 64px de padding em volta de nada. */}
       <Highlights
         title="Destaques para comprar"
         businessType={BusinessType.SALE}
