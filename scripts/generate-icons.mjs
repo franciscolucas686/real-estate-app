@@ -20,8 +20,14 @@
  *     atrás.
  *
  * Todo o resto — os ícones `any` do manifest, os favicons e a logo que o app desenha em React —
- * preserva o alpha, e é isso que faz o globo ler como círculo sobre qualquer superfície.
- */
+ * preserva o alpha, e é isso que faz a marca ler como círculo sobre qualquer superfície.
+ *
+ * **Onde a transparência começa, na arte atual:** na borda do disco, não no traço. O selo é
+ * linha navy sobre um interior claro, e as duas navs têm `bg-primary` `#00072d` — com o interior
+ * vazado, os contornos das mãos somem no navy e a marca de 28px da topbar vira uma mancha. Por
+ * isso o `logo-source.png` tem o **disco interno opaco** e alpha só fora dele. Isso não é o bug
+ * antigo do achatamento sobre branco voltando: aquele punha um **quadrado** branco atrás da arte;
+ * este é um disco, e é a arte. */
 import { Buffer } from 'node:buffer';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -34,18 +40,22 @@ const SRC = join(ROOT, 'assets', 'logo-source.png');
 const PUBLIC = join(ROOT, 'public');
 const ICONS = join(PUBLIC, 'icons');
 
-/** A chapa das duas exceções acima. Branco porque o oceano do globo é azul-escuro: sobre
- *  `#f0f1f5` ou sobre o `theme_color` `#00072D` a silhueta circular se dissolve no fundo. */
+/** A chapa das duas exceções acima. Branco porque é a cor do interior do próprio selo: qualquer
+ *  outra apareceria como um anel em volta do disco. Note que a chapa não é o que resolve o
+ *  contraste da marca — isso o disco opaco da arte já faz. Ela existe só pelas duas razões de
+ *  plataforma listadas no docblock. */
 const PLATE = '#ffffff';
 
 /** A máscara do Android garante só os 80% centrais. É a safe zone, não uma margem estética. */
 const MASKABLE_SCALE = 0.8;
 
-/** O iOS aplica a superelipse dele por cima, e o globo encosta na borda do quadrado de origem. */
+/** O iOS aplica a superelipse dele por cima, e a arte encosta na borda do quadrado de origem. */
 const APPLE_SCALE = 0.94;
 
-/** Abaixo disto o downscale de arte fotográfica vira borrão e precisa de sharpen. Vale saber que
- *  isto tem teto na própria arte: um globo fotográfico a 16px é um disco azul, com ou sem filtro. */
+/** Abaixo disto o downscale vira borrão e precisa de sharpen. Vale saber que isto tem teto na
+ *  própria arte: o selo é traço fino, e a 16px ele é um disco claro com uma mancha dentro, com ou
+ *  sem filtro. Se o favicon pequeno precisar de mais presença um dia, o caminho é uma chapa
+ *  escura só nos degraus <= 48 — `onPlate` já aceita isso —, não mexer neste número. */
 const SHARPEN_BELOW = 128;
 
 const png = (pipeline) => pipeline.png({ compressionLevel: 9, effort: 10 });
